@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "node",
+    "runtime",
+    "pallets/prmx-markets",
+    "pallets/prmx-holdings",
+    "pallets/prmx-quote",
+    "pallets/prmx-policy",
+    "pallets/prmx-orderbook-lp",
+    "pallets/prmx-oracle",
+]
+
+[profile.release]
+panic = "unwind"
+lto = true
+
+[profile.production]
+inherits = "release"
+lto = true
+codegen-units = 1

@@ -24,6 +24,7 @@ It replaces the previous generic "location-based" design:
 
 - The real key must **never** be hardcoded in the runtime.
 - Use a placeholder like `<ACCUWEATHER_API_KEY>` and pass it via node config / env.
+- For dev/test mode, a fallback test key may be defined.
 
 ---
 
@@ -52,16 +53,18 @@ For each such market:
 Another offchain worker (or the same one) periodically:
 
 1. Uses the bound AccuWeather Location Key for each market.
-2. Calls AccuWeather historical / current conditions APIs.
-3. Converts precipitation into hourly buckets and calls `submit_rainfall(...)`.
+2. Calls AccuWeather current conditions API with details.
+3. Extracts 24-hour precipitation data and calls `submit_rainfall(...)`.
 
 ### 1.4 Settlement
 
-- Policies only reference `market_id` and coverage window.
+- Policies reference `market_id` and coverage window.
 - At `settle_policy`, PRMX checks rainfall per market using the bound location:
   - *"Did 24h rainfall ever exceed strike during this policy's coverage window?"*
 
-**Customers do not specify lat/lon. They only choose a market, such as "Manila".**
+**Customers do not specify lat/lon for oracle purposes. They choose a market, such as "Manila".**
+
+> **Note:** Policies may store reference lat/lon from the quote request for display purposes, but this is not used for oracle/settlement logic.
 
 ---
 
@@ -73,7 +76,7 @@ To reuse the previous oracle interface, we treat `LocationId` as `MarketId`.
 pub type MarketId = u64;
 pub type LocationId = MarketId;      // alias: one location per market
 
-pub type Millimeters = u32;
+pub type Millimeters = u32;          // scaled by 10, so 12.5mm = 125
 pub type BucketIndex = u64;
 ```
 
@@ -109,8 +112,8 @@ fn bucket_start_time(idx: BucketIndex) -> u64 {
 The oracle pallet maintains a location binding per market.
 
 ```rust
-pub struct MarketLocationInfo {
-    pub accuweather_location_key: AccuWeatherLocationKey,
+pub struct MarketLocationInfo<T: Config> {
+    pub accuweather_location_key: BoundedVec<u8, T::MaxLocationKeyLength>,
     pub center_latitude: i32,      // copied from MarketInfo at bind time
     pub center_longitude: i32,     // copied from MarketInfo at bind time
 }
@@ -157,21 +160,26 @@ GET /locations/v1/cities/geoposition/search
 - **Result:**
   - JSON with a `Key` field used as `accuweather_location_key`.
 
-### 4.2 Historical / Current Conditions for Rainfall Ingestion
+### 4.2 Current Conditions for Rainfall Ingestion
 
-- **Example endpoint for historical hourly precipitation:**
+- **Endpoint for current conditions with precipitation details:**
 
 ```http
-GET /currentconditions/v1/{locationKey}/historical/24
+GET /currentconditions/v1/{locationKey}
     ?apikey=<ACCUWEATHER_API_KEY>
     &details=true
 ```
 
-- For each element in the returned array:
-  - Use `EpochTime` for timestamp (unix seconds).
-  - Use an appropriate precipitation field in mm:
-    - e.g. `PrecipitationSummary.PastHour.Metric.Value`
-    - or `Precipitation.Metric.Value` depending on the exact API.
+- **Response includes:**
+  - `EpochTime` for timestamp (unix seconds)
+  - `PrecipitationSummary.Past24Hours.Metric.Value` - total rainfall in mm over the past 24 hours
+
+- **Parsing:**
+  - Extract `EpochTime` as the observation timestamp
+  - Extract `PrecipitationSummary.Past24Hours.Metric.Value` as rainfall in mm
+  - Convert to scaled integer: `rainfall_mm = (value * 10) as u32`
+
+> **Note:** This endpoint provides 24-hour precipitation summary, which is available on the AccuWeather free/starter tier. The historical hourly endpoint (`/historical/24`) requires a premium subscription.
 
 Node-side workers are responsible for choosing the exact endpoint and field.
 On-chain we only see normalized `timestamp` and `rainfall_mm`.
@@ -197,7 +205,7 @@ Same concept as before, now indexed by `MarketId` (alias `LocationId`).
 ```rust
 pub struct RainBucket {
     pub timestamp: u64,           // aligned bucket start
-    pub rainfall_mm: Millimeters, // rainfall in that hour
+    pub rainfall_mm: Millimeters, // rainfall in that hour (scaled by 10)
 }
 
 RainBuckets: double_map (LocationId, BucketIndex) -> RainBucket;
@@ -223,6 +231,14 @@ RollingState: map LocationId -> Option<RollingWindowState>;
 
 - For a market, `rolling_sum_mm` is the sum of all hourly buckets within the last 24 hours window, relative to `last_bucket_index`.
 
+### 5.4 Oracle Providers
+
+Authorized accounts that can submit rainfall data:
+
+```rust
+OracleProviders: map AccountId -> bool;
+```
+
 ---
 
 ## 6. Config and Origins
@@ -230,7 +246,7 @@ RollingState: map LocationId -> Option<RollingWindowState>;
 ### Config Trait
 
 ```rust
-pub trait Config: frame_system::Config {
+pub trait Config: frame_system::Config + pallet_prmx_markets::Config {
     type RuntimeEvent: From<Event<Self>>
         + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -240,6 +256,13 @@ pub trait Config: frame_system::Config {
     /// Who can govern configuration (if needed).
     type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
+    /// Access to markets pallet for center coordinates
+    type MarketsApi: MarketsAccess;
+
+    /// Maximum length of AccuWeather location key
+    #[pallet::constant]
+    type MaxLocationKeyLength: Get<u32>;
+
     type WeightInfo: WeightInfo;
 }
 ```
@@ -248,8 +271,8 @@ pub trait Config: frame_system::Config {
 
 | Origin | Implementation |
 |--------|----------------|
-| `OracleOrigin` | `EnsureSignedBy<OracleOperators, AccountId>` |
-| `GovernanceOrigin` | `EnsureSignedBy<DaoAdminAccount, AccountId>` or `Root` |
+| `OracleOrigin` | `EnsureSignedBy<OracleOperators, AccountId>` or `EnsureRoot` |
+| `GovernanceOrigin` | `EnsureSignedBy<DaoAdminAccount, AccountId>` or `EnsureRoot` |
 
 ---
 
@@ -269,26 +292,34 @@ fn set_market_location_key(
 
 **Steps:**
 
-1. Ensure origin satisfies `OracleOrigin` or `GovernanceOrigin` (your choice).
+1. Ensure origin satisfies `OracleOrigin` or `GovernanceOrigin`.
 
-2. Use a Markets access trait to read `MarketInfo`:
+2. Use `MarketsApi` to read market info:
    - Confirm the market exists.
    - Retrieve `center_latitude`, `center_longitude`.
 
-3. Write:
+3. Convert key to bounded vec:
+
+   ```rust
+   let bounded_key: BoundedVec<u8, T::MaxLocationKeyLength> = accuweather_location_key
+       .try_into()
+       .map_err(|_| Error::<T>::LocationKeyTooLong)?;
+   ```
+
+4. Write:
 
    ```rust
    MarketLocationConfig::<T>::insert(
        market_id,
        MarketLocationInfo {
-           accuweather_location_key,
+           accuweather_location_key: bounded_key,
            center_latitude,
            center_longitude,
        },
    );
    ```
 
-4. Emit event:
+5. Emit event:
 
    ```rust
    MarketLocationBound { market_id, accuweather_location_key }
@@ -326,7 +357,7 @@ An offchain worker in `pallet_prmx_oracle` should:
    set_market_location_key(market_id, key_bytes)
    ```
 
-> **Note:** The API key is read from offchain configuration. It is **not** stored on-chain.
+> **Note:** The API key is read from offchain configuration (environment variable or offchain storage). It is **not** stored on-chain.
 
 ---
 
@@ -340,18 +371,18 @@ A second offchain worker (or the same one) periodically:
 
 2. For each such market:
    - Take `accuweather_location_key`.
-   - Call an AccuWeather endpoint to get last 24 hours of hourly data:
+   - Call AccuWeather endpoint to get current conditions with 24h precipitation:
 
    ```http
-   GET /currentconditions/v1/{locationKey}/historical/24
+   GET /currentconditions/v1/{locationKey}
        ?apikey=<ACCUWEATHER_API_KEY>&details=true
    ```
 
-3. For each hourly sample:
-   - Extract `EpochTime` (unix seconds).
-   - Extract rainfall in mm for that hour.
+3. Parse response:
+   - Extract `EpochTime` (unix seconds) as observation timestamp.
+   - Extract `PrecipitationSummary.Past24Hours.Metric.Value` as rainfall in mm.
 
-4. For each sample, call:
+4. Submit data:
 
    ```rust
    submit_rainfall(market_id, timestamp, rainfall_mm)
@@ -372,7 +403,9 @@ fn submit_rainfall(
 
 **Steps:**
 
-1. Ensure origin satisfies `OracleOrigin`.
+1. Ensure caller is authorized:
+   - Origin satisfies `OracleOrigin`, OR
+   - Caller is in `OracleProviders` storage map.
 
 2. Ensure `MarketLocationConfig::contains_key(location_id)` (bound market only).
 
@@ -380,21 +413,24 @@ fn submit_rainfall(
    - Not older than `MAX_PAST_DRIFT_SECS` from now.
    - Not more than `MAX_FUTURE_DRIFT_SECS` into the future.
 
-4. Compute:
+4. Enforce rainfall sanity check:
+   - `rainfall_mm <= MAX_RAINFALL_MM` (e.g., 10000 = 1000mm scaled)
+
+5. Compute:
 
    ```rust
    let idx = bucket_index_for_timestamp(timestamp);
    let bucket_start = bucket_start_time(idx);
    ```
 
-5. Load old bucket:
+6. Load old bucket:
 
    ```rust
    let old_bucket = RainBuckets::<T>::get(location_id, idx);
    let old_mm = old_bucket.map(|b| b.rainfall_mm).unwrap_or(0);
    ```
 
-6. Insert / overwrite:
+7. Insert / overwrite:
 
    ```rust
    RainBuckets::<T>::insert(
@@ -407,13 +443,13 @@ fn submit_rainfall(
    );
    ```
 
-7. Call internal:
+8. Call internal:
 
    ```rust
    update_rolling_state(location_id, idx, old_mm, rainfall_mm, now)
    ```
 
-8. Emit event:
+9. Emit event:
 
    ```rust
    RainfallUpdated { location_id, bucket_index: idx, rainfall_mm }
@@ -466,6 +502,12 @@ fn update_rolling_state(
 
    ```rust
    RollingState::<T>::insert(location_id, state);
+   ```
+
+6. Emit event:
+
+   ```rust
+   RollingSumUpdated { location_id, rolling_sum_mm: state.rolling_sum_mm }
    ```
 
 ### 8.4 Pruning Old Buckets
@@ -522,7 +564,9 @@ pub trait RainfallOracle {
 
 **Implementation:**
 
-1. Compute:
+1. Return `None` if market location not configured.
+
+2. Compute:
 
    ```rust
    let window_start = timestamp.saturating_sub(ROLLING_WINDOW_SECS);
@@ -530,7 +574,7 @@ pub trait RainfallOracle {
    let end_idx = bucket_index_for_timestamp(timestamp);
    ```
 
-2. Sum:
+3. Sum:
 
    ```rust
    let mut sum: u64 = 0;
@@ -576,13 +620,13 @@ fn exceeded_threshold_in_window(
 
 ### 9.4 Integration with Markets and Policies
 
-In `pallet_prmx_policy::settle_policy(policy_id)`:
+In `pallet_prmx_policy::settle_policy(policy_id, event_occurred)`:
 
 1. Load `PolicyInfo`, including `market_id`.
 
 2. Load `MarketInfo` with `strike_value`.
 
-3. Call:
+3. Call oracle (or use passed parameter):
 
    ```rust
    let triggered = T::RainfallOracle::exceeded_threshold_in_window(
@@ -591,27 +635,64 @@ In `pallet_prmx_policy::settle_policy(policy_id)`:
        policy.coverage_start,
        policy.coverage_end,
    )?;
+   // Or use: let triggered = event_occurred;
    ```
 
 4. If `triggered` is `true`:
-   - **YES wins**, pay `shares * PAYOUT_PER_SHARE`.
+   - **Policy Token side wins**, pay `shares * PAYOUT_PER_SHARE` to policy holder.
+   - Burn LP tokens for this policy.
 
 5. Else:
-   - **NO wins**, move `PolicyRiskPoolBalance[policy_id]` into `MarketNoResidualPool[market_id]`.
+   - **LP side wins**, automatically distribute pool to LP holders pro-rata.
+   - Burn LP tokens for this policy.
 
-> **Important:** Policies no longer store lat/lon. All geospatial logic is encapsulated at the market level via the AccuWeather binding.
+> **Note:** Settlement uses policy-specific LP tokens and automatic distribution. There is no market-level residual pool; payouts happen immediately at settlement.
 
 ---
 
-## 10. Data Quality and Safety
+## 10. Oracle Provider Management
 
-### 10.1 Multiple Submissions and Corrections
+### 10.1 Add Oracle Provider
+
+```rust
+fn add_oracle_provider(
+    origin,
+    account: AccountId,
+)
+```
+
+**Steps:**
+
+1. Ensure origin satisfies `GovernanceOrigin`.
+2. Insert `OracleProviders::<T>::insert(&account, true)`.
+3. Emit `OracleProviderAdded { account }` event.
+
+### 10.2 Remove Oracle Provider
+
+```rust
+fn remove_oracle_provider(
+    origin,
+    account: AccountId,
+)
+```
+
+**Steps:**
+
+1. Ensure origin satisfies `GovernanceOrigin`.
+2. Remove `OracleProviders::<T>::remove(&account)`.
+3. Emit `OracleProviderRemoved { account }` event.
+
+---
+
+## 11. Data Quality and Safety
+
+### 11.1 Multiple Submissions and Corrections
 
 - Repeated `submit_rainfall` calls for the same `(market_id, bucket_index)` are treated as **corrections**:
   - Overwrite `RainBuckets`.
   - Adjust rolling sum by delta.
 
-### 10.2 Timestamp Drift Limits
+### 11.2 Timestamp Drift Limits
 
 Define constants:
 
@@ -624,25 +705,31 @@ const MAX_FUTURE_DRIFT_SECS: u64 = 2 * 3600;    // e.g. 2 hours
   - `timestamp < now - MAX_PAST_DRIFT_SECS`, or
   - `timestamp > now + MAX_FUTURE_DRIFT_SECS`.
 
-### 10.3 Rainfall Sanity Checks
+### 11.3 Rainfall Sanity Checks
 
-- Optionally reject absurd values:
-  - Example: `rainfall_mm > 1000` for one hour.
-- Threshold can be made configurable via governance.
+- Reject absurd values:
+  - Example: `rainfall_mm > 10000` (1000mm scaled) for one hour.
 
-### 10.4 AccuWeather API Key Handling
+```rust
+const MAX_RAINFALL_MM: u32 = 10000; // 1000mm scaled by 10
+```
+
+### 11.4 AccuWeather API Key Handling
 
 - The key is **never** stored in the runtime or on-chain storage.
-- Offchain workers read the key from environment variables or node config.
+- Offchain workers read the key from:
+  1. Environment variable (`ACCUWEATHER_API_KEY`)
+  2. Offchain local storage
+  3. Dev-mode fallback test key (for testing only)
 - Documentation should always refer to it as `<ACCUWEATHER_API_KEY>`.
 
 ---
 
-## 11. Governance
+## 12. Governance
 
 DAO, via `GovernanceOrigin`, can:
 
-- Control membership of `OracleOrigin` accounts.
+- Control membership of `OracleProviders` accounts via `add_oracle_provider` / `remove_oracle_provider`.
 - Adjust drift limits and sanity thresholds.
 - Potentially control which AccuWeather endpoints and parameters are used (enforced in offchain config rather than on-chain).
 
@@ -653,15 +740,17 @@ DAO, via `GovernanceOrigin`, can:
 
 ---
 
-## 12. Example Runtime Config and AI Implementation Prompt
+## 13. Example Runtime Config and AI Implementation Prompt
 
 ### Example Runtime Config
 
 ```rust
 impl pallet_prmx_oracle::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
-    type OracleOrigin = EnsureSignedBy<OracleOperators, AccountId>;
-    type GovernanceOrigin = EnsureSignedBy<DaoAdminAccount, AccountId>;
+    type OracleOrigin = EnsureRoot<AccountId>;
+    type GovernanceOrigin = EnsureRoot<AccountId>;
+    type MarketsApi = PrmxMarkets;
+    type MaxLocationKeyLength = ConstU32<32>;
     type WeightInfo = ();
 }
 ```
@@ -676,14 +765,20 @@ impl pallet_prmx_oracle::Config for Runtime {
 > - `MarketLocationConfig<MarketId>` → `MarketLocationInfo`
 > - `RainBuckets<(LocationId, BucketIndex)>` → `RainBucket`
 > - `RollingState<LocationId>` → `RollingWindowState`
+> - `OracleProviders<AccountId>` → `bool`
 >
 > **Constants:**
 > - `BUCKET_INTERVAL_SECS = 3600`
 > - `ROLLING_WINDOW_SECS = 24 * 3600`
+> - `MAX_PAST_DRIFT_SECS = 7 * 24 * 3600`
+> - `MAX_FUTURE_DRIFT_SECS = 2 * 3600`
+> - `MAX_RAINFALL_MM = 10000`
 >
 > **Config:**
 > - `type OracleOrigin`
 > - `type GovernanceOrigin`
+> - `type MarketsApi: MarketsAccess`
+> - `type MaxLocationKeyLength: Get<u32>`
 >
 > **Extrinsics:**
 > - `set_market_location_key(market_id, accuweather_location_key)`
@@ -691,12 +786,16 @@ impl pallet_prmx_oracle::Config for Runtime {
 >   - Copies `center_latitude` and `center_longitude` from `pallet_prmx_markets::MarketInfo`.
 > - `submit_rainfall(location_id, timestamp, rainfall_mm)`
 >   - Requires `location_id` to have a `MarketLocationConfig`.
->   - Updates `RainBuckets` and `RollingState` as described in `oracle_design.md`.
+>   - Updates `RainBuckets` and `RollingState` as described.
+> - `add_oracle_provider(account)` - GovernanceOrigin only
+> - `remove_oracle_provider(account)` - GovernanceOrigin only
 >
 > **Offchain worker:**
 > - Scans markets without `MarketLocationConfig`.
 > - Calls AccuWeather Geoposition Search to get Key.
 > - Submits signed tx calling `set_market_location_key`.
+> - Fetches rainfall from `/currentconditions/v1/{locationKey}?details=true`.
+> - Parses `PrecipitationSummary.Past24Hours.Metric.Value` for 24h rainfall.
 >
 > **Trait implementation:**
 > - `RainfallOracle::rolling_sum_mm_at(location_id, timestamp)`

@@ -66,6 +66,20 @@ pub mod pallet {
         Cancelled,
     }
 
+    /// Settlement result for a policy
+    #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[scale_info(skip_type_params(T))]
+    pub struct SettlementResult<T: Config> {
+        /// Whether the rainfall event occurred (exceeded strike threshold)
+        pub event_occurred: bool,
+        /// Amount paid out to policy holder (0 if no event)
+        pub payout_to_holder: T::Balance,
+        /// Amount returned to LP holders (0 if event occurred)
+        pub returned_to_lps: T::Balance,
+        /// Timestamp of settlement (unix seconds)
+        pub settled_at: u64,
+    }
+
     /// Policy information
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
     #[scale_info(skip_type_params(T))]
@@ -186,6 +200,17 @@ pub mod pallet {
         PolicyId,
         T::Balance,
         ValueQuery,
+    >;
+
+    /// Settlement results by policy ID
+    #[pallet::storage]
+    #[pallet::getter(fn settlement_results)]
+    pub type SettlementResults<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        PolicyId,
+        SettlementResult<T>,
+        OptionQuery,
     >;
 
     // =========================================================================
@@ -482,6 +507,14 @@ pub mod pallet {
                 T::HoldingsApi::cleanup_policy_lp_tokens(policy_id)
                     .map_err(|_| Error::<T>::TransferFailed)?;
 
+                // Store settlement result
+                SettlementResults::<T>::insert(policy_id, SettlementResult {
+                    event_occurred: true,
+                    payout_to_holder: payout,
+                    returned_to_lps: T::Balance::zero(),
+                    settled_at: now,
+                });
+
                 Self::deposit_event(Event::PolicySettled {
                     policy_id,
                     payout_to_holder: payout,
@@ -505,6 +538,14 @@ pub mod pallet {
                 PolicyRiskPoolBalance::<T>::insert(policy_id, T::Balance::zero());
                 policy.status = PolicyStatus::Settled;
                 Policies::<T>::insert(policy_id, policy.clone());
+
+                // Store settlement result
+                SettlementResults::<T>::insert(policy_id, SettlementResult {
+                    event_occurred: false,
+                    payout_to_holder: T::Balance::zero(),
+                    returned_to_lps: pool_balance,
+                    settled_at: now,
+                });
 
                 Self::deposit_event(Event::PolicyExpiredNoEvent {
                     policy_id,

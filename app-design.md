@@ -18,7 +18,7 @@ PRMX is a Substrate-based Polkadot appchain (to be deployed via Tanssi) that pro
 
 - https://github.com/paritytech/polkadot-sdk/tree/polkadot-stable2506-2
 
-**If code and this DESIGN.md ever disagree, this document wins.**
+**If code and this app-design.md ever disagree, this document wins.**
 
 ---
 
@@ -360,6 +360,19 @@ pub struct PolicyInfo<T: Config> {
 }
 ```
 
+### 6.2 SettlementResult
+
+When a policy is settled, the outcome is stored for transparency and auditing:
+
+```rust
+pub struct SettlementResult<T: Config> {
+    pub event_occurred: bool,           // whether the rainfall event triggered
+    pub payout_to_holder: T::Balance,   // amount paid to policyholder (if event)
+    pub returned_to_lps: T::Balance,    // amount distributed to LP holders (if no event)
+    pub settled_at: u64,                // unix timestamp of settlement
+}
+```
+
 **Storage in `pallet_prmx_policy`:**
 
 ```rust
@@ -367,6 +380,7 @@ Policies: map PolicyId -> PolicyInfo;
 PoliciesByMarket: map MarketId -> BoundedVec<PolicyId>; // index
 NextPolicyId: PolicyId;
 PolicyRiskPoolBalance: map PolicyId -> Balance;
+SettlementResults: map PolicyId -> SettlementResult;   // settlement outcome storage
 ```
 
 ---
@@ -928,13 +942,15 @@ fn buy_lp(
 - Oracle offchain worker:
   - Uses AccuWeather Geoposition Search to map center coordinates to an AccuWeather Location Key
   - Stores this binding in `MarketLocationConfig[market_id]`
+  - **Submits signed transactions** to update on-chain state directly (DAO sponsors oracle authority)
 - Rainfall ingestion:
-  - For each bound market, oracle worker calls AccuWeather hourly or similar
-  - Stores hourly rainfall in `RainBuckets<(LocationId, BucketIndex)>`
+  - Offchain worker fetches rainfall every ~600 blocks (1 hour with 6-second blocks)
+  - Stores hourly rainfall in `RainBuckets<(LocationId, BucketIndex)>` with block number
   - Maintains `RollingState<LocationId>` with 24h rolling sum
 - `LocationId` is an alias for `MarketId`
+- **Automatic settlement**: Oracle can trigger settlement when thresholds are breached during coverage
 
-**Trait:**
+**RainfallOracle Trait:**
 
 ```rust
 pub trait RainfallOracle {
@@ -952,7 +968,20 @@ pub trait RainfallOracle {
 }
 ```
 
-The policy pallet uses `exceeded_threshold_in_window` at settlement time.
+**PolicySettlement Trait (implemented by policy pallet):**
+
+The oracle pallet uses this trait to coordinate automatic settlement:
+
+```rust
+pub trait PolicySettlement<AccountId> {
+    fn current_time() -> u64;
+    fn get_active_policies_in_window(market_id: MarketId, current_time: u64) -> Vec<PolicyId>;
+    fn get_policy_info(policy_id: PolicyId) -> Option<(MarketId, u64, u64)>;
+    fn trigger_immediate_settlement(policy_id: PolicyId) -> Result<(), DispatchError>;
+}
+```
+
+The policy pallet uses `exceeded_threshold_in_window` at settlement time, and the oracle pallet can call `trigger_immediate_settlement` when a threshold breach is detected during an active coverage period.
 
 ---
 
@@ -960,22 +989,33 @@ The policy pallet uses `exceeded_threshold_in_window` at settlement time.
 
 ### 13.1 Policy Settlement
 
-`settle_policy(policy_id, event_occurred)` in `pallet_prmx_policy`:
+Settlement can be triggered in two ways:
+
+1. **Manual settlement**: Anyone calls `settle_policy(policy_id, event_occurred)` after coverage ends
+2. **Automatic settlement**: Oracle pallet calls `trigger_immediate_settlement(policy_id)` when threshold is breached during coverage
+
+**`settle_policy(policy_id, event_occurred)` in `pallet_prmx_policy`:**
 
 1. Load `PolicyInfo` and `MarketInfo`
 
-2. Ensure policy is `Active` or `Expired`, and coverage window is in the past
+2. Ensure policy is `Active` or `Expired`, and coverage window is in the past (or event occurred during coverage)
 
 3. Use oracle or passed parameter to determine if event occurred:
 
    ```rust
-   // In production, this could come from oracle:
-   // let triggered = T::RainfallOracle::exceeded_threshold_in_window(...)?;
-   // For now, it's passed as parameter
    let triggered = event_occurred;
    ```
 
-4. Compute:
+4. Get current timestamp using `pallet_timestamp`:
+
+   ```rust
+   fn current_timestamp() -> u64 {
+       pallet_timestamp::Pallet::<T>::now()
+           .unique_saturated_into::<u64>() / 1000  // Convert ms to seconds
+   }
+   ```
+
+5. Compute:
 
    ```rust
    let shares = policy.shares;
@@ -988,6 +1028,7 @@ The policy pallet uses `exceeded_threshold_in_window` at settlement time.
 - Transfer `max_payout` from `policy_pool_account(policy_id)` to `policy.holder`
 - Set `PolicyRiskPoolBalance[policy_id] = 0`
 - Mark policy as `Settled`
+- **Store settlement result** in `SettlementResults[policy_id]`
 - **Cleanup LP tokens** (burn all LP tokens for this policy)
 
 **Case B: Event did not occur (LP side wins)**
@@ -995,9 +1036,46 @@ The policy pallet uses `exceeded_threshold_in_window` at settlement time.
 - **Automatically distribute** pool to LP holders pro-rata
 - Set `PolicyRiskPoolBalance[policy_id] = 0`
 - Mark policy as `Settled`
+- **Store settlement result** in `SettlementResults[policy_id]`
 - **Cleanup LP tokens** (burn all LP tokens for this policy)
 
-### 13.2 Automatic LP Distribution
+### 13.2 Settlement Result Storage
+
+After each settlement, the outcome is recorded:
+
+```rust
+SettlementResults::<T>::insert(policy_id, SettlementResult {
+    event_occurred: triggered,
+    payout_to_holder: payout_amount,
+    returned_to_lps: lp_distribution_amount,
+    settled_at: Self::current_timestamp(),
+});
+```
+
+### 13.3 Helper Functions for Automatic Settlement
+
+The policy pallet exposes these functions for oracle integration:
+
+```rust
+/// Get active policies within a coverage window for a market
+pub fn get_active_policies_in_window(market_id: MarketId, current_time: u64) -> Vec<PolicyId> {
+    PoliciesByMarket::<T>::get(market_id)
+        .iter()
+        .filter(|&&policy_id| {
+            if let Some(policy) = Policies::<T>::get(policy_id) {
+                policy.status == PolicyStatus::Active
+                    && current_time >= policy.coverage_start
+                    && current_time <= policy.coverage_end
+            } else {
+                false
+            }
+        })
+        .cloned()
+        .collect()
+}
+```
+
+### 13.4 Automatic LP Distribution
 
 When a policy settles with no event:
 
@@ -1017,7 +1095,7 @@ T::HoldingsApi::distribute_to_lp_holders(
    - Calculate `payout = (holder_shares / total_shares) * pool_balance`
    - Transfer payout from pool account to holder
 
-### 13.3 LP Token Cleanup
+### 13.5 LP Token Cleanup
 
 After settlement (both event and no-event cases):
 
@@ -1100,7 +1178,7 @@ type GovernanceOrigin = DaoOrigin;
 
 ```
 prmx-chain/
-  DESIGN.md
+  app-design.md
   oracle_design.md
   pallets/
     prmx-markets/
@@ -1120,6 +1198,21 @@ prmx-chain/
   node/
     src/chain_spec.rs
     src/service.rs
+  scripts/
+    run-node-dev.sh
+    set-oracle-api-key.mjs
+    test-settlement-at-maturity.mjs      # Test: no event, single LP
+    test-settlement-multiple-lps.mjs     # Test: no event, multiple LP holders
+    test-event-with-unfilled-orders.mjs  # Test: event occurs with unfilled orders
+    test-event-occurs.mjs                # Test: event triggers payout
+    test-full-insurance-cycle.mjs        # Test: complete insurance flow
+  frontend/
+    src/
+      app/           # Next.js pages
+      components/    # React components
+      hooks/         # Custom hooks
+      lib/           # API and utilities
+      types/         # TypeScript types
 ```
 
 ---
@@ -1130,7 +1223,7 @@ prmx-chain/
 
 > You are a senior Substrate engineer working against `polkadot-sdk/tree/polkadot-stable2506-2`.
 >
-> Using `DESIGN.md` as the single source of truth, implement `pallet_prmx_policy` with:
+> Using `app-design.md` as the single source of truth, implement `pallet_prmx_policy` with:
 >
 > **PolicyInfo** as defined in section 6 (with latitude/longitude, premium_paid, max_payout)
 >
@@ -1170,4 +1263,4 @@ prmx-chain/
 
 ---
 
-**If code and `DESIGN.md` ever conflict, `DESIGN.md` is authoritative and the code must be updated.**
+**If code and `app-design.md` ever conflict, `app-design.md` is authoritative and the code must be updated.**

@@ -370,53 +370,61 @@ export function useQuoteRequests() {
 const TRADE_HISTORY_KEY = 'prmx_lp_trade_history';
 
 /**
- * Get trade history from localStorage
+ * Get all trade history from localStorage (unfiltered)
  */
-export function getTradeHistory(address?: string): LpTradeRecord[] {
+export function getAllTradeHistory(): LpTradeRecord[] {
   if (typeof window === 'undefined') return [];
   
   try {
     const stored = localStorage.getItem(TRADE_HISTORY_KEY);
     if (!stored) return [];
-    
-    const allTrades: LpTradeRecord[] = JSON.parse(stored);
-    
-    // Filter by address if provided
-    if (address) {
-      return allTrades.filter(trade => 
-        trade.id.includes(address.slice(0, 10)) || 
-        trade.counterparty === address
-      );
-    }
-    
-    return allTrades;
+    return JSON.parse(stored);
   } catch {
     return [];
   }
 }
 
 /**
+ * Get trade history from localStorage filtered by trader address
+ */
+export function getTradeHistory(traderAddress?: string): LpTradeRecord[] {
+  const allTrades = getAllTradeHistory();
+  
+  // Filter by trader address if provided
+  if (traderAddress) {
+    return allTrades.filter(trade => trade.trader === traderAddress);
+  }
+  
+  return allTrades;
+}
+
+/**
  * Add a trade to history
+ * @param trade - Trade record (must include trader address)
  */
 export function addTradeToHistory(trade: Omit<LpTradeRecord, 'id'>): void {
   if (typeof window === 'undefined') return;
+  if (!trade.trader) {
+    console.warn('addTradeToHistory: trader address is required');
+    return;
+  }
   
-  const trades = getTradeHistory();
+  const trades = getAllTradeHistory();
   const newTrade: LpTradeRecord = {
     ...trade,
-    id: `${trade.timestamp}-${trade.policyId}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `${trade.trader.slice(0, 10)}-${trade.timestamp}-${trade.policyId}-${Math.random().toString(36).slice(2, 8)}`,
   };
   
   trades.unshift(newTrade); // Add to beginning
   
-  // Keep only last 100 trades
+  // Keep only last 100 trades per storage (global limit)
   const trimmed = trades.slice(0, 100);
   
   localStorage.setItem(TRADE_HISTORY_KEY, JSON.stringify(trimmed));
 }
 
 /**
- * Hook to manage trade history
+ * Hook to manage trade history for the current signed-in account
  */
 export function useTradeHistory() {
   const { selectedAccount } = useWalletStore();
@@ -425,26 +433,37 @@ export function useTradeHistory() {
 
   const refresh = useCallback(() => {
     setLoading(true);
-    const history = getTradeHistory();
+    // Filter by signed-in account address
+    const history = getTradeHistory(selectedAccount?.address);
     setTrades(history);
     setLoading(false);
-  }, []);
+  }, [selectedAccount?.address]);
 
   useEffect(() => {
     refresh();
-  }, [refresh, selectedAccount]);
-
-  const addTrade = useCallback((trade: Omit<LpTradeRecord, 'id'>) => {
-    addTradeToHistory(trade);
-    refresh();
   }, [refresh]);
 
+  const addTrade = useCallback((trade: Omit<LpTradeRecord, 'id' | 'trader'>) => {
+    if (!selectedAccount?.address) {
+      console.warn('Cannot add trade: no account selected');
+      return;
+    }
+    addTradeToHistory({
+      ...trade,
+      trader: selectedAccount.address,
+    });
+    refresh();
+  }, [refresh, selectedAccount?.address]);
+
   const clearHistory = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(TRADE_HISTORY_KEY);
+    if (typeof window !== 'undefined' && selectedAccount?.address) {
+      // Only clear trades for the current account
+      const allTrades = getAllTradeHistory();
+      const otherTrades = allTrades.filter(t => t.trader !== selectedAccount.address);
+      localStorage.setItem(TRADE_HISTORY_KEY, JSON.stringify(otherTrades));
       setTrades([]);
     }
-  }, []);
+  }, [selectedAccount?.address]);
 
   return { trades, loading, refresh, addTrade, clearHistory };
 }
@@ -476,8 +495,8 @@ export function useLpPositionOutcomes() {
         api.getLpHoldings(selectedAccount.address),
       ]);
       
-      // Get trade history for cost basis
-      const trades = getTradeHistory();
+      // Get trade history for cost basis (filtered by current account)
+      const trades = getTradeHistory(selectedAccount.address);
       
       const marketMap = new Map(markets.map(m => [m.id, m]));
       const holdingsMap = new Map(holdings.map(h => [h.policyId, h]));

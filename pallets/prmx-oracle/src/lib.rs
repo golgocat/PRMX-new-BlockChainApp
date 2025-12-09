@@ -1465,7 +1465,7 @@ pub mod pallet {
 
         /// Process pending manual fetch requests
         /// Returns true if any requests were processed
-        fn process_pending_fetch_requests(block_number: BlockNumberFor<T>) -> bool {
+        fn process_pending_fetch_requests(_block_number: BlockNumberFor<T>) -> bool {
             // Check for pending fetch requests
             let pending_markets: Vec<_> = PendingFetchRequests::<T>::iter()
                 .map(|(market_id, _)| market_id)

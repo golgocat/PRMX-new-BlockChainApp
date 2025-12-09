@@ -93,6 +93,7 @@ export interface LpTradeRecord {
   pricePerShare: number; // in USDT
   totalAmount: number; // in USDT
   timestamp: number;
+  trader: string; // The account that executed this trade
   counterparty?: string;
   txHash?: string;
 }

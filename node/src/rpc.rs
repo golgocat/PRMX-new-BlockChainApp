@@ -18,6 +18,7 @@ pub struct FullDeps<C, P> {
     /// Transaction pool instance.
     pub pool: Arc<P>,
     /// Whether to deny unsafe calls.
+    #[allow(dead_code)]
     pub deny_unsafe: sc_rpc::DenyUnsafe,
 }
 
@@ -38,7 +39,7 @@ where
     use substrate_frame_rpc_system::{System, SystemApiServer};
 
     let mut module = RpcModule::new(());
-    let FullDeps { client, pool, deny_unsafe } = deps;
+    let FullDeps { client, pool, deny_unsafe: _ } = deps;
 
     module.merge(System::new(client.clone(), pool).into_rpc())?;
     module.merge(TransactionPayment::new(client).into_rpc())?;

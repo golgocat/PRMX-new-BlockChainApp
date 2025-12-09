@@ -206,6 +206,7 @@ Same concept as before, now indexed by `MarketId` (alias `LocationId`).
 pub struct RainBucket {
     pub timestamp: u64,           // aligned bucket start
     pub rainfall_mm: Millimeters, // rainfall in that hour (scaled by 10)
+    pub block_number: u32,        // block when data was recorded
 }
 
 RainBuckets: double_map (LocationId, BucketIndex) -> RainBucket;
@@ -214,6 +215,7 @@ RainBuckets: double_map (LocationId, BucketIndex) -> RainBucket;
 **Interpretation:**
 
 - For market `market_id`, and bucket index `idx`, the record represents rainfall for `[bucket_start_time(idx), bucket_start_time(idx) + 3600)`.
+- `block_number` tracks when the data was written on-chain (useful for auditing and debugging).
 
 ### 5.3 Rolling 24h State Per Market
 
@@ -246,7 +248,10 @@ OracleProviders: map AccountId -> bool;
 ### Config Trait
 
 ```rust
-pub trait Config: frame_system::Config + pallet_prmx_markets::Config {
+pub trait Config: frame_system::Config 
+    + pallet_prmx_markets::Config
+    + frame_system::offchain::CreateSignedTransaction<Call<Self>>
+{
     type RuntimeEvent: From<Event<Self>>
         + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -258,6 +263,9 @@ pub trait Config: frame_system::Config + pallet_prmx_markets::Config {
 
     /// Access to markets pallet for center coordinates
     type MarketsApi: MarketsAccess;
+
+    /// Access to policy pallet for automatic settlement
+    type PolicySettlement: PolicySettlement<Self::AccountId>;
 
     /// Maximum length of AccuWeather location key
     #[pallet::constant]
@@ -363,32 +371,77 @@ An offchain worker in `pallet_prmx_oracle` should:
 
 ## 8. Rainfall Ingestion Per Market
 
-### 8.1 Ingestion Pattern
+### 8.1 Timing Constants
 
-A second offchain worker (or the same one) periodically:
+```rust
+pub const BLOCKS_PER_HOUR: u32 = 600;            // 6-second blocks
+pub const BLOCKS_PER_SETTLEMENT_CHECK: u32 = 10; // Check settlements every 10 blocks
+```
 
-1. Iterates markets that already have `MarketLocationConfig[market_id]` set.
+### 8.2 Ingestion Pattern (Signed OCW Transactions)
 
-2. For each such market:
-   - Take `accuweather_location_key`.
-   - Call AccuWeather endpoint to get current conditions with 24h precipitation:
+The offchain worker automatically fetches rainfall data using **signed transactions**:
+
+1. **Frequency**: Fetches every `BLOCKS_PER_HOUR` blocks (approximately 1 hour)
+
+2. **Key Management**:
+   - Oracle authority key is loaded via node keystore
+   - `KeyTypeId = *b"orcl"` identifies oracle keys
+   - DAO sponsors the oracle authority account with funds for transaction fees
+
+3. **For each market** with `MarketLocationConfig[market_id]` set:
+   - Take `accuweather_location_key`
+   - Call AccuWeather endpoint:
 
    ```http
    GET /currentconditions/v1/{locationKey}
        ?apikey=<ACCUWEATHER_API_KEY>&details=true
    ```
 
-3. Parse response:
-   - Extract `EpochTime` (unix seconds) as observation timestamp.
-   - Extract `PrecipitationSummary.Past24Hours.Metric.Value` as rainfall in mm.
+4. Parse response:
+   - Extract `EpochTime` (unix seconds) as observation timestamp
+   - Extract `PrecipitationSummary.Past24Hours.Metric.Value` as rainfall in mm
 
-4. Submit data:
+5. **Submit signed transaction**:
 
    ```rust
-   submit_rainfall(market_id, timestamp, rainfall_mm)
+   submit_rainfall_from_ocw(market_id, timestamp, rainfall_mm)
    ```
 
-### 8.2 `submit_rainfall` Extrinsic
+### 8.3 Signed Transaction Flow
+
+The runtime must implement `CreateSignedTransaction<Call<Self>>`:
+
+```rust
+impl frame_system::offchain::CreateSignedTransaction<pallet_prmx_oracle::Call<Runtime>> 
+    for Runtime 
+{
+    fn create_signed_transaction<C: AppCrypto<Self::Public, Self::Signature>>(
+        call: pallet_prmx_oracle::Call<Runtime>,
+        public: Self::Public,
+        account: Self::AccountId,
+        nonce: Self::Nonce,
+    ) -> Option<(pallet_prmx_oracle::Call<Runtime>, <Self::Extrinsic as Extrinsic>::SignaturePayload)> {
+        // Implementation
+    }
+}
+```
+
+**Node service loads oracle keys:**
+
+```rust
+const ORACLE_KEY_TYPE: KeyTypeId = KeyTypeId(*b"orcl");
+
+fn insert_oracle_authority_key(keystore: &KeystorePtr) -> Result<(), String> {
+    keystore.sr25519_generate_new(ORACLE_KEY_TYPE, Some("//Alice"))
+        .map_err(|e| format!("Failed to generate oracle key: {:?}", e))?;
+    Ok(())
+}
+```
+
+### 8.4 `submit_rainfall` Extrinsic (Manual)
+
+For manual submissions by authorized oracle providers:
 
 **Signature:**
 
@@ -409,28 +462,9 @@ fn submit_rainfall(
 
 2. Ensure `MarketLocationConfig::contains_key(location_id)` (bound market only).
 
-3. Enforce timestamp constraints:
-   - Not older than `MAX_PAST_DRIFT_SECS` from now.
-   - Not more than `MAX_FUTURE_DRIFT_SECS` into the future.
+3. Enforce timestamp and rainfall sanity checks.
 
-4. Enforce rainfall sanity check:
-   - `rainfall_mm <= MAX_RAINFALL_MM` (e.g., 10000 = 1000mm scaled)
-
-5. Compute:
-
-   ```rust
-   let idx = bucket_index_for_timestamp(timestamp);
-   let bucket_start = bucket_start_time(idx);
-   ```
-
-6. Load old bucket:
-
-   ```rust
-   let old_bucket = RainBuckets::<T>::get(location_id, idx);
-   let old_mm = old_bucket.map(|b| b.rainfall_mm).unwrap_or(0);
-   ```
-
-7. Insert / overwrite:
+4. Insert RainBucket with current block number:
 
    ```rust
    RainBuckets::<T>::insert(
@@ -439,23 +473,37 @@ fn submit_rainfall(
        RainBucket {
            timestamp: bucket_start,
            rainfall_mm,
+           block_number: current_block,
        },
    );
    ```
 
-8. Call internal:
+5. Update rolling state and emit event.
 
-   ```rust
-   update_rolling_state(location_id, idx, old_mm, rainfall_mm, now)
-   ```
+### 8.5 `submit_rainfall_from_ocw` Extrinsic (Automatic)
 
-9. Emit event:
+For submissions from the offchain worker via signed transactions:
 
-   ```rust
-   RainfallUpdated { location_id, bucket_index: idx, rainfall_mm }
-   ```
+**Signature:**
 
-### 8.3 Rolling State Update
+```rust
+fn submit_rainfall_from_ocw(
+    origin,
+    market_id: MarketId,
+    timestamp: u64,
+    rainfall_mm: Millimeters,
+)
+```
+
+**Steps:**
+
+1. Ensure signed origin with account in `OracleProviders`.
+
+2. Same validation and storage logic as `submit_rainfall`.
+
+3. Records block number when data was written.
+
+### 8.6 Rolling State Update
 
 **Internal helper:**
 
@@ -650,9 +698,208 @@ In `pallet_prmx_policy::settle_policy(policy_id, event_occurred)`:
 
 ---
 
-## 10. Oracle Provider Management
+## 10. PolicySettlement Trait
 
-### 10.1 Add Oracle Provider
+The oracle pallet uses this trait to coordinate with the policy pallet for automatic settlement when thresholds are breached during active coverage periods.
+
+### 10.1 Trait Definition
+
+```rust
+pub trait PolicySettlement<AccountId> {
+    /// Get current blockchain timestamp in Unix seconds
+    fn current_time() -> u64;
+
+    /// Get active policies within a coverage window for a market
+    fn get_active_policies_in_window(market_id: MarketId, current_time: u64) -> Vec<PolicyId>;
+
+    /// Get policy info: (market_id, coverage_start, coverage_end)
+    fn get_policy_info(policy_id: PolicyId) -> Option<(MarketId, u64, u64)>;
+
+    /// Trigger immediate settlement for a policy (called when threshold breached)
+    fn trigger_immediate_settlement(policy_id: PolicyId) -> Result<(), DispatchError>;
+}
+```
+
+### 10.2 Implementation by Policy Pallet
+
+The policy pallet implements this trait:
+
+```rust
+impl<T: Config> pallet_prmx_oracle::PolicySettlement<T::AccountId> for Pallet<T> {
+    fn current_time() -> u64 {
+        Self::current_timestamp()
+    }
+
+    fn get_active_policies_in_window(market_id: MarketId, current_time: u64) -> Vec<PolicyId> {
+        PoliciesByMarket::<T>::get(market_id)
+            .iter()
+            .filter(|&&policy_id| {
+                if let Some(policy) = Policies::<T>::get(policy_id) {
+                    policy.status == PolicyStatus::Active
+                        && current_time >= policy.coverage_start
+                        && current_time <= policy.coverage_end
+                } else {
+                    false
+                }
+            })
+            .cloned()
+            .collect()
+    }
+
+    fn get_policy_info(policy_id: PolicyId) -> Option<(MarketId, u64, u64)> {
+        Policies::<T>::get(policy_id)
+            .map(|p| (p.market_id, p.coverage_start, p.coverage_end))
+    }
+
+    fn trigger_immediate_settlement(policy_id: PolicyId) -> Result<(), DispatchError> {
+        Self::settle_policy_internal(policy_id, true)
+    }
+}
+```
+
+---
+
+## 11. ThresholdTriggerLog Storage
+
+When a threshold breach is detected during an active coverage period, the event is logged for auditing and debugging purposes.
+
+### 11.1 Structure
+
+```rust
+pub struct ThresholdTriggerLog<T: Config> {
+    pub policy_id: PolicyId,
+    pub triggered_at: u64,           // Unix timestamp when triggered
+    pub rolling_sum_mm: Millimeters, // Rainfall sum that exceeded threshold
+    pub strike_threshold: Millimeters,
+    pub block_number: BlockNumberFor<T>,
+}
+```
+
+### 11.2 Storage
+
+```rust
+ThresholdTriggerLogs: map u64 -> ThresholdTriggerLog;
+NextTriggerLogId: u64;
+```
+
+### 11.3 Usage
+
+When the oracle pallet detects a threshold breach:
+
+```rust
+let trigger_id = NextTriggerLogId::<T>::get();
+NextTriggerLogId::<T>::put(trigger_id + 1);
+
+let trigger_log = ThresholdTriggerLog {
+    policy_id,
+    triggered_at: current_time,
+    rolling_sum_mm: sum,
+    strike_threshold: strike_mm,
+    block_number: current_block,
+};
+
+ThresholdTriggerLogs::<T>::insert(trigger_id, trigger_log);
+
+Self::deposit_event(Event::ThresholdBreached {
+    market_id,
+    policy_id,
+    rolling_sum_mm: sum,
+    strike_mm,
+});
+```
+
+---
+
+## 12. Automatic Settlement via on_initialize
+
+The oracle pallet implements an `on_initialize` hook that periodically checks for threshold breaches and triggers automatic settlement.
+
+### 12.1 Hook Behavior
+
+```rust
+#[pallet::hooks]
+impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+    fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
+        let block_num: u32 = block_number.unique_saturated_into();
+
+        // Check for settlements every BLOCKS_PER_SETTLEMENT_CHECK blocks
+        let should_check_settlements = block_num % BLOCKS_PER_SETTLEMENT_CHECK == 0;
+
+        if should_check_settlements {
+            Self::check_and_settle_triggered_policies(block_number)
+        } else {
+            Weight::zero()
+        }
+    }
+}
+```
+
+### 12.2 Settlement Check Logic
+
+```rust
+pub fn check_and_settle_triggered_policies(block_number: BlockNumberFor<T>) -> Weight {
+    let current_time = T::PolicySettlement::current_time();
+
+    // For each market with a location config
+    for (market_id, _config) in MarketLocationConfig::<T>::iter() {
+        // Get current rolling sum
+        if let Some(state) = RollingState::<T>::get(market_id) {
+            let rolling_sum = state.rolling_sum_mm;
+
+            // Get market strike value
+            if let Ok(strike_mm) = T::MarketsApi::strike_value(market_id) {
+                // Check if threshold exceeded
+                if rolling_sum >= strike_mm {
+                    // Get active policies for this market
+                    let active_policies = T::PolicySettlement::get_active_policies_in_window(
+                        market_id, 
+                        current_time
+                    );
+
+                    // Trigger settlement for each active policy
+                    for policy_id in active_policies {
+                        if let Some((_, coverage_start, coverage_end)) = 
+                            T::PolicySettlement::get_policy_info(policy_id) 
+                        {
+                            if current_time >= coverage_start && current_time <= coverage_end {
+                                // Log the trigger
+                                let trigger_id = NextTriggerLogId::<T>::get();
+                                NextTriggerLogId::<T>::put(trigger_id + 1);
+                                
+                                ThresholdTriggerLogs::<T>::insert(trigger_id, ThresholdTriggerLog {
+                                    policy_id,
+                                    triggered_at: current_time,
+                                    rolling_sum_mm: rolling_sum,
+                                    strike_threshold: strike_mm,
+                                    block_number,
+                                });
+
+                                // Trigger immediate settlement
+                                let _ = T::PolicySettlement::trigger_immediate_settlement(policy_id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Weight::from_parts(100_000, 0)
+}
+```
+
+### 12.3 Timing Summary
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `BLOCKS_PER_HOUR` | 600 | ~1 hour with 6-second blocks |
+| `BLOCKS_PER_SETTLEMENT_CHECK` | 10 | Check every 10 blocks (~1 minute) |
+
+---
+
+## 13. Oracle Provider Management
+
+### 13.1 Add Oracle Provider
 
 ```rust
 fn add_oracle_provider(
@@ -667,7 +914,7 @@ fn add_oracle_provider(
 2. Insert `OracleProviders::<T>::insert(&account, true)`.
 3. Emit `OracleProviderAdded { account }` event.
 
-### 10.2 Remove Oracle Provider
+### 13.2 Remove Oracle Provider
 
 ```rust
 fn remove_oracle_provider(
@@ -684,15 +931,15 @@ fn remove_oracle_provider(
 
 ---
 
-## 11. Data Quality and Safety
+## 14. Data Quality and Safety
 
-### 11.1 Multiple Submissions and Corrections
+### 14.1 Multiple Submissions and Corrections
 
 - Repeated `submit_rainfall` calls for the same `(market_id, bucket_index)` are treated as **corrections**:
   - Overwrite `RainBuckets`.
   - Adjust rolling sum by delta.
 
-### 11.2 Timestamp Drift Limits
+### 14.2 Timestamp Drift Limits
 
 Define constants:
 
@@ -705,7 +952,7 @@ const MAX_FUTURE_DRIFT_SECS: u64 = 2 * 3600;    // e.g. 2 hours
   - `timestamp < now - MAX_PAST_DRIFT_SECS`, or
   - `timestamp > now + MAX_FUTURE_DRIFT_SECS`.
 
-### 11.3 Rainfall Sanity Checks
+### 14.3 Rainfall Sanity Checks
 
 - Reject absurd values:
   - Example: `rainfall_mm > 10000` (1000mm scaled) for one hour.
@@ -714,7 +961,7 @@ const MAX_FUTURE_DRIFT_SECS: u64 = 2 * 3600;    // e.g. 2 hours
 const MAX_RAINFALL_MM: u32 = 10000; // 1000mm scaled by 10
 ```
 
-### 11.4 AccuWeather API Key Handling
+### 14.4 AccuWeather API Key Handling
 
 - The key is **never** stored in the runtime or on-chain storage.
 - Offchain workers read the key from:
@@ -725,7 +972,7 @@ const MAX_RAINFALL_MM: u32 = 10000; // 1000mm scaled by 10
 
 ---
 
-## 12. Governance
+## 15. Governance
 
 DAO, via `GovernanceOrigin`, can:
 
@@ -740,7 +987,7 @@ DAO, via `GovernanceOrigin`, can:
 
 ---
 
-## 13. Example Runtime Config and AI Implementation Prompt
+## 16. Example Runtime Config and AI Implementation Prompt
 
 ### Example Runtime Config
 
@@ -750,6 +997,7 @@ impl pallet_prmx_oracle::Config for Runtime {
     type OracleOrigin = EnsureRoot<AccountId>;
     type GovernanceOrigin = EnsureRoot<AccountId>;
     type MarketsApi = PrmxMarkets;
+    type PolicySettlement = PrmxPolicy;
     type MaxLocationKeyLength = ConstU32<32>;
     type WeightInfo = ();
 }
@@ -763,13 +1011,17 @@ impl pallet_prmx_oracle::Config for Runtime {
 >
 > **Storage:**
 > - `MarketLocationConfig<MarketId>` → `MarketLocationInfo`
-> - `RainBuckets<(LocationId, BucketIndex)>` → `RainBucket`
+> - `RainBuckets<(LocationId, BucketIndex)>` → `RainBucket` (includes `block_number`)
 > - `RollingState<LocationId>` → `RollingWindowState`
 > - `OracleProviders<AccountId>` → `bool`
+> - `ThresholdTriggerLogs<u64>` → `ThresholdTriggerLog` (for audit)
+> - `NextTriggerLogId` → `u64`
 >
 > **Constants:**
 > - `BUCKET_INTERVAL_SECS = 3600`
 > - `ROLLING_WINDOW_SECS = 24 * 3600`
+> - `BLOCKS_PER_HOUR = 600` (6-second blocks)
+> - `BLOCKS_PER_SETTLEMENT_CHECK = 10`
 > - `MAX_PAST_DRIFT_SECS = 7 * 24 * 3600`
 > - `MAX_FUTURE_DRIFT_SECS = 2 * 3600`
 > - `MAX_RAINFALL_MM = 10000`
@@ -778,28 +1030,39 @@ impl pallet_prmx_oracle::Config for Runtime {
 > - `type OracleOrigin`
 > - `type GovernanceOrigin`
 > - `type MarketsApi: MarketsAccess`
+> - `type PolicySettlement: PolicySettlement<Self::AccountId>`
 > - `type MaxLocationKeyLength: Get<u32>`
 >
 > **Extrinsics:**
 > - `set_market_location_key(market_id, accuweather_location_key)`
 >   - Checks `OracleOrigin` / `GovernanceOrigin`.
 >   - Copies `center_latitude` and `center_longitude` from `pallet_prmx_markets::MarketInfo`.
-> - `submit_rainfall(location_id, timestamp, rainfall_mm)`
+> - `submit_rainfall(location_id, timestamp, rainfall_mm)` - manual submission
 >   - Requires `location_id` to have a `MarketLocationConfig`.
->   - Updates `RainBuckets` and `RollingState` as described.
+>   - Updates `RainBuckets` (with block_number) and `RollingState`.
+> - `submit_rainfall_from_ocw(market_id, timestamp, rainfall_mm)` - signed OCW submission
+>   - Same logic but uses signed transactions from offchain worker.
 > - `add_oracle_provider(account)` - GovernanceOrigin only
 > - `remove_oracle_provider(account)` - GovernanceOrigin only
+>
+> **Hooks:**
+> - `on_initialize`: Every `BLOCKS_PER_SETTLEMENT_CHECK` blocks, check for threshold breaches and trigger automatic settlement via `PolicySettlement::trigger_immediate_settlement`.
 >
 > **Offchain worker:**
 > - Scans markets without `MarketLocationConfig`.
 > - Calls AccuWeather Geoposition Search to get Key.
-> - Submits signed tx calling `set_market_location_key`.
-> - Fetches rainfall from `/currentconditions/v1/{locationKey}?details=true`.
+> - Submits **signed** tx calling `set_market_location_key`.
+> - Every `BLOCKS_PER_HOUR` blocks, fetches rainfall from `/currentconditions/v1/{locationKey}?details=true`.
 > - Parses `PrecipitationSummary.Past24Hours.Metric.Value` for 24h rainfall.
+> - Submits **signed** tx calling `submit_rainfall_from_ocw`.
 >
-> **Trait implementation:**
+> **Trait implementations:**
 > - `RainfallOracle::rolling_sum_mm_at(location_id, timestamp)`
 > - `RainfallOracle::exceeded_threshold_in_window(location_id, strike_mm, coverage_start, coverage_end)`
+>
+> **Runtime requirements:**
+> - Runtime must implement `CreateSignedTransaction<Call<Self>>`
+> - Node service must load oracle authority keys (`KeyTypeId = *b"orcl"`)
 >
 > Assume offchain workers are configured with `<ACCUWEATHER_API_KEY>` but never store it on-chain.
 

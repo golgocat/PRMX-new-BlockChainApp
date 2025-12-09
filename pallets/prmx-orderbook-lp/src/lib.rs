@@ -37,7 +37,7 @@ pub trait LpOrderbookApi<AccountId, Balance> {
 pub mod pallet {
     use super::*;
     use frame_support::pallet_prelude::*;
-    use frame_support::traits::fungibles::{Inspect, Mutate};
+    use frame_support::traits::fungibles::Mutate;
     use frame_support::traits::tokens::Preservation;
     use frame_system::pallet_prelude::*;
     use sp_runtime::traits::Zero;

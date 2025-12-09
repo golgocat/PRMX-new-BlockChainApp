@@ -17,7 +17,6 @@ extern crate alloc;
 
 pub use pallet::*;
 
-use alloc::string::String;
 use alloc::vec::Vec;
 
 /// Trait for accessing quote data from other pallets
@@ -476,7 +475,9 @@ pub mod pallet {
         }
 
         /// Fetch probability from external API
+        /// Note: Currently unused, reserved for future external probability API integration
         #[cfg(feature = "std")]
+        #[allow(dead_code)]
         fn fetch_probability(req: &QuoteRequest<T>) -> Result<PartsPerMillion, &'static str> {
             // Convert lat/lon to floats
             let lat = req.latitude as f64 / 1_000_000.0;

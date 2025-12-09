@@ -5,4 +5,5 @@ export {
   useLpPositionOutcomes, 
   addTradeToHistory,
   getTradeHistory,
+  getAllTradeHistory,
 } from './useChainData';

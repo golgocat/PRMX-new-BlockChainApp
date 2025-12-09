@@ -14,15 +14,14 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 extern crate alloc;
 
 use alloc::vec::Vec;
-use codec::{Decode, Encode, MaxEncodedLen};
-use scale_info::TypeInfo;
+use codec::Encode;
 
 use sp_api::impl_runtime_apis;
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
-    create_runtime_str, generic, impl_opaque_keys,
+    generic, impl_opaque_keys,
     traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, SaturatedConversion, Verify},
     transaction_validity::{TransactionSource, TransactionValidity},
     ApplyExtrinsicResult, MultiSignature,
@@ -38,7 +37,6 @@ use frame_support::{
     weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 };
 use frame_system::EnsureRoot;
-use pallet_grandpa::AuthorityId as GrandpaAuthId;
 
 // Re-export pallets for easy access
 pub use frame_system::Call as SystemCall;
@@ -94,8 +92,8 @@ pub mod opaque {
 /// Runtime version.
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("prmx"),
-    impl_name: create_runtime_str!("prmx-node"),
+    spec_name: alloc::borrow::Cow::Borrowed("prmx"),
+    impl_name: alloc::borrow::Cow::Borrowed("prmx-node"),
     authoring_version: 1,
     spec_version: 100,
     impl_version: 1,
@@ -118,6 +116,7 @@ pub fn native_version() -> sp_version::NativeVersion {
 // =============================================================================
 
 /// We assume that ~10% of the block weight is consumed by `on_initialize` handlers.
+#[allow(dead_code)]
 const AVERAGE_ON_INITIALIZE_RATIO: sp_runtime::Perbill = sp_runtime::Perbill::from_percent(10);
 /// We allow `Normal` extrinsics to fill up the block up to 75%, the rest can be used
 /// by Operational extrinsics.

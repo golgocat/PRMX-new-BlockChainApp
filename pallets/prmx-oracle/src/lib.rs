@@ -23,6 +23,43 @@ extern crate alloc;
 
 pub use pallet::*;
 
+// =============================================================================
+//                     Oracle Authority Crypto Types
+// =============================================================================
+
+/// Key type for oracle authority (used for signing offchain transactions)
+pub const KEY_TYPE: sp_runtime::KeyTypeId = sp_runtime::KeyTypeId(*b"orcl");
+
+/// Crypto module for oracle authority signatures
+pub mod crypto {
+    use super::KEY_TYPE;
+    use sp_core::sr25519::Signature as Sr25519Signature;
+    use sp_runtime::{
+        app_crypto::{app_crypto, sr25519},
+        traits::Verify,
+        MultiSignature, MultiSigner,
+    };
+
+    app_crypto!(sr25519, KEY_TYPE);
+
+    /// Oracle authority ID (public key)
+    pub struct OracleAuthId;
+
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for OracleAuthId {
+        type RuntimeAppPublic = Public;
+        type GenericPublic = sp_core::sr25519::Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+    }
+
+    impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
+        for OracleAuthId
+    {
+        type RuntimeAppPublic = Public;
+        type GenericPublic = sp_core::sr25519::Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+    }
+}
+
 use alloc::vec::Vec;
 use pallet_prmx_markets::MarketId;
 
@@ -69,6 +106,10 @@ pub const BLOCKS_PER_HOUR: u32 = 600;
 /// 600 seconds / 6 seconds = 100 blocks
 pub const BLOCKS_PER_BINDING_CHECK: u32 = 100;
 
+/// Blocks between settlement threshold checks (~1 minute for testing, can be increased in production)
+/// 60 seconds / 6 seconds = 10 blocks
+pub const BLOCKS_PER_SETTLEMENT_CHECK: u32 = 10;
+
 // =============================================================================
 //                          Helper Functions
 // =============================================================================
@@ -99,6 +140,29 @@ pub trait RainfallOracle {
         coverage_start: u64,
         coverage_end: u64,
     ) -> Result<bool, sp_runtime::DispatchError>;
+}
+
+// =============================================================================
+//                          PolicySettlement Trait
+// =============================================================================
+
+/// Policy ID type (must match pallet_prmx_policy::PolicyId)
+pub type PolicyId = u64;
+
+/// Trait for oracle to trigger automatic policy settlements
+pub trait PolicySettlement<AccountId> {
+    /// Get the current blockchain timestamp in seconds
+    fn current_time() -> u64;
+    
+    /// Get all active policies for a market that are currently in their coverage window
+    fn get_active_policies_in_window(market_id: MarketId, current_time: u64) -> Vec<PolicyId>;
+    
+    /// Get policy details: (holder, max_payout_u128, coverage_start, coverage_end, market_id)
+    fn get_policy_info(policy_id: PolicyId) -> Option<(AccountId, u128, u64, u64, MarketId)>;
+    
+    /// Trigger immediate settlement for a policy (called when threshold exceeded)
+    /// Returns Ok(payout_amount_u128) on success
+    fn trigger_immediate_settlement(policy_id: PolicyId) -> Result<u128, sp_runtime::DispatchError>;
 }
 
 #[frame_support::pallet]
@@ -133,6 +197,8 @@ pub mod pallet {
         pub timestamp: u64,
         /// Rainfall amount in mm (scaled by 10, so 12.5mm = 125)
         pub rainfall_mm: Millimeters,
+        /// Block number when this bucket was last updated
+        pub block_number: u32,
     }
 
     /// Rolling window state per oracle_design.md section 5.3
@@ -148,12 +214,45 @@ pub mod pallet {
         pub rolling_sum_mm: Millimeters,
     }
 
+    /// On-chain log of threshold trigger events
+    /// Records comprehensive data when a policy is auto-settled due to threshold breach
+    #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[scale_info(skip_type_params(T))]
+    pub struct ThresholdTriggerLog<T: Config> {
+        /// Unique trigger ID
+        pub trigger_id: u64,
+        /// Market ID where event occurred
+        pub market_id: MarketId,
+        /// Policy ID that was settled
+        pub policy_id: super::PolicyId,
+        /// Unix timestamp when trigger occurred
+        pub triggered_at: u64,
+        /// Block number when trigger occurred
+        pub block_number: BlockNumberFor<T>,
+        /// 24H rolling rainfall sum at trigger time (in tenths of mm)
+        pub rolling_sum_mm: Millimeters,
+        /// Strike threshold that was exceeded (in tenths of mm)
+        pub strike_threshold: Millimeters,
+        /// Policy holder account
+        pub holder: T::AccountId,
+        /// Payout amount to holder (stored as u128)
+        pub payout_amount: u128,
+        /// Market center latitude (scaled by 1e6)
+        pub center_latitude: i32,
+        /// Market center longitude (scaled by 1e6)
+        pub center_longitude: i32,
+    }
+
     // =========================================================================
     //                                  Config
     // =========================================================================
 
     #[pallet::config]
-    pub trait Config: frame_system::Config + pallet_prmx_markets::Config {
+    pub trait Config:
+        frame_system::Config
+        + pallet_prmx_markets::Config
+        + frame_system::offchain::CreateSignedTransaction<Call<Self>>
+    {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Who can submit rainfall data and bind AccuWeather locations
@@ -165,9 +264,15 @@ pub mod pallet {
         /// Access to markets pallet for center coordinates
         type MarketsApi: MarketsAccess;
 
+        /// Access to policy pallet for automatic settlements
+        type PolicySettlement: super::PolicySettlement<Self::AccountId>;
+
         /// Maximum length of AccuWeather location key
         #[pallet::constant]
         type MaxLocationKeyLength: Get<u32>;
+
+        /// Oracle authority ID for signing offchain transactions
+        type AuthorityId: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>;
 
         /// Weight info for extrinsics
         type WeightInfo: WeightInfo;
@@ -230,6 +335,31 @@ pub mod pallet {
     pub type OracleProviders<T: Config> =
         StorageMap<_, Blake2_128Concat, T::AccountId, bool, ValueQuery>;
 
+    /// On-chain threshold trigger logs
+    /// Records all automatic settlements triggered by threshold breaches
+    #[pallet::storage]
+    #[pallet::getter(fn threshold_trigger_logs)]
+    pub type ThresholdTriggerLogs<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        u64, // trigger_id
+        ThresholdTriggerLog<T>,
+        OptionQuery,
+    >;
+
+    /// Next trigger log ID (auto-increment)
+    #[pallet::storage]
+    #[pallet::getter(fn next_trigger_log_id)]
+    pub type NextTriggerLogId<T: Config> = StorageValue<_, u64, ValueQuery>;
+
+    /// Pending manual fetch requests by market ID
+    /// Stores the block number when the request was made
+    /// Used by offchain worker to trigger immediate AccuWeather API fetch
+    #[pallet::storage]
+    #[pallet::getter(fn pending_fetch_requests)]
+    pub type PendingFetchRequests<T: Config> =
+        StorageMap<_, Blake2_128Concat, MarketId, BlockNumberFor<T>, OptionQuery>;
+
     // =========================================================================
     //                                  Events
     // =========================================================================
@@ -257,6 +387,25 @@ pub mod pallet {
         OracleProviderAdded { account: T::AccountId },
         /// Oracle provider removed
         OracleProviderRemoved { account: T::AccountId },
+        /// Threshold triggered - automatic settlement initiated
+        ThresholdTriggered {
+            trigger_id: u64,
+            market_id: MarketId,
+            policy_id: super::PolicyId,
+            rolling_sum_mm: Millimeters,
+            strike_threshold: Millimeters,
+            triggered_at: u64,
+            payout_amount: u128,
+        },
+        /// Manual rainfall fetch requested by DAO
+        RainfallFetchRequested {
+            market_id: MarketId,
+        },
+        /// Manual rainfall fetch completed by offchain worker
+        RainfallFetchCompleted {
+            market_id: MarketId,
+            records_updated: u32,
+        },
     }
 
     // =========================================================================
@@ -285,6 +434,40 @@ pub mod pallet {
         NotOracleProvider,
         /// Invalid coverage window (end must be after start)
         InvalidCoverageWindow,
+        /// Settlement failed
+        SettlementFailed,
+        /// Fetch request already pending for this market
+        FetchAlreadyPending,
+        /// No pending fetch request for this market (unsigned tx validation)
+        NoPendingFetchRequest,
+        /// Invalid unsigned transaction submission
+        InvalidUnsignedSubmission,
+    }
+
+    // =========================================================================
+    //                              Genesis Config
+    // =========================================================================
+
+    /// Genesis configuration for oracle pallet
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        /// Initial oracle providers (accounts authorized to submit rainfall data)
+        pub oracle_providers: Vec<T::AccountId>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            // Register initial oracle providers
+            for account in &self.oracle_providers {
+                OracleProviders::<T>::insert(account, true);
+                log::info!(
+                    target: "prmx-oracle",
+                    "🔐 Genesis: Registered oracle provider"
+                );
+            }
+        }
     }
 
     // =========================================================================
@@ -413,9 +596,13 @@ pub mod pallet {
                 .unwrap_or(0);
 
             // Insert/overwrite bucket
+            let current_block: u32 = frame_system::Pallet::<T>::block_number()
+                .try_into()
+                .unwrap_or(0);
             let bucket = RainBucket {
                 timestamp: bucket_start,
                 rainfall_mm,
+                block_number: current_block,
             };
             RainBuckets::<T>::insert(location_id, idx, bucket);
 
@@ -509,6 +696,7 @@ pub mod pallet {
             let bucket = RainBucket {
                 timestamp: bucket_start_time(bucket_idx),
                 rainfall_mm,
+                block_number: block_num as u32,
             };
             RainBuckets::<T>::insert(market_id, bucket_idx, bucket);
 
@@ -567,6 +755,218 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Request manual rainfall data fetch from AccuWeather for a specific market.
+        /// Only callable by GovernanceOrigin (DAO).
+        /// The offchain worker will process this request and fetch real data.
+        #[pallet::call_index(6)]
+        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        pub fn request_rainfall_fetch(
+            origin: OriginFor<T>,
+            market_id: MarketId,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+
+            // Validate market exists
+            ensure!(
+                pallet_prmx_markets::Markets::<T>::contains_key(market_id),
+                Error::<T>::MarketNotFound
+            );
+
+            // Validate market has location binding
+            ensure!(
+                MarketLocationConfig::<T>::contains_key(market_id),
+                Error::<T>::MarketLocationNotConfigured
+            );
+
+            // Check if there's already a pending request
+            ensure!(
+                !PendingFetchRequests::<T>::contains_key(market_id),
+                Error::<T>::FetchAlreadyPending
+            );
+
+            // Store request with current block number
+            let current_block = frame_system::Pallet::<T>::block_number();
+            PendingFetchRequests::<T>::insert(market_id, current_block);
+
+            log::info!(
+                target: "prmx-oracle",
+                "📥 Manual rainfall fetch requested for market {} at block {:?}",
+                market_id,
+                current_block
+            );
+
+            Self::deposit_event(Event::RainfallFetchRequested { market_id });
+
+            Ok(())
+        }
+
+        /// Complete a manual rainfall fetch by processing fetched data.
+        /// Called by DAO after offchain worker has fetched and stored data.
+        /// This extrinsic allows the DAO to manually submit the AccuWeather data.
+        #[pallet::call_index(7)]
+        #[pallet::weight(Weight::from_parts(50_000, 0))]
+        pub fn complete_rainfall_fetch(
+            origin: OriginFor<T>,
+            market_id: MarketId,
+            rainfall_mm: Millimeters, // The 24h rolling sum from AccuWeather
+        ) -> DispatchResult {
+            // Only governance can complete fetch requests
+            T::GovernanceOrigin::ensure_origin(origin)?;
+
+            // Verify there's a pending fetch request (or allow direct update)
+            // Clear the pending request if it exists
+            PendingFetchRequests::<T>::remove(market_id);
+
+            // Get current time for rolling state updates
+            let now = Self::current_timestamp();
+            let bucket_idx = bucket_index_for_timestamp(now);
+            let bucket_start = bucket_start_time(bucket_idx);
+
+            log::info!(
+                target: "prmx-oracle",
+                "📊 Processing manual rainfall fetch completion for market {} with {} mm",
+                market_id,
+                rainfall_mm as f64 / 10.0
+            );
+
+            // Get old bucket value for delta calculation
+            let _old_mm = RainBuckets::<T>::get(market_id, bucket_idx)
+                .map(|b| b.rainfall_mm)
+                .unwrap_or(0);
+
+            // Insert/overwrite bucket with new data
+            let current_block: u32 = frame_system::Pallet::<T>::block_number()
+                .try_into()
+                .unwrap_or(0);
+            let bucket = RainBucket {
+                timestamp: bucket_start,
+                rainfall_mm,
+                block_number: current_block,
+            };
+            RainBuckets::<T>::insert(market_id, bucket_idx, bucket);
+
+            Self::deposit_event(Event::RainfallUpdated {
+                location_id: market_id,
+                bucket_index: bucket_idx,
+                rainfall_mm,
+            });
+
+            // Update rolling state - set the rolling sum to the provided value
+            // (AccuWeather Past24Hours already gives us the 24h sum)
+            let state = RollingWindowState {
+                last_bucket_index: bucket_idx,
+                oldest_bucket_index: bucket_idx.saturating_sub(24), // ~24 hours of buckets
+                rolling_sum_mm: rainfall_mm,
+            };
+            RollingState::<T>::insert(market_id, state);
+
+            Self::deposit_event(Event::RollingSumUpdated {
+                location_id: market_id,
+                rolling_sum_mm: rainfall_mm,
+            });
+
+            log::info!(
+                target: "prmx-oracle",
+                "✅ Completed rainfall fetch for market {}: rolling sum = {} mm",
+                market_id,
+                rainfall_mm as f64 / 10.0
+            );
+
+            Self::deposit_event(Event::RainfallFetchCompleted {
+                market_id,
+                records_updated: 1,
+            });
+
+            Ok(())
+        }
+
+        /// Update on-chain rainfall data from offchain worker (signed transaction).
+        /// This is called by the offchain worker after fetching real data from AccuWeather.
+        /// The signer must be an authorized oracle provider.
+        #[pallet::call_index(8)]
+        #[pallet::weight(Weight::from_parts(50_000, 0))]
+        pub fn submit_rainfall_from_ocw(
+            origin: OriginFor<T>,
+            market_id: MarketId,
+            rainfall_mm: Millimeters, // The 24h rolling sum from AccuWeather (in tenths of mm)
+        ) -> DispatchResult {
+            // Verify signed by an oracle provider
+            let who = ensure_signed(origin)?;
+            ensure!(
+                OracleProviders::<T>::get(&who),
+                Error::<T>::NotOracleProvider
+            );
+
+            // Validate market exists
+            ensure!(
+                pallet_prmx_markets::Markets::<T>::contains_key(market_id),
+                Error::<T>::MarketNotFound
+            );
+
+            // Sanity check rainfall value (1000mm = 10000 in tenths)
+            ensure!(
+                rainfall_mm <= MAX_RAINFALL_MM,
+                Error::<T>::InvalidRainfallValue
+            );
+
+            // Get current time for rolling state updates
+            let now = Self::current_timestamp();
+            let bucket_idx = bucket_index_for_timestamp(now);
+            let bucket_start = bucket_start_time(bucket_idx);
+
+            log::info!(
+                target: "prmx-oracle",
+                "🤖 OCW signed tx: updating rainfall for market {} with {} mm",
+                market_id,
+                rainfall_mm as f64 / 10.0
+            );
+
+            // Get old bucket value for delta calculation
+            let _old_mm = RainBuckets::<T>::get(market_id, bucket_idx)
+                .map(|b| b.rainfall_mm)
+                .unwrap_or(0);
+
+            // Insert/overwrite bucket with new data
+            let current_block: u32 = frame_system::Pallet::<T>::block_number()
+                .try_into()
+                .unwrap_or(0);
+            let bucket = RainBucket {
+                timestamp: bucket_start,
+                rainfall_mm,
+                block_number: current_block,
+            };
+            RainBuckets::<T>::insert(market_id, bucket_idx, bucket);
+
+            Self::deposit_event(Event::RainfallUpdated {
+                location_id: market_id,
+                bucket_index: bucket_idx,
+                rainfall_mm,
+            });
+
+            // Update rolling state - set the rolling sum to the provided value
+            // (AccuWeather Past24Hours already gives us the 24h sum)
+            let state = RollingWindowState {
+                last_bucket_index: bucket_idx,
+                oldest_bucket_index: bucket_idx.saturating_sub(24),
+                rolling_sum_mm: rainfall_mm,
+            };
+            RollingState::<T>::insert(market_id, state);
+
+            Self::deposit_event(Event::RollingSumUpdated {
+                location_id: market_id,
+                rolling_sum_mm: rainfall_mm,
+            });
+
+            log::info!(
+                target: "prmx-oracle",
+                "✅ OCW updated on-chain rainfall for market {}: {} mm",
+                market_id,
+                rainfall_mm as f64 / 10.0
+            );
+
+            Ok(())
+        }
+
     }
 
     // =========================================================================
@@ -574,6 +974,12 @@ pub mod pallet {
     // =========================================================================
 
     impl<T: Config> Pallet<T> {
+        /// Get current timestamp from PolicySettlement trait (uses pallet_timestamp)
+        pub fn current_timestamp() -> u64 {
+            // Use the PolicySettlement trait to get the real blockchain timestamp
+            T::PolicySettlement::current_time()
+        }
+
         /// Update rolling state after rainfall submission
         /// Per oracle_design.md section 8.3
         fn update_rolling_state(
@@ -678,6 +1084,180 @@ pub mod pallet {
 
             Ok(false)
         }
+
+        /// Check all active policies across all markets and trigger settlements if threshold exceeded
+        /// This is called from on_initialize every BLOCKS_PER_SETTLEMENT_CHECK blocks
+        pub fn check_and_settle_triggered_policies(block_number: BlockNumberFor<T>) -> Weight {
+            use sp_runtime::traits::UniqueSaturatedInto;
+            let _block_num: u32 = block_number.unique_saturated_into();
+            
+            // Get current timestamp from the policy pallet (which has access to pallet_timestamp)
+            let current_time = T::PolicySettlement::current_time();
+            
+            let mut weight = Weight::from_parts(5_000, 0);
+            let mut settlements_triggered = 0u32;
+            
+            // Iterate through all markets
+            let next_market_id = pallet_prmx_markets::NextMarketId::<T>::get();
+            
+            for market_id in 0..next_market_id {
+                // Get rolling state for this market
+                let rolling_state = match RollingState::<T>::get(market_id) {
+                    Some(state) => state,
+                    None => continue, // No rainfall data for this market
+                };
+                
+                // Get strike threshold for this market
+                let strike_threshold = match T::MarketsApi::strike_value(market_id) {
+                    Ok(strike) => strike,
+                    Err(_) => continue, // Market not found
+                };
+                
+                let current_rolling_sum = rolling_state.rolling_sum_mm;
+                
+                // Check if current rainfall exceeds threshold
+                if current_rolling_sum >= strike_threshold {
+                    log::info!(
+                        target: "prmx-oracle",
+                        "⚠️ Threshold breach detected! Market {}: {} mm >= {} mm threshold",
+                        market_id,
+                        current_rolling_sum as f64 / 10.0,
+                        strike_threshold as f64 / 10.0
+                    );
+                    
+                    // Get all active policies in their coverage window for this market
+                    let active_policies = T::PolicySettlement::get_active_policies_in_window(market_id, current_time);
+                    
+                    log::info!(
+                        target: "prmx-oracle",
+                        "🔍 Found {} active policies in coverage window for market {} (current_time={})",
+                        active_policies.len(),
+                        market_id,
+                        current_time
+                    );
+                    
+                    if active_policies.is_empty() {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "⚠️ No active policies to settle for market {} - check coverage windows",
+                            market_id
+                        );
+                    }
+                    
+                    let mut policies_settled_count = 0u32;
+                    
+                    for policy_id in active_policies {
+                        // Get policy info for logging
+                        if let Some((holder, _max_payout, _coverage_start, _coverage_end, _market_id)) = 
+                            T::PolicySettlement::get_policy_info(policy_id) 
+                        {
+                            // Get market coordinates for logging
+                            let (center_lat, center_lon) = T::MarketsApi::center_coordinates(market_id)
+                                .unwrap_or((0, 0));
+                            
+                            // Trigger immediate settlement
+                            match T::PolicySettlement::trigger_immediate_settlement(policy_id) {
+                                Ok(payout_amount) => {
+                                    // Create and store trigger log
+                                    let trigger_id = NextTriggerLogId::<T>::get();
+                                    NextTriggerLogId::<T>::put(trigger_id + 1);
+                                    
+                                    let trigger_log = ThresholdTriggerLog {
+                                        trigger_id,
+                                        market_id,
+                                        policy_id,
+                                        triggered_at: current_time,
+                                        block_number,
+                                        rolling_sum_mm: current_rolling_sum,
+                                        strike_threshold,
+                                        holder: holder.clone(),
+                                        payout_amount,
+                                        center_latitude: center_lat,
+                                        center_longitude: center_lon,
+                                    };
+                                    
+                                    ThresholdTriggerLogs::<T>::insert(trigger_id, trigger_log);
+                                    
+                                    // Emit event
+                                    Self::deposit_event(Event::ThresholdTriggered {
+                                        trigger_id,
+                                        market_id,
+                                        policy_id,
+                                        rolling_sum_mm: current_rolling_sum,
+                                        strike_threshold,
+                                        triggered_at: current_time,
+                                        payout_amount,
+                                    });
+                                    
+                                    settlements_triggered += 1;
+                                    policies_settled_count += 1;
+                                    
+                                    log::info!(
+                                        target: "prmx-oracle",
+                                        "✅ Auto-settled policy {} (trigger_id: {}) - Payout: {} to holder",
+                                        policy_id,
+                                        trigger_id,
+                                        payout_amount
+                                    );
+                                }
+                                Err(e) => {
+                                    log::warn!(
+                                        target: "prmx-oracle",
+                                        "❌ Failed to auto-settle policy {}: {:?}",
+                                        policy_id,
+                                        e
+                                    );
+                                }
+                            }
+                        }
+                        
+                        // Add weight for each policy processed
+                        weight = weight.saturating_add(Weight::from_parts(50_000, 0));
+                    }
+                    
+                    // Reset the rolling state after trigger to continue monitoring for future policies
+                    // This ensures the oracle starts fresh after a threshold event
+                    if policies_settled_count > 0 {
+                        // Reset rolling state to zero
+                        let reset_state = RollingWindowState {
+                            last_bucket_index: rolling_state.last_bucket_index,
+                            oldest_bucket_index: rolling_state.last_bucket_index, // Start fresh
+                            rolling_sum_mm: 0, // Reset to zero
+                        };
+                        RollingState::<T>::insert(market_id, reset_state);
+                        
+                        // Clear old rain buckets for this market
+                        // Keep only the current bucket index as reference point
+                        let _ = RainBuckets::<T>::clear_prefix(market_id, u32::MAX, None);
+                        
+                        log::info!(
+                            target: "prmx-oracle",
+                            "🔄 Reset rainfall data for market {} after settling {} policies",
+                            market_id,
+                            policies_settled_count
+                        );
+                        
+                        Self::deposit_event(Event::RollingSumUpdated {
+                            location_id: market_id,
+                            rolling_sum_mm: 0,
+                        });
+                    }
+                }
+                
+                // Add weight for each market processed
+                weight = weight.saturating_add(Weight::from_parts(10_000, 0));
+            }
+            
+            if settlements_triggered > 0 {
+                log::info!(
+                    target: "prmx-oracle",
+                    "🏁 Settlement check complete: {} policies auto-settled",
+                    settlements_triggered
+                );
+            }
+            
+            weight
+        }
     }
 
     // =========================================================================
@@ -692,23 +1272,22 @@ pub mod pallet {
 
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        /// On initialize hook - bootstrap test data for markets without rainfall data
-        /// Runs every 50 blocks to catch newly created markets
+        /// On initialize hook:
+        /// 1. Bootstrap test data for markets without rainfall data (every 50 blocks)
+        /// 2. Check for threshold breaches and trigger automatic settlements (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
         fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
             use sp_runtime::traits::UniqueSaturatedInto;
             let block_num: u32 = block_number.unique_saturated_into();
             
-            // Run bootstrap check every 50 blocks (or first 5 blocks for initial setup)
-            // This catches newly created markets that don't have data yet
-            if block_num > 5 && block_num % 50 != 0 {
-                return Weight::zero();
-            }
-
-            // In dev mode, add test rainfall data for markets without data
-            // NOTE: We no longer auto-bind mock location keys since we have a real API key
-            // The offchain worker will resolve real AccuWeather location keys
+            let mut weight = Weight::zero();
+            
+            // =========================================================================
+            // Part 1: Bootstrap test data (dev-mode only, every 50 blocks)
+            // =========================================================================
+            let should_bootstrap = block_num <= 5 || block_num % 50 == 0;
+            
             #[cfg(feature = "dev-mode")]
-            {
+            if should_bootstrap {
                 let next_id = pallet_prmx_markets::NextMarketId::<T>::get();
                 
                 for market_id in 0..next_id {
@@ -729,6 +1308,7 @@ pub mod pallet {
                         let bucket = RainBucket {
                             timestamp: bucket_start_time(bucket_idx),
                             rainfall_mm: base_rainfall,
+                            block_number: block_num,
                         };
                         RainBuckets::<T>::insert(market_id, bucket_idx, bucket);
 
@@ -760,9 +1340,20 @@ pub mod pallet {
                         });
                     }
                 }
+                weight = weight.saturating_add(Weight::from_parts(10_000, 0));
+            }
+            
+            // =========================================================================
+            // Part 2: Automatic settlement check (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
+            // =========================================================================
+            let should_check_settlements = block_num % BLOCKS_PER_SETTLEMENT_CHECK == 0;
+            
+            if should_check_settlements {
+                let settlements_weight = Self::check_and_settle_triggered_policies(block_number);
+                weight = weight.saturating_add(settlements_weight);
             }
 
-            Weight::from_parts(10_000, 0)
+            weight
         }
 
         /// Offchain worker entry point
@@ -772,6 +1363,11 @@ pub mod pallet {
             use sp_runtime::traits::UniqueSaturatedInto;
             let block_num: u32 = block_number.unique_saturated_into();
 
+            // =========================================================================
+            // Priority 1: Process pending manual fetch requests (every block)
+            // =========================================================================
+            let has_pending_requests = Self::process_pending_fetch_requests(block_number);
+
             // Determine what operations to run based on block number
             // - Rainfall ingestion: once per hour (every 600 blocks), or first 10 blocks for quick startup
             // - Location binding: every ~10 minutes (every 100 blocks) for new markets
@@ -779,21 +1375,22 @@ pub mod pallet {
             let should_fetch_rainfall = is_startup_window || block_num % BLOCKS_PER_HOUR == 0;
             let should_check_bindings = is_startup_window || block_num % BLOCKS_PER_BINDING_CHECK == 0;
 
-            // Early return if nothing to do this block
-            if !should_fetch_rainfall && !should_check_bindings {
+            // Early return if nothing to do this block (and no pending requests processed)
+            if !should_fetch_rainfall && !should_check_bindings && !has_pending_requests {
                 return;
             }
 
             // Log occasionally to show worker is alive
-            if should_check_bindings || is_startup_window {
-                log::info!(
-                    target: "prmx-oracle",
-                    "Offchain worker at block {} (startup: {}, rainfall: {}, bindings: {})",
+            if should_check_bindings || is_startup_window || has_pending_requests {
+            log::info!(
+                target: "prmx-oracle",
+                    "Offchain worker at block {} (startup: {}, rainfall: {}, bindings: {}, pending: {})",
                     block_num,
                     is_startup_window,
                     should_fetch_rainfall,
-                    should_check_bindings
-                );
+                    should_check_bindings,
+                    has_pending_requests
+            );
             }
 
             // Try to get API key from offchain local storage
@@ -809,25 +1406,14 @@ pub mod pallet {
                         key_preview
                     );
 
-                    // Process markets that need location binding
-                    // More frequent during startup and every ~10 minutes after
-                    if should_check_bindings {
-                        if let Err(e) = Self::process_unbound_markets(&key, block_number) {
+                    // Process markets: resolve bindings AND fetch rainfall
+                    // This combined approach handles both binding resolution and rainfall fetching
+                    // in the same offchain worker invocation to avoid storage persistence issues
+                    if should_check_bindings || should_fetch_rainfall {
+                        if let Err(e) = Self::process_markets_and_fetch_rainfall(&key, block_number, should_fetch_rainfall) {
                             log::warn!(
                                 target: "prmx-oracle",
-                                "Error processing unbound markets: {:?}",
-                                e
-                            );
-                        }
-                    }
-
-                    // Process rainfall ingestion for bound markets
-                    // More frequent during startup and hourly after
-                    if should_fetch_rainfall {
-                        if let Err(e) = Self::process_rainfall_ingestion(&key, block_number) {
-                            log::warn!(
-                                target: "prmx-oracle",
-                                "Error ingesting rainfall data: {:?}",
+                                "Error processing markets: {:?}",
                                 e
                             );
                         }
@@ -846,7 +1432,7 @@ pub mod pallet {
     /// Test API key for development (DO NOT USE IN PRODUCTION)
     /// This is configured in the node for testing purposes only.
     #[cfg(feature = "dev-mode")]
-    pub const TEST_ACCUWEATHER_API_KEY: &[u8] = b"zpka_db8e78f41a5a431483111521abb69a4b_188626e6";
+    pub const TEST_ACCUWEATHER_API_KEY: &[u8] = b"zpka_0e2a1931d6fc4529838aeb766c0b1d50_d101de0d";
 
     impl<T: Config> Pallet<T> {
         /// Get AccuWeather API key from offchain storage or test fallback
@@ -877,148 +1463,295 @@ pub mod pallet {
             None
         }
 
-        /// Process markets without AccuWeather location binding
-        /// Per oracle_design.md section 7.2
-        fn process_unbound_markets(api_key: &[u8], _block_number: BlockNumberFor<T>) -> Result<(), &'static str> {
+        /// Process pending manual fetch requests
+        /// Returns true if any requests were processed
+        fn process_pending_fetch_requests(block_number: BlockNumberFor<T>) -> bool {
+            // Check for pending fetch requests
+            let pending_markets: Vec<_> = PendingFetchRequests::<T>::iter()
+                .map(|(market_id, _)| market_id)
+                .collect();
+
+            if pending_markets.is_empty() {
+                return false;
+            }
+
+            log::info!(
+                target: "prmx-oracle",
+                "📥 Found {} pending fetch request(s) to process",
+                pending_markets.len()
+            );
+
+            // Get API key
+            let api_key = match Self::get_accuweather_api_key() {
+                Some(key) => key,
+                None => {
+                    log::warn!(
+                        target: "prmx-oracle",
+                        "Cannot process pending fetch requests: AccuWeather API key not configured"
+                    );
+                    return false;
+                }
+            };
+
+            let mut processed_any = false;
+
+            for market_id in pending_markets {
+                log::info!(
+                    target: "prmx-oracle",
+                    "🌧️ Processing manual fetch request for market {}",
+                    market_id
+                );
+
+                // Get location info
+                let location_info = match MarketLocationConfig::<T>::get(market_id) {
+                    Some(info) => info,
+                    None => {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "Market {} has no location binding, skipping",
+                            market_id
+                        );
+                        continue;
+                    }
+                };
+
+                let location_key = match core::str::from_utf8(&location_info.accuweather_location_key) {
+                    Ok(key) => key,
+                    Err(_) => {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "Invalid location key encoding for market {}",
+                            market_id
+                        );
+                        continue;
+                    }
+                };
+
+                // Fetch rainfall data from AccuWeather
+                match Self::fetch_accuweather_rainfall(&api_key, location_key) {
+                    Ok(rainfall_data) => {
+                        log::info!(
+                            target: "prmx-oracle",
+                            "✅ Fetched {} rainfall records for market {} from AccuWeather",
+                            rainfall_data.len(),
+                            market_id
+                        );
+
+                        if !rainfall_data.is_empty() {
+                            // Store the fetched data in offchain index
+                            // DAO can then call complete_rainfall_fetch or the data will be displayed
+                            Self::store_fetched_rainfall_data(market_id, rainfall_data.clone());
+                            
+                            // Log the fetched rainfall value for the DAO to see
+                            // The rainfall_data contains (timestamp, rainfall_mm) pairs
+                            // AccuWeather Past24Hours gives us the 24h sum in the first entry
+                            if let Some((_, rainfall_mm)) = rainfall_data.first() {
+                                log::info!(
+                                    target: "prmx-oracle",
+                                    "🌧️ AccuWeather 24h rainfall for market {}: {:.1} mm - DAO can call complete_rainfall_fetch to update on-chain",
+                                    market_id,
+                                    *rainfall_mm as f64 / 10.0
+                                );
+                            }
+                            
+                            processed_any = true;
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "Failed to fetch rainfall for market {}: {}",
+                            market_id,
+                            e
+                        );
+                    }
+                }
+            }
+
+            processed_any
+        }
+
+        /// Store fetched rainfall data in offchain indexed storage for logging/reference
+        fn store_fetched_rainfall_data(
+            market_id: MarketId,
+            rainfall_data: Vec<(u64, Millimeters)>,
+        ) {
+            // Store data in offchain index for reference
+            let key = Self::pending_rainfall_data_key(market_id);
+            let encoded_data = rainfall_data.encode();
+            sp_io::offchain_index::set(&key, &encoded_data);
+            
+            log::info!(
+                target: "prmx-oracle",
+                "📝 Stored {} rainfall records in offchain index for market {}",
+                rainfall_data.len(),
+                market_id
+            );
+        }
+
+        /// Generate offchain index key for pending rainfall data
+        fn pending_rainfall_data_key(market_id: MarketId) -> Vec<u8> {
+            let mut key = b"prmx-oracle::pending-rainfall::".to_vec();
+            key.extend_from_slice(&market_id.to_le_bytes());
+            key
+        }
+
+        /// Combined function: resolve location bindings AND fetch rainfall data
+        /// This handles both in a single pass to avoid storage persistence issues with --tmp
+        fn process_markets_and_fetch_rainfall(
+            api_key: &[u8],
+            _block_number: BlockNumberFor<T>,
+            should_fetch_rainfall: bool,
+        ) -> Result<(), &'static str> {
             use pallet_prmx_markets::Markets;
 
-            // Iterate markets (limit to a few per block for throttling)
             let mut processed = 0u32;
             const MAX_MARKETS_PER_BLOCK: u32 = 3;
 
-            // Get next market ID to iterate
             let next_id = pallet_prmx_markets::NextMarketId::<T>::get();
+            
+            log::info!(
+                target: "prmx-oracle",
+                "🔄 Processing {} markets (fetch_rainfall: {})",
+                next_id,
+                should_fetch_rainfall
+            );
 
             for market_id in 0..next_id {
                 if processed >= MAX_MARKETS_PER_BLOCK {
                     break;
-                }
-
-                // Skip if already bound
-                if MarketLocationConfig::<T>::contains_key(market_id) {
-                    continue;
                 }
 
                 // Get market info
-                if let Some(market) = Markets::<T>::get(market_id) {
+                let market = match Markets::<T>::get(market_id) {
+                    Some(m) => m,
+                    None => continue,
+                };
+
+                // Get center coordinates
+                let lat = market.center_latitude as f64 / 1_000_000.0;
+                let lon = market.center_longitude as f64 / 1_000_000.0;
+
+                // First, try to get location key from offchain local storage
+                let location_key = Self::get_location_key_from_offchain_index(market_id);
+                
+                let location_key: Vec<u8> = match location_key {
+                    Some(key) => {
+                        log::info!(
+                            target: "prmx-oracle",
+                            "📖 Found cached location key for market {}",
+                            market_id
+                        );
+                        key
+                    }
+                    None => {
+                        // Need to resolve location key from AccuWeather
+                        log::info!(
+                            target: "prmx-oracle",
+                            "🔍 Resolving AccuWeather location key for market {} (lat: {}, lon: {})",
+                            market_id,
+                            lat,
+                            lon
+                        );
+                        
+                        match Self::fetch_accuweather_location_key(api_key, lat, lon) {
+                            Ok(key) => {
+                                let key_str = core::str::from_utf8(&key).unwrap_or("invalid");
+                                log::info!(
+                                    target: "prmx-oracle",
+                                    "✅ Resolved AccuWeather location key for market {}: {}",
+                                    market_id,
+                                    key_str
+                                );
+
+                                // Store for future use
+                                let storage_key = Self::location_binding_key(market_id);
+                                sp_io::offchain::local_storage_set(
+                                    sp_core::offchain::StorageKind::PERSISTENT,
+                                    &storage_key,
+                                    &key,
+                                );
+                                
+                                key
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    target: "prmx-oracle",
+                                    "❌ Failed to resolve location key for market {}: {}",
+                                    market_id,
+                                    e
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                };
+
+                // Now fetch rainfall if enabled
+                if should_fetch_rainfall {
+                    let key_str = core::str::from_utf8(&location_key).unwrap_or("invalid");
                     log::info!(
                         target: "prmx-oracle",
-                        "Market {} needs AccuWeather location binding",
-                        market_id
-                    );
-
-                    // Get center coordinates
-                    let lat = market.center_latitude as f64 / 1_000_000.0;
-                    let lon = market.center_longitude as f64 / 1_000_000.0;
-
-                    // Call AccuWeather Geoposition Search
-                    match Self::fetch_accuweather_location_key(api_key, lat, lon) {
-                        Ok(location_key) => {
-                            let key_str = core::str::from_utf8(&location_key).unwrap_or("invalid");
-                            log::info!(
-                                target: "prmx-oracle",
-                                "✅ Resolved AccuWeather location key for market {}: {}",
-                                market_id,
-                                key_str
-                            );
-
-                            // Store location binding via offchain indexing
-                            // This will be picked up by the next block's on_initialize
-                            let key = Self::location_binding_key(market_id);
-                            sp_io::offchain_index::set(&key, &location_key);
-                            
-                            log::info!(
-                                target: "prmx-oracle",
-                                "📝 Stored location binding in offchain index for market {}",
-                                market_id
-                            );
-                        }
-                        Err(e) => {
-                            log::warn!(
-                                target: "prmx-oracle",
-                                "Failed to fetch location key for market {}: {}",
-                                market_id,
-                                e
-                            );
-                        }
-                    }
-
-                    processed += 1;
-                }
-            }
-
-            Ok(())
-        }
-
-        /// Process rainfall ingestion for bound markets
-        /// Prioritizes markets without any data (last 24h bootstrap)
-        fn process_rainfall_ingestion(api_key: &[u8], _block_number: BlockNumberFor<T>) -> Result<(), &'static str> {
-            // Iterate bound markets
-            let mut processed = 0u32;
-            const MAX_MARKETS_PER_BLOCK: u32 = 3;
-
-            let next_id = pallet_prmx_markets::NextMarketId::<T>::get();
-
-            // First pass: prioritize markets without any rolling state (no data yet)
-            for market_id in 0..next_id {
-                if processed >= MAX_MARKETS_PER_BLOCK {
-                    break;
-                }
-
-                // Only process bound markets that have NO data yet
-                if let Some(location_info) = MarketLocationConfig::<T>::get(market_id) {
-                    // Skip if already has data
-                    if RollingState::<T>::contains_key(market_id) {
-                        continue;
-                    }
-
-                    let location_key =
-                        core::str::from_utf8(&location_info.accuweather_location_key)
-                            .map_err(|_| "Invalid location key encoding")?;
-
-                    log::info!(
-                        target: "prmx-oracle",
-                        "🌧️ Fetching initial 24h rainfall for market {} (no data yet)",
-                        market_id
-                    );
-
-                    Self::fetch_and_store_rainfall(api_key, location_key, market_id)?;
-                    processed += 1;
-                }
-            }
-
-            // Second pass: update markets that already have data (regular refresh)
-            for market_id in 0..next_id {
-                if processed >= MAX_MARKETS_PER_BLOCK {
-                    break;
-                }
-
-                if let Some(location_info) = MarketLocationConfig::<T>::get(market_id) {
-                    // Only process markets that already have data
-                    if !RollingState::<T>::contains_key(market_id) {
-                        continue;
-                    }
-
-                    let location_key =
-                        core::str::from_utf8(&location_info.accuweather_location_key)
-                            .map_err(|_| "Invalid location key encoding")?;
-
-                    log::debug!(
-                        target: "prmx-oracle",
-                        "Refreshing rainfall for market {} (location: {})",
+                        "🌧️ Fetching 24h rainfall for market {} from AccuWeather (location: {})",
                         market_id,
-                        location_key
+                        key_str
                     );
 
-                    Self::fetch_and_store_rainfall(api_key, location_key, market_id)?;
-                    processed += 1;
+                    if let Err(e) = Self::fetch_and_store_rainfall(api_key, key_str, market_id) {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "❌ Failed to fetch rainfall for market {}: {}",
+                            market_id,
+                            e
+                        );
+                    }
                 }
+
+                processed += 1;
             }
+
+            log::info!(
+                target: "prmx-oracle",
+                "🔄 Completed processing {} markets",
+                processed
+            );
 
             Ok(())
         }
 
-        /// Fetch rainfall data and store via offchain indexing
+        /// Get location key from offchain indexed storage
+        fn get_location_key_from_offchain_index(market_id: MarketId) -> Option<Vec<u8>> {
+            let key = Self::location_binding_key(market_id);
+            
+            // Read from offchain local storage (where offchain_index::set stores data)
+            let value = sp_io::offchain::local_storage_get(
+                sp_core::offchain::StorageKind::PERSISTENT,
+                &key,
+            );
+            
+            log::info!(
+                target: "prmx-oracle",
+                "📖 Reading offchain index for market {}: found = {}",
+                market_id,
+                value.is_some()
+            );
+            
+            match value {
+                Some(data) if !data.is_empty() => {
+                    let key_str = core::str::from_utf8(&data).unwrap_or("invalid");
+                    log::info!(
+                        target: "prmx-oracle",
+                        "📖 Found offchain location key for market {}: {}",
+                        market_id,
+                        key_str
+                    );
+                    Some(data)
+                }
+                _ => None,
+            }
+        }
+
+        /// Fetch rainfall data and submit signed transaction to update on-chain storage
         fn fetch_and_store_rainfall(
             api_key: &[u8],
             location_key: &str,
@@ -1033,19 +1766,40 @@ pub mod pallet {
                         market_id
                     );
 
-                    // Store rainfall data via offchain indexing
-                    for (timestamp, rainfall_mm) in rainfall_data {
-                        let key = Self::rainfall_data_key(market_id, timestamp);
-                        let value = rainfall_mm.to_le_bytes();
-                        sp_io::offchain_index::set(&key, &value);
-                        
+                    // Get the 24h rainfall value (the first/only entry should be the 24h total)
+                    if let Some((timestamp, rainfall_mm)) = rainfall_data.first() {
                         log::info!(
                             target: "prmx-oracle",
-                            "📝 Stored rainfall {:.1} mm for market {} at timestamp {} in offchain index",
-                            rainfall_mm as f64 / 10.0,
+                            "🌧️ Submitting signed tx to update on-chain: market {} = {:.1} mm",
                             market_id,
-                            timestamp
+                            *rainfall_mm as f64 / 10.0
                         );
+
+                        // Submit signed transaction to update on-chain storage
+                        let result = Self::submit_rainfall_signed_tx(market_id, *rainfall_mm);
+                        
+                        match result {
+                            Ok(()) => {
+                                log::info!(
+                                    target: "prmx-oracle",
+                                    "✅ Signed tx submitted for market {} with {:.1} mm",
+                                    market_id,
+                                    *rainfall_mm as f64 / 10.0
+                                );
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    target: "prmx-oracle",
+                                    "❌ Failed to submit signed tx for market {}: {}",
+                                    market_id,
+                                    e
+                                );
+                                // Also store in offchain index as fallback
+                                let key = Self::rainfall_data_key(market_id, *timestamp);
+                                let value = rainfall_mm.to_le_bytes();
+                                sp_io::offchain_index::set(&key, &value);
+                            }
+                        }
                     }
                 }
                 Err(e) => {
@@ -1059,6 +1813,57 @@ pub mod pallet {
             }
 
             Ok(())
+        }
+
+        /// Submit a signed transaction to update on-chain rainfall data
+        fn submit_rainfall_signed_tx(
+            market_id: MarketId,
+            rainfall_mm: Millimeters,
+        ) -> Result<(), &'static str> {
+            use frame_system::offchain::{Signer, SendSignedTransaction};
+
+            // Get signer from keystore
+            let signer = Signer::<T, T::AuthorityId>::all_accounts();
+            
+            if !signer.can_sign() {
+                log::warn!(
+                    target: "prmx-oracle",
+                    "⚠️ No oracle authority keys found in keystore. Cannot submit signed tx."
+                );
+                return Err("No oracle authority keys in keystore");
+            }
+
+            // Create the call
+            let call = Call::<T>::submit_rainfall_from_ocw {
+                market_id,
+                rainfall_mm,
+            };
+
+            // Send signed transaction
+            let results = signer.send_signed_transaction(|_account| call.clone());
+
+            for (acc, result) in &results {
+                match result {
+                    Ok(()) => {
+                        log::info!(
+                            target: "prmx-oracle",
+                            "✅ Signed tx sent from account {:?}",
+                            acc.id
+                        );
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "❌ Signed tx from account {:?} failed: {:?}",
+                            acc.id,
+                            e
+                        );
+                    }
+                }
+            }
+
+            Err("All signed transactions failed")
         }
 
         /// Generate offchain index key for location binding

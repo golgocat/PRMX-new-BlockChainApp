@@ -61,7 +61,7 @@ export interface QuoteRequest {
 export interface QuoteResult {
   fairPremiumUsdt: bigint;
   premiumUsdt: bigint;
-  breakEvenProbBp: number;
+  probabilityPercent: number; // Event probability in percent * 100 (e.g., 1000 = 10.00%)
 }
 
 // LP Token Types
@@ -81,6 +81,34 @@ export interface LpAskOrder {
   quantity: bigint;
   remaining: bigint;
   createdAt: number;
+}
+
+// Trade History Types
+export interface LpTradeRecord {
+  id: string;
+  type: 'buy' | 'sell';
+  policyId: number;
+  marketName: string;
+  shares: number;
+  pricePerShare: number; // in USDT
+  totalAmount: number; // in USDT
+  timestamp: number;
+  counterparty?: string;
+  txHash?: string;
+}
+
+// LP Position Outcome
+export interface LpPositionOutcome {
+  policyId: number;
+  marketId: number;
+  marketName: string;
+  sharesHeld: number;
+  investmentCost: number; // Total amount paid for LP tokens
+  outcome: 'matured' | 'event_triggered' | 'active';
+  payoutReceived: number; // Amount received (if matured) or 0 (if event triggered)
+  profitLoss: number; // payoutReceived - investmentCost
+  settledAt?: number;
+  eventOccurred?: boolean;
 }
 
 // Oracle Types

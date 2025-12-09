@@ -51,6 +51,7 @@ sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polka
 sp-inherents = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
 sp-io = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
 sp-keyring = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
+sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
 sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
 sp-timestamp = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
 

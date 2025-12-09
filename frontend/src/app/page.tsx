@@ -166,9 +166,9 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-text-secondary">My Policies</p>
-                  <p className="text-2xl font-bold">{stats.myPolicies}</p>
-                  <p className="text-xs text-text-tertiary mt-1">{stats.myActivePolicies} active</p>
+                  <p className="text-sm text-text-secondary">{isDao ? 'Total Policies' : 'My Policies'}</p>
+                  <p className="text-2xl font-bold">{isDao ? stats.totalPolicies : stats.myPolicies}</p>
+                  <p className="text-xs text-text-tertiary mt-1">{isDao ? stats.activePolicies : stats.myActivePolicies} active</p>
                 </div>
                 <Shield className="w-10 h-10 text-prmx-cyan opacity-50" />
               </div>
@@ -238,12 +238,7 @@ export default function DashboardPage() {
                     <TableEmpty
                       icon={<Shield className="w-8 h-8" />}
                       title="No policies yet"
-                      description="Be the first to get coverage!"
-                      action={
-                        <Link href="/policies/new">
-                          <Button size="sm">Get Coverage</Button>
-                        </Link>
-                      }
+                      description={isDao ? "No policies have been created yet" : "Be the first to get coverage!"}
                     />
                   ) : (
                     recentPolicies.map((policy) => {
@@ -346,8 +341,8 @@ export default function DashboardPage() {
                         <Activity className="w-5 h-5 text-success" />
                       </div>
                       <div>
-                        <p className="font-medium">My Policies</p>
-                        <p className="text-xs text-text-secondary">View and manage your coverage</p>
+                        <p className="font-medium">{isDao ? 'All Policies' : 'My Policies'}</p>
+                        <p className="text-xs text-text-secondary">{isDao ? 'Manage and settle policies' : 'View and manage your coverage'}</p>
                       </div>
                     </div>
                   </div>

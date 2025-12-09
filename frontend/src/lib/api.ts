@@ -239,9 +239,9 @@ export async function getMarkets(): Promise<Market[]> {
         daoMarginBp: data.risk?.daoMarginBp || 2000,
       },
       windowRules: {
-        minDurationSecs: data.windowRules?.minDurationSecs || 86400,
-        maxDurationSecs: data.windowRules?.maxDurationSecs || 604800,
-        minLeadTimeSecs: data.windowRules?.minLeadTimeSecs || 1814400,
+        minDurationSecs: data.windowRules?.minDurationSecs ?? 86400,
+        maxDurationSecs: data.windowRules?.maxDurationSecs ?? 604800,
+        minLeadTimeSecs: data.windowRules?.minLeadTimeSecs ?? 1814400,
       },
     };
   });
@@ -271,9 +271,9 @@ export async function getMarket(marketId: number): Promise<Market | null> {
       daoMarginBp: data.risk?.daoMarginBp || 2000,
     },
     windowRules: {
-      minDurationSecs: data.windowRules?.minDurationSecs || 86400,
-      maxDurationSecs: data.windowRules?.maxDurationSecs || 604800,
-      minLeadTimeSecs: data.windowRules?.minLeadTimeSecs || 1814400,
+      minDurationSecs: data.windowRules?.minDurationSecs ?? 86400,
+      maxDurationSecs: data.windowRules?.maxDurationSecs ?? 604800,
+      minLeadTimeSecs: data.windowRules?.minLeadTimeSecs ?? 1814400,
     },
   };
 }
@@ -358,7 +358,7 @@ export async function getQuoteRequests(): Promise<QuoteRequest[]> {
         result = {
           fairPremiumUsdt: fairPremium,
           premiumUsdt: totalPremium,
-          breakEvenProbBp: probabilityPpm, // Keep as PPM for now, display will convert
+          probabilityPercent: probabilityPpm / 100, // Convert PPM to percent * 100 (e.g., 50000 PPM -> 500 -> 5.00%)
         };
       }
     } catch {}
@@ -526,6 +526,64 @@ export async function getPolicies(): Promise<Policy[]> {
 export async function getPoliciesByHolder(holder: string): Promise<Policy[]> {
   const policies = await getPolicies();
   return policies.filter(p => p.holder === holder);
+}
+
+/**
+ * Derive the policy pool account address
+ * Replicates Substrate's PalletId::into_sub_account_truncating
+ * 
+ * The derivation follows Substrate's logic:
+ * 1. Start with "modl" prefix (4 bytes)
+ * 2. Add PalletId (8 bytes): "prmxplcy"
+ * 3. Add sub-account seed encoded as: "policy" string bytes + policy_id as u32 LE
+ * 4. Pad to 32 bytes with zeros
+ * 5. This becomes the AccountId directly (no hashing for truncating version)
+ */
+export function derivePolicyPoolAddress(policyId: number): string {
+  const { encodeAddress } = require('@polkadot/util-crypto');
+  const { stringToU8a, u8aConcat } = require('@polkadot/util');
+  
+  // "modl" prefix (4 bytes) - standard Substrate pallet account prefix
+  const modlPrefix = stringToU8a('modl');
+  
+  // PALLET_ID = b"prmxplcy" (8 bytes)
+  const palletId = stringToU8a('prmxplcy');
+  
+  // Sub-account seed: "policy" (6 bytes) + policy_id as u32 LE (4 bytes)
+  const policyPrefix = stringToU8a('policy');
+  const policyIdBytes = new Uint8Array(4);
+  new DataView(policyIdBytes.buffer).setUint32(0, policyId, true); // little endian
+  
+  // Combine all parts
+  const combined = u8aConcat(modlPrefix, palletId, policyPrefix, policyIdBytes);
+  
+  // Pad to 32 bytes (AccountId size) with zeros - this is "truncating" behavior
+  const accountBytes = new Uint8Array(32);
+  accountBytes.set(combined.slice(0, Math.min(combined.length, 32)));
+  
+  // Encode as SS58 address (prefix 42 for generic Substrate)
+  return encodeAddress(accountBytes, 42);
+}
+
+/**
+ * Get the policy risk pool balance
+ */
+export async function getPolicyPoolBalance(policyId: number): Promise<bigint> {
+  const api = await getApi();
+  const balance = await api.query.prmxPolicy.policyRiskPoolBalance(policyId);
+  return BigInt(balance.toString());
+}
+
+/**
+ * Get full policy pool info (address + balance)
+ */
+export async function getPolicyPoolInfo(policyId: number): Promise<{
+  address: string;
+  balance: bigint;
+}> {
+  const address = derivePolicyPoolAddress(policyId);
+  const balance = await getPolicyPoolBalance(policyId);
+  return { address, balance };
 }
 
 /**
@@ -816,6 +874,66 @@ export async function getRollingRainfallSum(marketId: number): Promise<{
 }
 
 /**
+ * Individual rainfall bucket data
+ */
+export interface RainBucket {
+  bucketIndex: number;
+  timestamp: Date;
+  rainfallMm: number;
+  blockNumber: number;
+  rawData: Record<string, unknown>; // Raw blockchain data for debugging
+}
+
+/**
+ * Get individual rain bucket readings for a market (past 24 hours)
+ */
+export async function getRainBuckets(marketId: number): Promise<RainBucket[]> {
+  const api = await getApi();
+  
+  // Get rolling state to know the bucket range
+  const rollingState = await getRollingRainfallSum(marketId);
+  if (!rollingState) return [];
+  
+  const { oldestBucketIndex, lastBucketIndex } = rollingState;
+  const buckets: RainBucket[] = [];
+  
+  // Fetch each bucket in the range
+  for (let idx = oldestBucketIndex; idx <= lastBucketIndex; idx++) {
+    try {
+      const bucket = await api.query.prmxOracle.rainBuckets(marketId, idx);
+      
+      if (!(bucket as any).isNone) {
+        const data = (bucket as any).unwrap().toJSON();
+        // Handle both camelCase and snake_case
+        const timestampSecs = data.timestamp ?? data.timestamp;
+        const rainfallMm = data.rainfallMm ?? data.rainfall_mm ?? 0;
+        const blockNumber = data.blockNumber ?? data.block_number ?? 0;
+        
+        buckets.push({
+          bucketIndex: idx,
+          timestamp: new Date(timestampSecs * 1000),
+          rainfallMm: rainfallMm / 10, // Convert from tenths of mm to mm
+          blockNumber,
+          rawData: {
+            marketId,
+            bucketIndex: idx,
+            ...data,
+            _note: 'rainfall_mm is in tenths of mm (e.g., 100 = 10.0mm)',
+          },
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to fetch bucket ${idx} for market ${marketId}:`, err);
+    }
+  }
+  
+  // Sort by timestamp descending (newest first)
+  buckets.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  
+  return buckets;
+}
+
+/**
  * Settlement result for a policy
  */
 export interface SettlementResult {
@@ -841,6 +959,81 @@ export async function getSettlementResult(policyId: number): Promise<SettlementR
     returnedToLps: BigInt(data.returnedToLps || '0'),
     settledAt: data.settledAt,
   };
+}
+
+/**
+ * Threshold trigger log - records automatic settlement events
+ */
+export interface ThresholdTriggerLog {
+  triggerId: number;
+  marketId: number;
+  policyId: number;
+  triggeredAt: number; // Unix timestamp
+  blockNumber: number;
+  rollingSumMm: number; // Rainfall that triggered (in tenths of mm)
+  strikeThreshold: number; // Threshold that was exceeded (in tenths of mm)
+  holder: string;
+  payoutAmount: string; // u128 as string
+  centerLatitude: number;
+  centerLongitude: number;
+}
+
+/**
+ * Get all threshold trigger logs from the chain
+ */
+export async function getThresholdTriggerLogs(): Promise<ThresholdTriggerLog[]> {
+  const api = await getApi();
+  const logs: ThresholdTriggerLog[] = [];
+  
+  try {
+    // Get the next trigger log ID to know how many logs exist
+    const nextIdRaw = await api.query.prmxOracle.nextTriggerLogId();
+    const nextId = (nextIdRaw as any).toNumber?.() ?? Number(nextIdRaw.toString());
+    
+    // Fetch all trigger logs from 0 to nextId-1
+    for (let i = 0; i < nextId; i++) {
+      try {
+        const logData = await api.query.prmxOracle.thresholdTriggerLogs(i);
+        
+        if (!(logData as any).isNone && logData) {
+          const data = (logData as any).unwrap?.()?.toJSON() ?? (logData as any).toJSON();
+          
+          if (data) {
+            logs.push({
+              triggerId: data.triggerId ?? data.trigger_id ?? i,
+              marketId: data.marketId ?? data.market_id ?? 0,
+              policyId: data.policyId ?? data.policy_id ?? 0,
+              triggeredAt: data.triggeredAt ?? data.triggered_at ?? 0,
+              blockNumber: data.blockNumber ?? data.block_number ?? 0,
+              rollingSumMm: data.rollingSumMm ?? data.rolling_sum_mm ?? 0,
+              strikeThreshold: data.strikeThreshold ?? data.strike_threshold ?? 0,
+              holder: data.holder ?? '',
+              payoutAmount: String(data.payoutAmount ?? data.payout_amount ?? '0'),
+              centerLatitude: data.centerLatitude ?? data.center_latitude ?? 0,
+              centerLongitude: data.centerLongitude ?? data.center_longitude ?? 0,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to fetch trigger log ${i}:`, err);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch threshold trigger logs:', err);
+  }
+  
+  // Sort by trigger ID descending (newest first)
+  logs.sort((a, b) => b.triggerId - a.triggerId);
+  
+  return logs;
+}
+
+/**
+ * Get trigger logs for a specific market
+ */
+export async function getThresholdTriggerLogsByMarket(marketId: number): Promise<ThresholdTriggerLog[]> {
+  const allLogs = await getThresholdTriggerLogs();
+  return allLogs.filter(log => log.marketId === marketId);
 }
 
 /**
@@ -943,6 +1136,162 @@ export async function setAccuweatherApiKey(
         }
       });
   });
+}
+
+/**
+ * Request manual rainfall data fetch from AccuWeather (DAO only)
+ * This triggers the offchain worker to fetch real data from the AccuWeather API
+ * for the specified market
+ */
+export async function requestRainfallFetch(
+  signer: KeyringPair,
+  marketId: number
+): Promise<string> {
+  const api = await getApi();
+  
+  console.log(`[API] requestRainfallFetch called: marketId=${marketId}`);
+  
+  // The extrinsic requires GovernanceOrigin (EnsureRoot), so we need to use sudo
+  const innerCall = api.tx.prmxOracle.requestRainfallFetch(marketId);
+  const sudoCall = api.tx.sudo.sudo(innerCall);
+  
+  return new Promise((resolve, reject) => {
+    let unsub: () => void;
+    
+    sudoCall
+      .signAndSend(signer, ({ status, dispatchError, events }) => {
+        console.log(`[API] Transaction status:`, status.type);
+        
+        if (dispatchError) {
+          console.error(`[API] Dispatch error:`, dispatchError.toString());
+          if (dispatchError.isModule) {
+            const decoded = api.registry.findMetaError(dispatchError.asModule);
+            reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+          } else {
+            reject(new Error(dispatchError.toString()));
+          }
+          unsub?.();
+          return;
+        }
+        
+        // Check for failure events
+        if (events) {
+          const failedEvent = events.find(({ event }) => 
+            (event.section === 'system' && event.method === 'ExtrinsicFailed') ||
+            (event.section === 'sudo' && event.method === 'SudoFailed')
+          );
+          if (failedEvent) {
+            console.error(`[API] Extrinsic failed event:`, failedEvent.event.data.toString());
+            reject(new Error('Transaction failed on-chain (check if you are the sudo account)'));
+            unsub?.();
+            return;
+          }
+          
+          // Log events
+          events.forEach(({ event }) => {
+            console.log(`[API] Event: ${event.section}.${event.method}`);
+          });
+        }
+        
+        if (status.isInBlock) {
+          console.log(`[API] Rainfall fetch request included in block:`, status.asInBlock.toHex());
+          resolve(status.asInBlock.toHex());
+          unsub?.();
+        }
+      })
+      .then(unsubFn => {
+        unsub = unsubFn;
+      })
+      .catch(err => {
+        console.error(`[API] signAndSend error:`, err);
+        reject(err);
+      });
+  });
+}
+
+/**
+ * Complete a manual rainfall fetch by submitting the data (DAO only)
+ * This is called after the offchain worker has fetched data from AccuWeather
+ * @param rainfallMm - 24h rolling sum in tenths of mm (e.g., 150 = 15.0mm)
+ */
+export async function completeRainfallFetch(
+  signer: KeyringPair,
+  marketId: number,
+  rainfallMm: number
+): Promise<string> {
+  const api = await getApi();
+  
+  console.log(`[API] completeRainfallFetch called: marketId=${marketId}, rainfallMm=${rainfallMm}`);
+  
+  // The extrinsic requires GovernanceOrigin (EnsureRoot), so we need to use sudo
+  const innerCall = api.tx.prmxOracle.completeRainfallFetch(marketId, rainfallMm);
+  const sudoCall = api.tx.sudo.sudo(innerCall);
+  
+  return new Promise((resolve, reject) => {
+    let unsub: () => void;
+    
+    sudoCall
+      .signAndSend(signer, ({ status, dispatchError, events }) => {
+        console.log(`[API] Transaction status:`, status.type);
+        
+        if (dispatchError) {
+          console.error(`[API] Dispatch error:`, dispatchError.toString());
+          if (dispatchError.isModule) {
+            const decoded = api.registry.findMetaError(dispatchError.asModule);
+            reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+          } else {
+            reject(new Error(dispatchError.toString()));
+          }
+          unsub?.();
+          return;
+        }
+        
+        // Check for failure events
+        if (events) {
+          const failedEvent = events.find(({ event }) => 
+            (event.section === 'system' && event.method === 'ExtrinsicFailed') ||
+            (event.section === 'sudo' && event.method === 'SudoFailed')
+          );
+          if (failedEvent) {
+            console.error(`[API] Extrinsic failed event:`, failedEvent.event.data.toString());
+            reject(new Error('Transaction failed on-chain (check if you are the sudo account)'));
+            unsub?.();
+            return;
+          }
+          
+          // Log events
+          events.forEach(({ event }) => {
+            console.log(`[API] Event: ${event.section}.${event.method}`);
+          });
+        }
+        
+        if (status.isInBlock) {
+          console.log(`[API] Rainfall fetch completed in block:`, status.asInBlock.toHex());
+          resolve(status.asInBlock.toHex());
+          unsub?.();
+        }
+      })
+      .then(unsubFn => {
+        unsub = unsubFn;
+      })
+      .catch(err => {
+        console.error(`[API] signAndSend error:`, err);
+        reject(err);
+      });
+  });
+}
+
+/**
+ * Check if there's a pending rainfall fetch request for a market
+ */
+export async function getPendingFetchRequest(marketId: number): Promise<number | null> {
+  const api = await getApi();
+  const result = await api.query.prmxOracle.pendingFetchRequests(marketId);
+  
+  if (result.isSome) {
+    return (result as any).unwrap().toNumber();
+  }
+  return null;
 }
 
 // ============================================================================

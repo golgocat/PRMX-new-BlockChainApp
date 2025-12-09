@@ -20,7 +20,12 @@ import {
   Info,
   Filter,
   X,
-  SlidersHorizontal
+  SlidersHorizontal,
+  History,
+  CheckCircle2,
+  XCircle,
+  TrendingDown,
+  Trash2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
@@ -28,10 +33,11 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
 import { formatUSDT, formatAddress, formatDate } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
-import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets } from '@/hooks/useChainData';
+import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory, useLpPositionOutcomes, addTradeToHistory } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -62,6 +68,11 @@ export default function LpTradingPage() {
   const { holdings, loading: holdingsLoading, refresh: refreshHoldings } = useMyLpHoldings();
   const { policies } = usePolicies();
   const { markets } = useMarkets();
+  const { trades, loading: tradesLoading, refresh: refreshTrades, addTrade, clearHistory } = useTradeHistory();
+  const { outcomes, loading: outcomesLoading, refresh: refreshOutcomes } = useLpPositionOutcomes();
+  
+  // Active tab state
+  const [activeTab, setActiveTab] = useState<'orderbook' | 'history'>('orderbook');
 
   // Helper to get policy by ID
   const getPolicyById = (policyId: number) => policies.find(p => p.id === policyId);
@@ -174,16 +185,9 @@ export default function LpTradingPage() {
     setSortBy('price');
   };
 
-  // Get policies where the current user has LP holdings (can sell)
-  const myLpPolicyIds = new Set(holdings.map(h => h.policyId));
-  const sellablePolicies = policies.filter(p => 
-    p.status === 'Active' && 
-    myLpPolicyIds.has(p.id)
-  );
-
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refreshOrders(), refreshHoldings()]);
+    await Promise.all([refreshOrders(), refreshHoldings(), refreshTrades(), refreshOutcomes()]);
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -227,6 +231,20 @@ export default function LpTradingPage() {
     setIsSubmitting(true);
     try {
       await api.placeLpAsk(keypair, selectedPolicy.id, BigInt(quantity), BigInt(priceUsdt));
+      
+      // Record sell order placement in trade history
+      const market = getMarketById(selectedPolicy.marketId);
+      addTrade({
+        type: 'sell',
+        policyId: selectedPolicy.id,
+        marketName: market?.name || `Market ${selectedPolicy.marketId}`,
+        shares: quantity,
+        pricePerShare: parseFloat(sellPrice),
+        totalAmount: quantity * parseFloat(sellPrice),
+        timestamp: Date.now(),
+        counterparty: 'Order placed',
+      });
+      
       toast.success('Sell order placed successfully!');
       setShowSellModal(false);
       handleRefresh();
@@ -264,6 +282,23 @@ export default function LpTradingPage() {
         selectedOrder.policyId,
         selectedOrder.priceUsdt
       );
+      
+      // Record buy trade in history
+      const policy = getPolicyById(selectedOrder.policyId);
+      const market = policy ? getMarketById(policy.marketId) : null;
+      const pricePerShare = Number(selectedOrder.priceUsdt) / 1_000_000;
+      
+      addTrade({
+        type: 'buy',
+        policyId: selectedOrder.policyId,
+        marketName: market?.name || `Market ${policy?.marketId || 'Unknown'}`,
+        shares: quantity,
+        pricePerShare,
+        totalAmount: quantity * pricePerShare,
+        timestamp: Date.now(),
+        counterparty: formatAddress(selectedOrder.seller),
+      });
+      
       toast.success('Order filled successfully!');
       setShowBuyModal(false);
       handleRefresh();
@@ -353,18 +388,35 @@ export default function LpTradingPage() {
         />
         <StatCard
           title="My Holdings"
-          value={holdingsLoading ? '...' : holdings.length}
+          value={holdingsLoading ? '...' : holdings.filter(h => h.shares > 0).length}
           icon={<Shield className="w-5 h-5" />}
           iconColor="bg-prmx-purple/10 text-prmx-purple-light"
         />
         <StatCard
-          title="My Orders"
-          value={myOrders.length}
-          icon={<ArrowUpRight className="w-5 h-5" />}
+          title="Trade History"
+          value={tradesLoading ? '...' : trades.length}
+          icon={<History className="w-5 h-5" />}
           iconColor="bg-prmx-cyan/10 text-prmx-cyan"
         />
       </div>
 
+      {/* Tabs Navigation */}
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'orderbook' | 'history')}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="orderbook">
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Orderbook
+            <Badge variant="cyan" className="ml-2">{orders.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="history">
+            <History className="w-4 h-4 mr-2" />
+            History
+            <Badge variant={trades.length > 0 ? "purple" : "default"} className="ml-2">{trades.length}</Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Orderbook Tab */}
+        <TabsContent value="orderbook">
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Orderbook */}
@@ -640,22 +692,27 @@ export default function LpTradingPage() {
           {/* My Holdings */}
           <Card>
             <CardHeader>
-              <h3 className="font-semibold">My LP Holdings</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">My LP Holdings</h3>
+                {holdings.filter(h => h.shares > 0).length > 0 && (
+                  <span className="text-xs text-text-tertiary">Click to view & sell</span>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {holdingsLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <RefreshCw className="w-6 h-6 animate-spin text-text-tertiary" />
                 </div>
-              ) : holdings.length === 0 ? (
+              ) : holdings.filter(h => h.shares > 0).length === 0 ? (
                 <div className="text-center py-8">
                   <Wallet className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
                   <p className="text-text-secondary text-sm">No LP holdings yet</p>
-                  <p className="text-xs text-text-tertiary mt-1">Buy LP tokens to earn from policy premiums</p>
+                  <p className="text-xs text-text-tertiary mt-1">Fill orders from the orderbook to acquire LP tokens</p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {holdings.map((holding, index) => {
+                  {holdings.filter(h => h.shares > 0).map((holding, index) => {
                     const policy = getPolicyById(holding.policyId);
                     const market = policy ? getMarketById(policy.marketId) : null;
                     const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
@@ -708,72 +765,6 @@ export default function LpTradingPage() {
             </CardContent>
           </Card>
 
-          {/* Policies to Sell */}
-          <Card>
-            <CardHeader>
-              <h3 className="font-semibold">Sell LP Tokens</h3>
-            </CardHeader>
-            <CardContent>
-              {sellablePolicies.length === 0 ? (
-                <div className="text-center py-8">
-                  <Shield className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
-                  <p className="text-text-secondary text-sm">No LP tokens to sell</p>
-                  <p className="text-xs text-text-tertiary mt-1">
-                    Buy LP tokens from the orderbook first
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {sellablePolicies.map((policy) => {
-                    const myHolding = holdings.find(h => h.policyId === policy.id);
-                    const myShares = myHolding ? Number(myHolding.shares) : 0;
-                    const market = getMarketById(policy.marketId);
-                    const daysRemaining = getDaysRemaining(policy.coverageEnd);
-                    
-                    return (
-                    <div
-                      key={policy.id}
-                      className="p-3 rounded-xl bg-background-tertiary/50 border border-border-secondary"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="font-medium">Policy #{policy.id}</span>
-                          {market && (
-                            <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5">
-                              <MapPin className="w-3 h-3" />
-                              {market.name}
-                            </p>
-                          )}
-                        </div>
-                        <Badge variant="purple">
-                          {myShares} LP tokens
-                        </Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-xs text-text-secondary mb-2">
-                        <div>Pool: {formatUSDT(policy.capitalPool.totalCapital)}</div>
-                        <div className="text-right">
-                          <span className={cn(
-                            daysRemaining <= 3 ? "text-warning" : ""
-                          )}>
-                            {daysRemaining > 0 ? `${daysRemaining}d left` : 'Expired'}
-                          </span>
-                        </div>
-                      </div>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => handleOpenSellModal(policy)}
-                      >
-                        <ArrowUpRight className="w-4 h-4 mr-1" /> Create Sell Order
-                      </Button>
-                    </div>
-                  );})}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Balance */}
           <Card className="bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
             <CardContent className="p-4">
@@ -788,6 +779,286 @@ export default function LpTradingPage() {
           </Card>
         </div>
       </div>
+        </TabsContent>
+
+        {/* History Tab */}
+        <TabsContent value="history">
+          <div className="space-y-6">
+            {/* Trade History Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="w-5 h-5 text-prmx-cyan" />
+                    <h3 className="font-semibold">Trade History</h3>
+                  </div>
+                  {trades.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm('Clear all trade history?')) {
+                          clearHistory();
+                          toast.success('Trade history cleared');
+                        }
+                      }}
+                      icon={<Trash2 className="w-4 h-4" />}
+                      className="text-text-tertiary hover:text-error"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {tradesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-text-tertiary" />
+                  </div>
+                ) : trades.length === 0 ? (
+                  <div className="text-center py-8">
+                    <History className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
+                    <p className="text-text-secondary text-sm">No trades yet</p>
+                    <p className="text-xs text-text-tertiary mt-1">Your buy and sell orders will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {trades.map((trade) => (
+                      <div
+                        key={trade.id}
+                        className={cn(
+                          "p-4 rounded-xl border transition-all",
+                          trade.type === 'buy' 
+                            ? "bg-success/5 border-success/20" 
+                            : "bg-error/5 border-error/20"
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-lg flex items-center justify-center",
+                              trade.type === 'buy' ? "bg-success/20" : "bg-error/20"
+                            )}>
+                              {trade.type === 'buy' ? (
+                                <ArrowDownRight className="w-4 h-4 text-success" />
+                              ) : (
+                                <ArrowUpRight className="w-4 h-4 text-error" />
+                              )}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className={cn(
+                                  "font-semibold",
+                                  trade.type === 'buy' ? "text-success" : "text-error"
+                                )}>
+                                  {trade.type === 'buy' ? 'Bought' : 'Sold'}
+                                </span>
+                                <span className="text-text-primary">
+                                  {trade.shares} share{trade.shares > 1 ? 's' : ''}
+                                </span>
+                              </div>
+                              <p className="text-xs text-text-secondary">
+                                Policy #{trade.policyId} • {trade.marketName}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-semibold">${trade.totalAmount.toFixed(2)}</p>
+                            <p className="text-xs text-text-tertiary">
+                              ${trade.pricePerShare.toFixed(2)}/share
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-text-tertiary pt-2 border-t border-border-secondary/50">
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {new Date(trade.timestamp).toLocaleString()}
+                          </span>
+                          {trade.counterparty && (
+                            <span>Counterparty: {trade.counterparty}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Position Outcomes Section */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-prmx-purple" />
+                  <h3 className="font-semibold">Position Outcomes</h3>
+                </div>
+                <p className="text-sm text-text-secondary mt-1">
+                  Track your LP positions and their final outcomes
+                </p>
+              </CardHeader>
+              <CardContent>
+                {outcomesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <RefreshCw className="w-6 h-6 animate-spin text-text-tertiary" />
+                  </div>
+                ) : outcomes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Shield className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
+                    <p className="text-text-secondary text-sm">No position history</p>
+                    <p className="text-xs text-text-tertiary mt-1">
+                      Settled positions and their outcomes will appear here
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {outcomes.map((outcome) => (
+                      <div
+                        key={outcome.policyId}
+                        className={cn(
+                          "p-4 rounded-xl border",
+                          outcome.outcome === 'matured' && "bg-success/5 border-success/20",
+                          outcome.outcome === 'event_triggered' && "bg-error/5 border-error/20",
+                          outcome.outcome === 'active' && "bg-background-tertiary/50 border-border-secondary"
+                        )}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div className={cn(
+                              "w-10 h-10 rounded-lg flex items-center justify-center",
+                              outcome.outcome === 'matured' && "bg-success/20",
+                              outcome.outcome === 'event_triggered' && "bg-error/20",
+                              outcome.outcome === 'active' && "bg-prmx-cyan/20"
+                            )}>
+                              {outcome.outcome === 'matured' && <CheckCircle2 className="w-5 h-5 text-success" />}
+                              {outcome.outcome === 'event_triggered' && <XCircle className="w-5 h-5 text-error" />}
+                              {outcome.outcome === 'active' && <Clock className="w-5 h-5 text-prmx-cyan" />}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">Policy #{outcome.policyId}</span>
+                                <Badge 
+                                  variant={
+                                    outcome.outcome === 'matured' ? 'success' : 
+                                    outcome.outcome === 'event_triggered' ? 'destructive' : 
+                                    'default'
+                                  }
+                                >
+                                  {outcome.outcome === 'matured' && 'Matured'}
+                                  {outcome.outcome === 'event_triggered' && 'Event Triggered'}
+                                  {outcome.outcome === 'active' && 'Active'}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-text-secondary flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {outcome.marketName}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className={cn(
+                              "text-lg font-bold",
+                              outcome.profitLoss >= 0 ? "text-success" : "text-error"
+                            )}>
+                              {outcome.profitLoss >= 0 ? '+' : ''}{outcome.profitLoss.toFixed(2)} USDT
+                            </p>
+                            <p className="text-xs text-text-tertiary">
+                              {outcome.profitLoss >= 0 ? 'Profit' : 'Loss'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3 pt-3 border-t border-border-secondary/50">
+                          <div>
+                            <p className="text-xs text-text-tertiary">Shares Held</p>
+                            <p className="font-medium">{outcome.sharesHeld}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-text-tertiary">Investment</p>
+                            <p className="font-medium">${outcome.investmentCost.toFixed(2)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-text-tertiary">Payout</p>
+                            <p className={cn(
+                              "font-medium",
+                              outcome.payoutReceived > 0 ? "text-success" : "text-text-primary"
+                            )}>
+                              ${outcome.payoutReceived.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-text-tertiary">
+                              {outcome.outcome === 'event_triggered' ? 'Trigger' : 'Status'}
+                            </p>
+                            <p className="font-medium">
+                              {outcome.eventOccurred !== undefined ? (
+                                outcome.eventOccurred ? (
+                                  <span className="text-error flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Rain Event
+                                  </span>
+                                ) : (
+                                  <span className="text-success">No Event</span>
+                                )
+                              ) : (
+                                <span className="text-text-secondary">Pending</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {outcome.settledAt && (
+                          <div className="flex items-center gap-1 text-xs text-text-tertiary mt-3 pt-2 border-t border-border-secondary/50">
+                            <Clock className="w-3 h-3" />
+                            Settled: {new Date(outcome.settledAt * 1000).toLocaleString()}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Summary Stats */}
+            {outcomes.length > 0 && (
+              <Card className="bg-gradient-to-r from-prmx-cyan/5 to-prmx-purple/5 border-prmx-cyan/20">
+                <CardContent className="p-4">
+                  <h4 className="font-semibold mb-3">Performance Summary</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm text-text-secondary">Total Positions</p>
+                      <p className="text-xl font-bold">{outcomes.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-text-secondary">Matured</p>
+                      <p className="text-xl font-bold text-success">
+                        {outcomes.filter(o => o.outcome === 'matured').length}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-text-secondary">Triggered</p>
+                      <p className="text-xl font-bold text-error">
+                        {outcomes.filter(o => o.outcome === 'event_triggered').length}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-text-secondary">Total P&L</p>
+                      <p className={cn(
+                        "text-xl font-bold",
+                        outcomes.reduce((sum, o) => sum + o.profitLoss, 0) >= 0 
+                          ? "text-success" 
+                          : "text-error"
+                      )}>
+                        ${outcomes.reduce((sum, o) => sum + o.profitLoss, 0).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
 
       {/* Sell Modal */}
       <Modal
@@ -971,7 +1242,7 @@ export default function LpTradingPage() {
                     <div className="text-xs text-text-tertiary mb-1">Strike Threshold</div>
                     <div className="font-medium flex items-center gap-1">
                       <Droplets className="w-3 h-3 text-prmx-cyan" />
-                      {market.strikeValue} mm rainfall
+                      {market.strikeValue} mm (24h)
                     </div>
                   </div>
                   <div className="p-2 rounded-lg bg-background-primary/50">
@@ -1053,7 +1324,7 @@ export default function LpTradingPage() {
                 <div className="mt-3 pt-3 border-t border-border-secondary text-xs text-text-secondary flex items-start gap-2">
                   <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>
-                    As an LP, you earn {maxPayout}/share if rainfall stays below {market.strikeValue}mm. 
+                    As an LP, you earn {maxPayout}/share if the 24h rolling rainfall stays below {market.strikeValue}mm. 
                     If the event occurs (rainfall exceeds threshold), your investment pays out to policy holders.
                   </span>
                 </div>
@@ -1276,7 +1547,7 @@ export default function LpTradingPage() {
                 <AlertTriangle className="w-4 h-4 text-error mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-text-secondary">
                   <span className="text-error font-medium">Risk: </span>
-                  If rainfall exceeds {market?.strikeValue || 50}mm during the coverage period, 
+                  If the 24h rolling rainfall exceeds {market?.strikeValue || 50}mm during the coverage period, 
                   your LP tokens will pay out to the policy holder and you will lose your investment.
                 </div>
               </div>

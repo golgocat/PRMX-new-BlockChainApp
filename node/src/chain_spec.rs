@@ -187,5 +187,12 @@ fn testnet_genesis(
                 }),
             ],
         },
+        // PRMX Oracle - Oracle Providers
+        // Register Alice as an oracle provider for offchain worker signed transactions
+        "prmxOracle": {
+            "oracleProviders": vec![
+                endowed_accounts[0].clone(), // Alice
+            ],
+        },
     })
 }

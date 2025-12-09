@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Shield, 
   Plus, 
@@ -9,7 +9,10 @@ import {
   ChevronRight,
   RefreshCw,
   CheckCircle2,
-  XCircle
+  XCircle,
+  CloudRain,
+  DollarSign,
+  AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -23,6 +26,7 @@ import { formatUSDT, formatTimeRemaining, formatDate, formatCoordinates, formatA
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMyPolicies, usePolicies, useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
+import type { SettlementResult } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 
@@ -35,12 +39,48 @@ export default function PoliciesPage() {
   const { markets } = useMarkets();
   
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('my');
+  // DAO should always see "All Policies", customers default to "My Policies"
+  const [activeTab, setActiveTab] = useState(isDao ? 'all' : 'my');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [settlingPolicy, setSettlingPolicy] = useState<number | null>(null);
+  const [settlementResults, setSettlementResults] = useState<Map<number, SettlementResult>>(new Map());
+  const [loadingSettlements, setLoadingSettlements] = useState(false);
 
-  const policies = activeTab === 'my' ? myPolicies : allPolicies;
-  const loading = activeTab === 'my' ? myLoading : allLoading;
+  // DAO always sees all policies
+  const policies = isDao || activeTab === 'all' ? allPolicies : myPolicies;
+  const loading = isDao || activeTab === 'all' ? allLoading : myLoading;
+
+  // Fetch settlement results for settled policies
+  const fetchSettlementResults = useCallback(async () => {
+    const settledPolicies = policies.filter(p => p.status === 'Settled');
+    if (settledPolicies.length === 0) return;
+
+    setLoadingSettlements(true);
+    const results = new Map<number, SettlementResult>();
+    
+    await Promise.all(
+      settledPolicies.map(async (policy) => {
+        try {
+          const result = await api.getSettlementResult(policy.id);
+          if (result) {
+            results.set(policy.id, result);
+          }
+        } catch (err) {
+          console.error(`Failed to fetch settlement for policy ${policy.id}:`, err);
+        }
+      })
+    );
+    
+    setSettlementResults(results);
+    setLoadingSettlements(false);
+  }, [policies]);
+
+  // Load settlement results when policies change
+  useEffect(() => {
+    if (!loading && policies.length > 0) {
+      fetchSettlementResults();
+    }
+  }, [loading, policies.length, fetchSettlementResults]);
 
   const getMarketName = (marketId: number) => {
     const market = markets.find(m => m.id === marketId);
@@ -60,11 +100,12 @@ export default function PoliciesPage() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    if (activeTab === 'my') {
-      await refreshMy();
-    } else {
+    if (isDao || activeTab === 'all') {
       await refreshAll();
+    } else {
+      await refreshMy();
     }
+    // Settlement results will be refetched via useEffect when policies update
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -140,9 +181,9 @@ export default function PoliciesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <StatCard
-          title={activeTab === 'my' ? 'My Policies' : 'Total Policies'}
+          title={isDao ? 'Total Policies' : (activeTab === 'my' ? 'My Policies' : 'Total Policies')}
           value={loading ? '...' : policies.length}
           icon={<Shield className="w-5 h-5" />}
         />
@@ -153,15 +194,21 @@ export default function PoliciesPage() {
           iconColor="bg-success/10 text-success"
         />
         <StatCard
-          title="Expired (Unsettled)"
+          title="Pending Settlement"
           value={loading ? '...' : expiredPolicies.length}
           icon={<Clock className="w-5 h-5" />}
           iconColor="bg-warning/10 text-warning"
         />
         <StatCard
-          title="Settled"
-          value={loading ? '...' : settledPolicies.length}
-          icon={<XCircle className="w-5 h-5" />}
+          title="Events Triggered"
+          value={loading || loadingSettlements ? '...' : Array.from(settlementResults.values()).filter(r => r.eventOccurred).length}
+          icon={<CloudRain className="w-5 h-5" />}
+          iconColor="bg-prmx-cyan/10 text-prmx-cyan"
+        />
+        <StatCard
+          title="Matured (No Event)"
+          value={loading || loadingSettlements ? '...' : Array.from(settlementResults.values()).filter(r => !r.eventOccurred).length}
+          icon={<CheckCircle2 className="w-5 h-5" />}
           iconColor="bg-text-tertiary/10 text-text-tertiary"
         />
       </div>
@@ -170,12 +217,17 @@ export default function PoliciesPage() {
       <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            <Tabs defaultValue="my" onChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="my">My Policies ({myPolicies.length})</TabsTrigger>
-                <TabsTrigger value="all">All Policies ({allPolicies.length})</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            {/* DAO sees only "All Policies", no tabs needed */}
+            {isDao ? (
+              <h3 className="text-lg font-semibold">All Policies ({allPolicies.length})</h3>
+            ) : (
+              <Tabs defaultValue="my" onChange={setActiveTab}>
+                <TabsList>
+                  <TabsTrigger value="my">My Policies ({myPolicies.length})</TabsTrigger>
+                  <TabsTrigger value="all">All Policies ({allPolicies.length})</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
             <div className="flex-1">
               <Input
                 placeholder="Search by market or holder..."
@@ -196,7 +248,7 @@ export default function PoliciesPage() {
                 <TableHeaderCell>Coverage Period</TableHeaderCell>
                 <TableHeaderCell>Shares</TableHeaderCell>
                 <TableHeaderCell>Max Payout</TableHeaderCell>
-                <TableHeaderCell>Status</TableHeaderCell>
+                <TableHeaderCell>Status / Outcome</TableHeaderCell>
                 <TableHeaderCell></TableHeaderCell>
               </TableRow>
             </TableHead>
@@ -211,9 +263,11 @@ export default function PoliciesPage() {
                 <TableEmpty
                   icon={<Shield className="w-8 h-8" />}
                   title="No policies found"
-                  description={activeTab === 'my' 
-                    ? "You don't have any policies yet" 
-                    : "No policies match your search"}
+                  description={isDao 
+                    ? "No policies have been created yet" 
+                    : (activeTab === 'my' 
+                      ? "You don't have any policies yet" 
+                      : "No policies match your search")}
                 />
               ) : (
                 filteredPolicies.map((policy) => {
@@ -221,6 +275,7 @@ export default function PoliciesPage() {
                   const status = policy.status === 'Active' && isExpired ? 'Expired' : policy.status;
                   const canSettle = isExpired && policy.status === 'Active';
                   const isOwner = policy.holder === selectedAccount?.address;
+                  const settlementResult = settlementResults.get(policy.id);
                   
                   return (
                     <TableRow key={policy.id}>
@@ -259,7 +314,52 @@ export default function PoliciesPage() {
                       <TableCell>{policy.shares.toString()}</TableCell>
                       <TableCell>{formatUSDT(policy.maxPayout)}</TableCell>
                       <TableCell>
-                        <StatusBadge status={status} />
+                        {policy.status === 'Settled' && settlementResult ? (
+                          <div className="space-y-1">
+                            <div className={cn(
+                              "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium",
+                              settlementResult.eventOccurred 
+                                ? "bg-success/10 text-success" 
+                                : "bg-prmx-cyan/10 text-prmx-cyan"
+                            )}>
+                              {settlementResult.eventOccurred ? (
+                                <>
+                                  <CloudRain className="w-3 h-3" />
+                                  Event Triggered
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle2 className="w-3 h-3" />
+                                  Matured
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 text-xs">
+                              <DollarSign className="w-3 h-3 text-text-tertiary" />
+                              {settlementResult.eventOccurred ? (
+                                <span className="text-success font-medium">
+                                  Payout: {formatUSDT(settlementResult.payoutToHolder)}
+                                </span>
+                              ) : (
+                                <span className="text-text-secondary">
+                                  Returned to LPs
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : policy.status === 'Settled' ? (
+                          <StatusBadge status={status} />
+                        ) : status === 'Expired' ? (
+                          <div className="space-y-1">
+                            <StatusBadge status={status} />
+                            <div className="flex items-center gap-1 text-xs text-warning">
+                              <AlertTriangle className="w-3 h-3" />
+                              Pending settlement
+                            </div>
+                          </div>
+                        ) : (
+                          <StatusBadge status={status} />
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

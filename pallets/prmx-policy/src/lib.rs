@@ -458,7 +458,7 @@ pub mod pallet {
             let _who = ensure_signed(origin)?;
 
             // Load policy
-            let mut policy = Policies::<T>::get(policy_id)
+            let policy = Policies::<T>::get(policy_id)
                 .ok_or(Error::<T>::PolicyNotFound)?;
 
             // Ensure policy is active or expired (not already settled)
@@ -481,13 +481,123 @@ pub mod pallet {
                 Error::<T>::CoverageNotEnded
             );
 
+            // Call internal settlement function
+            Self::do_settle_policy(policy_id, event_occurred)?;
+
+            Ok(())
+        }
+
+        /// Trigger immediate settlement for a policy when threshold is exceeded.
+        /// This is called by the Oracle pallet when automatic settlement is triggered.
+        /// Does NOT require coverage window to have ended.
+        /// 
+        /// - `policy_id`: The policy to settle immediately.
+        #[pallet::call_index(2)]
+        #[pallet::weight(50_000)]
+        pub fn trigger_immediate_settlement(
+            origin: OriginFor<T>,
+            policy_id: PolicyId,
+        ) -> DispatchResult {
+            // For now, allow root origin (oracle will call via internal function)
+            // In production, this would be restricted to OracleOrigin
+            ensure_root(origin)?;
+
+            // Load policy
+            let policy = Policies::<T>::get(policy_id)
+                .ok_or(Error::<T>::PolicyNotFound)?;
+
+            // Ensure policy is active (not already settled or cancelled)
+            ensure!(
+                policy.status == PolicyStatus::Active,
+                Error::<T>::PolicyAlreadySettled
+            );
+
+            log::info!(
+                target: "prmx-policy",
+                "⚡ Immediate settlement triggered for policy {} (threshold exceeded)",
+                policy_id
+            );
+
+            // Call internal settlement function with event_occurred = true
+            Self::do_settle_policy(policy_id, true)?;
+
+            Ok(())
+        }
+    }
+
+    // =========================================================================
+    //                           Helper Functions
+    // =========================================================================
+
+    impl<T: Config> Pallet<T> {
+        /// Get the derived account for a policy's capital pool
+        pub fn policy_pool_account(policy_id: PolicyId) -> T::AccountId {
+            PALLET_ID.into_sub_account_truncating(("policy", policy_id))
+        }
+
+        /// Get the derived account for a market's residual pool
+        pub fn market_residual_account(market_id: MarketId) -> T::AccountId {
+            PALLET_ID.into_sub_account_truncating(("market", market_id))
+        }
+
+        /// Get current timestamp from pallet_timestamp (in seconds)
+        pub fn current_timestamp() -> u64 {
+            // Get timestamp from pallet_timestamp (returns milliseconds)
+            let now_ms: u64 = pallet_timestamp::Pallet::<T>::now()
+                .try_into()
+                .unwrap_or(0);
+            let now_secs = now_ms / 1000;
+            log::info!(
+                target: "prmx-policy",
+                "🔍 current_timestamp() - raw_ms: {}, seconds: {}",
+                now_ms,
+                now_secs
+            );
+            now_secs
+        }
+
+        /// Get all policies for a market
+        pub fn get_policies_for_market(market_id: MarketId) -> Vec<PolicyId> {
+            PoliciesByMarket::<T>::get(market_id).into_inner()
+        }
+
+        /// Get policy info
+        pub fn get_policy(policy_id: PolicyId) -> Option<PolicyInfo<T>> {
+            Policies::<T>::get(policy_id)
+        }
+
+        /// Check if policy is active
+        pub fn is_policy_active(policy_id: PolicyId) -> bool {
+            Policies::<T>::get(policy_id)
+                .map(|p| p.status == PolicyStatus::Active)
+                .unwrap_or(false)
+        }
+
+        /// Internal settlement function - performs the actual settlement logic
+        /// Returns the payout amount on success
+        pub fn do_settle_policy(policy_id: PolicyId, event_occurred: bool) -> Result<T::Balance, DispatchError> {
+            // Load policy
+            let mut policy = Policies::<T>::get(policy_id)
+                .ok_or(Error::<T>::PolicyNotFound)?;
+
+            // Ensure policy is active or expired (not already settled)
+            ensure!(
+                policy.status == PolicyStatus::Active || policy.status == PolicyStatus::Expired,
+                Error::<T>::PolicyAlreadySettled
+            );
+
+            let now = Self::current_timestamp();
+
             // Get pool account and balance
             let pool_account = Self::policy_pool_account(policy_id);
             let pool_balance = PolicyRiskPoolBalance::<T>::get(policy_id);
 
+            let payout_to_holder: T::Balance;
+
             if event_occurred {
                 // Event occurred - pay out to policy holder
                 let payout = policy.max_payout;
+                payout_to_holder = payout;
 
                 // Transfer from pool to holder
                 T::Assets::transfer(
@@ -521,12 +631,11 @@ pub mod pallet {
                 });
             } else {
                 // Event did not occur - distribute pool to LP holders pro-rata
-                // This is the automatic payout mechanism
-                // LP tokens are POLICY-SPECIFIC, so distribute to this policy's LP holders only
+                payout_to_holder = T::Balance::zero();
                 
                 // Distribute directly from policy pool to all LP holders OF THIS POLICY
                 T::HoldingsApi::distribute_to_lp_holders(
-                    policy_id,  // Use policy_id, not market_id!
+                    policy_id,
                     &pool_account,
                     pool_balance,
                 ).map_err(|_| Error::<T>::TransferFailed)?;
@@ -553,56 +662,52 @@ pub mod pallet {
                 });
             }
 
-            Ok(())
+            Ok(payout_to_holder)
+        }
+
+        /// Get all active policies for a market that are currently in their coverage window
+        pub fn get_active_policies_in_window(market_id: MarketId, current_time: u64) -> Vec<PolicyId> {
+            let policy_ids = PoliciesByMarket::<T>::get(market_id);
+            
+            policy_ids
+                .into_iter()
+                .filter(|&policy_id| {
+                    if let Some(policy) = Policies::<T>::get(policy_id) {
+                        // Check if policy is active AND currently in coverage window
+                        policy.status == PolicyStatus::Active
+                            && current_time >= policy.coverage_start
+                            && current_time <= policy.coverage_end
+                    } else {
+                        false
+                    }
+                })
+                .collect()
         }
     }
+}
 
-    // =========================================================================
-    //                           Helper Functions
-    // =========================================================================
+// =============================================================================
+//                       PolicySettlement Trait Implementation
+// =============================================================================
 
-    impl<T: Config> Pallet<T> {
-        /// Get the derived account for a policy's capital pool
-        pub fn policy_pool_account(policy_id: PolicyId) -> T::AccountId {
-            PALLET_ID.into_sub_account_truncating(("policy", policy_id))
-        }
+impl<T: Config> pallet_prmx_oracle::PolicySettlement<T::AccountId> for Pallet<T> {
+    fn current_time() -> u64 {
+        pallet::Pallet::<T>::current_timestamp()
+    }
+    
+    fn get_active_policies_in_window(market_id: pallet_prmx_markets::MarketId, current_time: u64) -> Vec<pallet_prmx_oracle::PolicyId> {
+        pallet::Pallet::<T>::get_active_policies_in_window(market_id, current_time)
+    }
 
-        /// Get the derived account for a market's residual pool
-        pub fn market_residual_account(market_id: MarketId) -> T::AccountId {
-            PALLET_ID.into_sub_account_truncating(("market", market_id))
-        }
+    fn get_policy_info(policy_id: pallet_prmx_oracle::PolicyId) -> Option<(T::AccountId, u128, u64, u64, pallet_prmx_markets::MarketId)> {
+        pallet::Policies::<T>::get(policy_id).map(|p| {
+            (p.holder, p.max_payout.into(), p.coverage_start, p.coverage_end, p.market_id)
+        })
+    }
 
-        /// Get current timestamp from pallet_timestamp (in seconds)
-        fn current_timestamp() -> u64 {
-            // Get timestamp from pallet_timestamp (returns milliseconds)
-            let now_ms: u64 = pallet_timestamp::Pallet::<T>::now()
-                .try_into()
-                .unwrap_or(0);
-            let now_secs = now_ms / 1000;
-            log::info!(
-                target: "prmx-policy",
-                "🔍 current_timestamp() - raw_ms: {}, seconds: {}",
-                now_ms,
-                now_secs
-            );
-            now_secs
-        }
-
-        /// Get all policies for a market
-        pub fn get_policies_for_market(market_id: MarketId) -> Vec<PolicyId> {
-            PoliciesByMarket::<T>::get(market_id).into_inner()
-        }
-
-        /// Get policy info
-        pub fn get_policy(policy_id: PolicyId) -> Option<PolicyInfo<T>> {
-            Policies::<T>::get(policy_id)
-        }
-
-        /// Check if policy is active
-        pub fn is_policy_active(policy_id: PolicyId) -> bool {
-            Policies::<T>::get(policy_id)
-                .map(|p| p.status == PolicyStatus::Active)
-                .unwrap_or(false)
-        }
+    fn trigger_immediate_settlement(policy_id: pallet_prmx_oracle::PolicyId) -> Result<u128, sp_runtime::DispatchError> {
+        // Call internal settlement function with event_occurred = true
+        let payout = pallet::Pallet::<T>::do_settle_policy(policy_id, true)?;
+        Ok(payout.into())
     }
 }

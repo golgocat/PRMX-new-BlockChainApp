@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWalletStore } from '@/stores/walletStore';
 import * as api from '@/lib/api';
-import type { Market, Policy, QuoteRequest, LpAskOrder, LpHolding } from '@/types';
+import type { Market, Policy, QuoteRequest, LpAskOrder, LpHolding, LpTradeRecord, LpPositionOutcome } from '@/types';
 
 /**
  * Hook to fetch and refresh markets data
@@ -361,4 +361,221 @@ export function useQuoteRequests() {
   }, [refresh]);
 
   return { quotes, loading, error, refresh };
+}
+
+// ============================================================================
+// Trade History (localStorage-based)
+// ============================================================================
+
+const TRADE_HISTORY_KEY = 'prmx_lp_trade_history';
+
+/**
+ * Get trade history from localStorage
+ */
+export function getTradeHistory(address?: string): LpTradeRecord[] {
+  if (typeof window === 'undefined') return [];
+  
+  try {
+    const stored = localStorage.getItem(TRADE_HISTORY_KEY);
+    if (!stored) return [];
+    
+    const allTrades: LpTradeRecord[] = JSON.parse(stored);
+    
+    // Filter by address if provided
+    if (address) {
+      return allTrades.filter(trade => 
+        trade.id.includes(address.slice(0, 10)) || 
+        trade.counterparty === address
+      );
+    }
+    
+    return allTrades;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Add a trade to history
+ */
+export function addTradeToHistory(trade: Omit<LpTradeRecord, 'id'>): void {
+  if (typeof window === 'undefined') return;
+  
+  const trades = getTradeHistory();
+  const newTrade: LpTradeRecord = {
+    ...trade,
+    id: `${trade.timestamp}-${trade.policyId}-${Math.random().toString(36).slice(2, 8)}`,
+  };
+  
+  trades.unshift(newTrade); // Add to beginning
+  
+  // Keep only last 100 trades
+  const trimmed = trades.slice(0, 100);
+  
+  localStorage.setItem(TRADE_HISTORY_KEY, JSON.stringify(trimmed));
+}
+
+/**
+ * Hook to manage trade history
+ */
+export function useTradeHistory() {
+  const { selectedAccount } = useWalletStore();
+  const [trades, setTrades] = useState<LpTradeRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const refresh = useCallback(() => {
+    setLoading(true);
+    const history = getTradeHistory();
+    setTrades(history);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh, selectedAccount]);
+
+  const addTrade = useCallback((trade: Omit<LpTradeRecord, 'id'>) => {
+    addTradeToHistory(trade);
+    refresh();
+  }, [refresh]);
+
+  const clearHistory = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(TRADE_HISTORY_KEY);
+      setTrades([]);
+    }
+  }, []);
+
+  return { trades, loading, refresh, addTrade, clearHistory };
+}
+
+/**
+ * Hook to get LP position outcomes (settled positions)
+ */
+export function useLpPositionOutcomes() {
+  const { isChainConnected, selectedAccount } = useWalletStore();
+  const [outcomes, setOutcomes] = useState<LpPositionOutcome[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!isChainConnected || !selectedAccount) {
+      setOutcomes([]);
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Get all policies and markets
+      const [policies, markets, holdings] = await Promise.all([
+        api.getPolicies(),
+        api.getMarkets(),
+        api.getLpHoldings(selectedAccount.address),
+      ]);
+      
+      // Get trade history for cost basis
+      const trades = getTradeHistory();
+      
+      const marketMap = new Map(markets.map(m => [m.id, m]));
+      const holdingsMap = new Map(holdings.map(h => [h.policyId, h]));
+      
+      const positionOutcomes: LpPositionOutcome[] = [];
+      
+      // Check all policies where user has/had holdings
+      const relevantPolicyIds = new Set([
+        ...holdings.map(h => h.policyId),
+        ...trades.filter(t => t.type === 'buy').map(t => t.policyId),
+      ]);
+      
+      for (const policyId of relevantPolicyIds) {
+        const policy = policies.find(p => p.id === policyId);
+        if (!policy) continue;
+        
+        const market = marketMap.get(policy.marketId);
+        const holding = holdingsMap.get(policyId);
+        const currentShares = holding ? Number(holding.shares) : 0;
+        
+        // Calculate investment cost from trade history
+        const policyTrades = trades.filter(t => t.policyId === policyId);
+        const totalBuyCost = policyTrades
+          .filter(t => t.type === 'buy')
+          .reduce((sum, t) => sum + t.totalAmount, 0);
+        const totalSellRevenue = policyTrades
+          .filter(t => t.type === 'sell')
+          .reduce((sum, t) => sum + t.totalAmount, 0);
+        const netCost = totalBuyCost - totalSellRevenue;
+        
+        // Check if policy is settled
+        let outcome: LpPositionOutcome['outcome'] = 'active';
+        let payoutReceived = 0;
+        let settledAt: number | undefined;
+        let eventOccurred: boolean | undefined;
+        
+        if (policy.status === 'Settled') {
+          try {
+            const settlement = await api.getSettlementResult(policyId);
+            if (settlement) {
+              eventOccurred = settlement.eventOccurred;
+              settledAt = settlement.settledAt;
+              
+              if (settlement.eventOccurred) {
+                // Event occurred - LPs lost their capital
+                outcome = 'event_triggered';
+                payoutReceived = 0;
+              } else {
+                // Policy matured - LPs get their capital back
+                outcome = 'matured';
+                // Calculate share of returned capital
+                const shareRatio = currentShares / policy.capitalPool.totalShares;
+                payoutReceived = Number(settlement.returnedToLps) / 1_000_000 * shareRatio;
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to get settlement for policy ${policyId}:`, err);
+          }
+        } else if (policy.status === 'Expired') {
+          outcome = 'matured';
+          // If expired but not settled yet, estimate payout
+          const payoutPerShare = market ? Number(market.payoutPerShare) / 1_000_000 : 100;
+          payoutReceived = currentShares * payoutPerShare;
+        }
+        
+        positionOutcomes.push({
+          policyId,
+          marketId: policy.marketId,
+          marketName: market?.name || `Market ${policy.marketId}`,
+          sharesHeld: currentShares,
+          investmentCost: netCost,
+          outcome,
+          payoutReceived,
+          profitLoss: payoutReceived - netCost,
+          settledAt,
+          eventOccurred,
+        });
+      }
+      
+      // Sort by settlement time (most recent first), then by policy ID
+      positionOutcomes.sort((a, b) => {
+        if (a.settledAt && b.settledAt) return b.settledAt - a.settledAt;
+        if (a.settledAt) return -1;
+        if (b.settledAt) return 1;
+        return b.policyId - a.policyId;
+      });
+      
+      setOutcomes(positionOutcomes);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch position outcomes');
+    } finally {
+      setLoading(false);
+    }
+  }, [isChainConnected, selectedAccount]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { outcomes, loading, error, refresh };
 }

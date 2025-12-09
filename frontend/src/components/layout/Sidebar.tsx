@@ -9,8 +9,7 @@ import {
   Wallet, 
   Cloud,
   Settings,
-  HelpCircle,
-  FileText
+  HelpCircle
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
@@ -19,6 +18,7 @@ import { useUserRole, UserRole } from '@/stores/walletStore';
 type NavItem = {
   href: string;
   label: string;
+  labelByRole?: Partial<Record<UserRole, string>>; // Role-specific labels
   icon: React.ComponentType<{ className?: string }>;
   roles?: UserRole[]; // If undefined, show for all roles
 };
@@ -26,14 +26,13 @@ type NavItem = {
 const mainNavItems: NavItem[] = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/markets', label: 'Markets', icon: Globe2, roles: ['dao', 'customer'] },
-  { href: '/policies', label: 'My Policies', icon: Shield, roles: ['dao', 'customer'] },
+  { href: '/policies', label: 'My Policies', labelByRole: { dao: 'All Policies' }, icon: Shield, roles: ['dao', 'customer'] },
   { href: '/lp', label: 'LP Trading', icon: Wallet, roles: ['dao', 'lp'] },
   { href: '/oracle', label: 'Oracle Data', icon: Cloud },
 ];
 
 const secondaryNavItems: NavItem[] = [
-  { href: '/docs', label: 'Documentation', icon: FileText },
-  { href: '/help', label: 'Help & Support', icon: HelpCircle },
+  { href: '/help', label: 'Help & Resources', icon: HelpCircle },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -64,6 +63,8 @@ export function Sidebar() {
           {filteredMainNav.map((item) => {
             const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
             const Icon = item.icon;
+            // Use role-specific label if available, otherwise default label
+            const label = item.labelByRole?.[userRole] || item.label;
             
             return (
               <Link
@@ -74,7 +75,7 @@ export function Sidebar() {
                 )}
               >
                 <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
+                <span>{label}</span>
               </Link>
             );
           })}

@@ -286,7 +286,7 @@ export default function MarketDetailPage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-text-secondary">Strike Threshold</span>
-                  <p className="font-medium">{market.strikeValue} mm cumulative rainfall</p>
+                  <p className="font-medium">{market.strikeValue} mm (24h rolling sum)</p>
                 </div>
                 <div>
                   <span className="text-text-secondary">Payout per Share</span>
@@ -315,20 +315,23 @@ export default function MarketDetailPage() {
               </h2>
             </CardHeader>
             <CardContent>
-              {rainfallData ? (
+              {rainfallData ? (() => {
+                // Convert from tenths of mm to mm for display
+                const displayRainfall = rainfallData.rollingSumMm / 10;
+                return (
                 <div className="text-center py-4">
                   <p className="text-4xl font-bold text-prmx-cyan">
-                    {rainfallData.rollingSumMm} mm
+                    {displayRainfall.toFixed(1)} mm
                   </p>
                   <p className="text-sm text-text-secondary mt-2">
-                    Rolling 7-day rainfall sum
+                    24h rolling rainfall sum
                   </p>
                   <div className={`mt-4 p-3 rounded-lg ${
-                    rainfallData.rollingSumMm >= market.strikeValue 
+                    displayRainfall >= market.strikeValue 
                       ? 'bg-success/10 border border-success/30' 
                       : 'bg-prmx-cyan/10 border border-prmx-cyan/30'
                   }`}>
-                    {rainfallData.rollingSumMm >= market.strikeValue ? (
+                    {displayRainfall >= market.strikeValue ? (
                       <div className="flex items-center justify-center gap-2 text-success">
                         <CheckCircle2 className="w-4 h-4" />
                         <span className="text-sm font-medium">Strike threshold reached!</span>
@@ -337,13 +340,14 @@ export default function MarketDetailPage() {
                       <div className="flex items-center justify-center gap-2 text-prmx-cyan">
                         <Clock className="w-4 h-4" />
                         <span className="text-sm font-medium">
-                          {market.strikeValue - rainfallData.rollingSumMm} mm to strike
+                          {(market.strikeValue - displayRainfall).toFixed(1)} mm to strike
                         </span>
                       </div>
                     )}
                   </div>
                 </div>
-              ) : (
+                );
+              })() : (
                 <div className="text-center py-8 text-text-secondary">
                   <Droplets className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>No rainfall data available</p>

@@ -54,8 +54,8 @@ export default function NewPolicyPage() {
   // Form state
   const [formData, setFormData] = useState({
     shares: '1',
-    coverageStartDays: '21', // Days from now
-    coverageDurationDays: '7',
+    coverageStartDays: '0', // Days from now (0 for testing)
+    coverageDurationDays: '1', // 1 day for quick testing
   });
 
   // Poll for quote result
@@ -487,7 +487,7 @@ export default function NewPolicyPage() {
                         Fair Premium: {formatUSDT(currentQuote.result.fairPremiumUsdt)}
                       </div>
                       <div className="text-sm text-text-secondary">
-                        Break-even P(event): {(Number(currentQuote.result.breakEvenProbBp) / 10000).toFixed(2)}%
+                        Event Probability: {(Number(currentQuote.result.probabilityPercent) / 100).toFixed(2)}%
                       </div>
                     </div>
                   </div>

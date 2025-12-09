@@ -11,7 +11,34 @@ use sc_service::{error::Error as ServiceError, Configuration, TaskManager};
 use sc_telemetry::{Telemetry, TelemetryWorker};
 use sc_transaction_pool_api::OffchainTransactionPoolFactory;
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
+use sp_keystore::KeystorePtr;
 use std::sync::Arc;
+
+/// Oracle authority key type (must match pallet_prmx_oracle::KEY_TYPE)
+const ORACLE_KEY_TYPE: sp_runtime::KeyTypeId = sp_runtime::KeyTypeId(*b"orcl");
+
+/// Insert oracle authority key into keystore for offchain worker transaction signing.
+/// In dev mode, this uses Alice's key.
+fn insert_oracle_authority_key(keystore: &KeystorePtr) -> Result<(), ServiceError> {
+    use sp_keystore::Keystore;
+    
+    // In dev mode, use Alice's seed (same as used in dev chain spec)
+    // This ensures the oracle key matches Alice's account which is an oracle provider
+    let seed = "//Alice";
+    
+    // Generate key from seed and insert into keystore
+    keystore.sr25519_generate_new(
+        ORACLE_KEY_TYPE,
+        Some(seed),
+    ).map_err(|e| ServiceError::Other(format!("Failed to insert oracle authority key: {:?}", e)))?;
+    
+    log::info!(
+        "🔐 Oracle authority key inserted into keystore (seed: {})",
+        seed
+    );
+    
+    Ok(())
+}
 
 /// The full client type definition.
 pub type FullClient = sc_service::TFullClient<
@@ -138,6 +165,12 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
         transaction_pool,
         other: (block_import, grandpa_link, mut telemetry),
     } = new_partial(&config)?;
+
+    // Insert oracle authority key into keystore for offchain worker signed transactions
+    // This allows the offchain worker to sign transactions as an oracle provider
+    if config.role.is_authority() {
+        insert_oracle_authority_key(&keystore_container.keystore())?;
+    }
 
     let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(
         &client.block_hash(0).ok().flatten().expect("Genesis block exists; qed"),

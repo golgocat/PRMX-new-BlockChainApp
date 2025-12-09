@@ -23,7 +23,7 @@ use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
 use sp_runtime::{
     create_runtime_str, generic, impl_opaque_keys,
-    traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, Verify},
+    traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, SaturatedConversion, Verify},
     transaction_validity::{TransactionSource, TransactionValidity},
     ApplyExtrinsicResult, MultiSignature,
 };
@@ -429,6 +429,68 @@ parameter_types! {
     pub const MaxLocationKeyLength: u32 = 64;
 }
 
+/// Implements frame_system::offchain::SigningTypes for signed transaction submission
+impl frame_system::offchain::SigningTypes for Runtime {
+    type Public = <Signature as Verify>::Signer;
+    type Signature = Signature;
+}
+
+/// Implements frame_system::offchain::CreateTransactionBase for submitting signed transactions
+impl<LocalCall> frame_system::offchain::CreateTransactionBase<LocalCall> for Runtime
+where
+    RuntimeCall: From<LocalCall>,
+{
+    type Extrinsic = UncheckedExtrinsic;
+    type RuntimeCall = RuntimeCall;
+}
+
+/// Implements frame_system::offchain::CreateSignedTransaction for creating signed transactions
+impl<LocalCall> frame_system::offchain::CreateSignedTransaction<LocalCall> for Runtime
+where
+    RuntimeCall: From<LocalCall>,
+{
+    fn create_signed_transaction<C: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>>(
+        call: RuntimeCall,
+        public: <Signature as Verify>::Signer,
+        account: AccountId,
+        nonce: Nonce,
+    ) -> Option<UncheckedExtrinsic> {
+        let tip = 0;
+        // Take the biggest period possible.
+        let period = BlockHashCount::get()
+            .checked_next_power_of_two()
+            .map(|c| c / 2)
+            .unwrap_or(2) as u64;
+        let current_block = System::block_number()
+            .saturated_into::<u64>()
+            // The `System::block_number` is initialized with `n+1`,
+            // so the actual block number is `n`.
+            .saturating_sub(1);
+        let era = generic::Era::mortal(period, current_block);
+        let extra: SignedExtra = (
+            frame_system::CheckNonZeroSender::<Runtime>::new(),
+            frame_system::CheckSpecVersion::<Runtime>::new(),
+            frame_system::CheckTxVersion::<Runtime>::new(),
+            frame_system::CheckGenesis::<Runtime>::new(),
+            frame_system::CheckEra::<Runtime>::from(era),
+            frame_system::CheckNonce::<Runtime>::from(nonce),
+            frame_system::CheckWeight::<Runtime>::new(),
+            pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+        );
+        let raw_payload = SignedPayload::new(call, extra)
+            .map_err(|e| {
+                log::warn!("Unable to create signed payload: {:?}", e);
+            })
+            .ok()?;
+        let signature = raw_payload.using_encoded(|payload| C::sign(payload, public))?;
+        let (call, extra, _) = raw_payload.deconstruct();
+        Some(UncheckedExtrinsic::new_signed(call, sp_runtime::MultiAddress::Id(account), signature, extra))
+    }
+}
+
+/// A type for signing payloads for offchain worker transactions
+pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
+
 impl pallet_prmx_oracle::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     /// Oracle providers can submit data (Root for now, can be expanded)
@@ -437,7 +499,11 @@ impl pallet_prmx_oracle::Config for Runtime {
     type GovernanceOrigin = EnsureRoot<AccountId>;
     /// Access to markets pallet for center coordinates
     type MarketsApi = PrmxMarkets;
+    /// Access to policy pallet for automatic settlements
+    type PolicySettlement = PrmxPolicy;
     type MaxLocationKeyLength = MaxLocationKeyLength;
+    /// Oracle authority ID for signing offchain worker transactions
+    type AuthorityId = pallet_prmx_oracle::crypto::OracleAuthId;
     type WeightInfo = ();
 }
 

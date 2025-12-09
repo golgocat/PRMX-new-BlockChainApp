@@ -11,13 +11,21 @@ import {
   FileQuestion,
   Shield,
   Wallet,
-  Cloud
+  Cloud,
+  Code2,
+  Zap,
+  Book,
+  ArrowRight,
+  Github,
+  FileText
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { cn } from '@/lib/utils';
 
+// FAQ Data
 const faqs = [
   {
     category: 'General',
@@ -51,7 +59,7 @@ const faqs = [
       },
       {
         q: 'How long can coverage last?',
-        a: 'Coverage windows range from 1 to 7 days, depending on the market. You must purchase coverage at least 21 days before the coverage start date.',
+        a: 'Coverage windows range from 1 to 7 days, depending on the market configuration.',
       },
       {
         q: 'What is the payout per share?',
@@ -87,7 +95,7 @@ const faqs = [
       },
       {
         q: 'How often is data updated?',
-        a: 'Rainfall data is updated regularly through offchain workers. The 24-hour rolling sum is continuously calculated and stored on-chain.',
+        a: 'Rainfall data is updated hourly through offchain workers. The 24-hour rolling sum is continuously calculated and stored on-chain.',
       },
       {
         q: 'Can the data be manipulated?',
@@ -95,6 +103,68 @@ const faqs = [
       },
     ],
   },
+];
+
+// Documentation sections
+const docSections = [
+  {
+    title: 'Getting Started',
+    icon: Zap,
+    color: 'bg-prmx-cyan/10 text-prmx-cyan',
+    items: [
+      { title: 'Introduction to PRMX', description: 'Learn the basics of parametric insurance' },
+      { title: 'Connecting Your Wallet', description: 'Set up your Polkadot wallet' },
+      { title: 'Understanding Markets', description: 'Browse and analyze available markets' },
+      { title: 'Your First Policy', description: 'Step-by-step coverage purchase guide' },
+    ],
+  },
+  {
+    title: 'Insurance Coverage',
+    icon: Shield,
+    color: 'bg-prmx-purple/10 text-prmx-purple-light',
+    items: [
+      { title: 'How Parametric Insurance Works', description: 'Smart contract-based automatic payouts' },
+      { title: 'Coverage Windows', description: 'Understanding coverage periods' },
+      { title: 'Strike Thresholds', description: '24h rolling rainfall triggers' },
+      { title: 'Settlement Process', description: 'How policies are settled' },
+    ],
+  },
+  {
+    title: 'LP Trading',
+    icon: Wallet,
+    color: 'bg-success/10 text-success',
+    items: [
+      { title: 'Understanding LP Tokens', description: 'What LP tokens represent' },
+      { title: 'Trading on the Orderbook', description: 'Buy and sell LP positions' },
+      { title: 'Risk and Returns', description: 'Potential gains and risks' },
+      { title: 'Distribution Mechanism', description: 'How profits are distributed' },
+    ],
+  },
+  {
+    title: 'Oracle System',
+    icon: Cloud,
+    color: 'bg-info/10 text-info',
+    items: [
+      { title: 'AccuWeather Integration', description: 'Real-time weather data source' },
+      { title: 'Data Updates', description: 'Hourly data fetching process' },
+      { title: 'Rolling 24h Calculation', description: 'How rainfall sums are computed' },
+      { title: 'Data Verification', description: 'Verifying oracle data on-chain' },
+    ],
+  },
+];
+
+// Technical resources
+const technicalResources = [
+  { title: 'GitHub Repository', href: 'https://github.com/golgocat/PRMX-new-BlockChainApp', icon: Github },
+  { title: 'Smart Contract Reference', href: '#', icon: Code2 },
+  { title: 'API Documentation', href: '#', icon: FileText },
+];
+
+// Community resources
+const communityResources = [
+  { title: 'Discord Community', href: 'https://discord.gg', description: 'Join our community chat' },
+  { title: 'Twitter Updates', href: 'https://twitter.com', description: 'Follow for announcements' },
+  { title: 'Telegram Group', href: 'https://t.me', description: 'Connect with other users' },
 ];
 
 function FAQItem({ question, answer }: { question: string; answer: string }) {
@@ -120,6 +190,7 @@ function FAQItem({ question, answer }: { question: string; answer: string }) {
 
 export default function HelpPage() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('faq');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const filteredFaqs = faqs.map(category => ({
@@ -137,9 +208,9 @@ export default function HelpPage() {
     <div className="space-y-8">
       {/* Page Header */}
       <div className="text-center max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Help & Support</h1>
+        <h1 className="text-3xl font-bold mb-2">Help & Resources</h1>
         <p className="text-text-secondary">
-          Find answers to common questions or reach out to our team
+          Find answers, learn about PRMX, and access technical resources
         </p>
       </div>
 
@@ -154,120 +225,269 @@ export default function HelpPage() {
         />
       </div>
 
-      {/* Category Filters */}
-      <div className="flex flex-wrap justify-center gap-2">
-        <Button
-          variant={selectedCategory === null ? 'primary' : 'secondary'}
-          size="sm"
-          onClick={() => setSelectedCategory(null)}
-        >
-          All Topics
-        </Button>
-        {faqs.map((category) => {
-          const Icon = category.icon;
-          return (
-            <Button
-              key={category.category}
-              variant={selectedCategory === category.category ? 'primary' : 'secondary'}
-              size="sm"
-              onClick={() => setSelectedCategory(category.category)}
-              icon={<Icon className="w-4 h-4" />}
-            >
-              {category.category}
-            </Button>
-          );
-        })}
+      {/* Tabs */}
+      <div className="flex justify-center">
+        <Tabs defaultValue="faq" onChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="faq">Q&A</TabsTrigger>
+            <TabsTrigger value="guides">Guides</TabsTrigger>
+            <TabsTrigger value="resources">Resources</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* FAQ Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          {filteredFaqs.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <FileQuestion className="w-12 h-12 mx-auto mb-4 text-text-tertiary" />
-                <h3 className="font-semibold mb-2">No results found</h3>
-                <p className="text-text-secondary text-sm">
-                  Try a different search term or browse categories
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredFaqs.map((category) => {
+      {/* FAQ Tab */}
+      {activeTab === 'faq' && (
+        <>
+          {/* Category Filters */}
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button
+              variant={selectedCategory === null ? 'primary' : 'secondary'}
+              size="sm"
+              onClick={() => setSelectedCategory(null)}
+            >
+              All Topics
+            </Button>
+            {faqs.map((category) => {
               const Icon = category.icon;
               return (
-                <Card key={category.category}>
+                <Button
+                  key={category.category}
+                  variant={selectedCategory === category.category ? 'primary' : 'secondary'}
+                  size="sm"
+                  onClick={() => setSelectedCategory(category.category)}
+                  icon={<Icon className="w-4 h-4" />}
+                >
+                  {category.category}
+                </Button>
+              );
+            })}
+          </div>
+
+          {/* FAQ Content */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+              {filteredFaqs.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center">
+                    <FileQuestion className="w-12 h-12 mx-auto mb-4 text-text-tertiary" />
+                    <h3 className="font-semibold mb-2">No results found</h3>
+                    <p className="text-text-secondary text-sm">
+                      Try a different search term or browse categories
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                filteredFaqs.map((category) => {
+                  const Icon = category.icon;
+                  return (
+                    <Card key={category.category}>
+                      <CardHeader>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-prmx-cyan/10 flex items-center justify-center">
+                            <Icon className="w-5 h-5 text-prmx-cyan" />
+                          </div>
+                          <h2 className="text-lg font-semibold">{category.category}</h2>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        {category.questions.map((faq, index) => (
+                          <FAQItem key={index} question={faq.q} answer={faq.a} />
+                        ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Contact Section */}
+            <div className="space-y-6">
+              <Card className="bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-prmx-gradient flex items-center justify-center">
+                    <MessageCircle className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="font-semibold mb-2">Still need help?</h3>
+                  <p className="text-sm text-text-secondary mb-4">
+                    Our support team is here to assist you
+                  </p>
+                  <Button fullWidth>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Contact Support
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Guides Tab */}
+      {activeTab === 'guides' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-6">
+            {docSections.map((section) => {
+              const Icon = section.icon;
+              return (
+                <Card key={section.title}>
                   <CardHeader>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-prmx-cyan/10 flex items-center justify-center">
-                        <Icon className="w-5 h-5 text-prmx-cyan" />
+                      <div className={`w-10 h-10 rounded-xl ${section.color} flex items-center justify-center`}>
+                        <Icon className="w-5 h-5" />
                       </div>
-                      <h2 className="text-lg font-semibold">{category.category}</h2>
+                      <h2 className="text-lg font-semibold">{section.title}</h2>
                     </div>
                   </CardHeader>
                   <CardContent className="pt-0">
-                    {category.questions.map((faq, index) => (
-                      <FAQItem key={index} question={faq.q} answer={faq.a} />
-                    ))}
+                    <div className="space-y-2">
+                      {section.items.map((item) => (
+                        <div
+                          key={item.title}
+                          className="flex items-center justify-between p-3 rounded-xl hover:bg-background-tertiary transition-colors group cursor-pointer"
+                        >
+                          <div>
+                            <span className="text-text-primary group-hover:text-prmx-cyan transition-colors font-medium">
+                              {item.title}
+                            </span>
+                            <p className="text-xs text-text-tertiary mt-0.5">{item.description}</p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-text-tertiary group-hover:text-prmx-cyan transition-colors" />
+                        </div>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
               );
-            })
-          )}
+            })}
+          </div>
+
+          {/* Featured Article */}
+          <div className="space-y-6">
+            <Card className="bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 rounded-xl bg-prmx-gradient flex items-center justify-center mb-4">
+                  <Book className="w-6 h-6 text-white" />
+                </div>
+                <h3 className="font-semibold mb-2">What is Parametric Insurance?</h3>
+                <p className="text-sm text-text-secondary mb-4">
+                  Learn how PRMX uses smart contracts and real-time weather data 
+                  to provide automatic, transparent insurance coverage.
+                </p>
+                <Button variant="secondary" fullWidth>
+                  Read Article <ArrowRight className="w-4 h-4 ml-2" />
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <h3 className="font-semibold">Quick Tips</h3>
+              </CardHeader>
+              <CardContent className="pt-0 space-y-3 text-sm">
+                <div className="p-3 rounded-lg bg-background-tertiary/50">
+                  <p className="font-medium mb-1">💡 Check Oracle Data</p>
+                  <p className="text-text-secondary text-xs">Always verify current rainfall levels before purchasing coverage.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-background-tertiary/50">
+                  <p className="font-medium mb-1">📊 Understand the Strike</p>
+                  <p className="text-text-secondary text-xs">The 24h rolling sum must exceed the strike threshold for payout.</p>
+                </div>
+                <div className="p-3 rounded-lg bg-background-tertiary/50">
+                  <p className="font-medium mb-1">⚠️ LP Risk Warning</p>
+                  <p className="text-text-secondary text-xs">Only invest in LP tokens what you can afford to lose.</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
+      )}
 
-        {/* Contact Section */}
-        <div className="space-y-6">
-          <Card className="bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
-            <CardContent className="p-6 text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-prmx-gradient flex items-center justify-center">
-                <MessageCircle className="w-8 h-8 text-white" />
-              </div>
-              <h3 className="font-semibold mb-2">Still need help?</h3>
-              <p className="text-sm text-text-secondary mb-4">
-                Our support team is here to assist you with any questions
-              </p>
-              <Button fullWidth>
-                <Mail className="w-4 h-4 mr-2" />
-                Contact Support
-              </Button>
-            </CardContent>
-          </Card>
-
+      {/* Resources Tab */}
+      {activeTab === 'resources' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          {/* Technical Resources */}
           <Card>
             <CardHeader>
-              <h3 className="font-semibold">Resources</h3>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-prmx-purple/10 flex items-center justify-center">
+                  <Code2 className="w-5 h-5 text-prmx-purple-light" />
+                </div>
+                <h2 className="text-lg font-semibold">Technical Resources</h2>
+              </div>
             </CardHeader>
-            <CardContent className="pt-0 space-y-3">
-              <a
-                href="/docs"
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-background-tertiary transition-colors"
-              >
-                <span className="text-sm">Documentation</span>
-                <ExternalLink className="w-4 h-4 text-text-tertiary" />
-              </a>
-              <a
-                href="https://discord.gg"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-background-tertiary transition-colors"
-              >
-                <span className="text-sm">Discord Community</span>
-                <ExternalLink className="w-4 h-4 text-text-tertiary" />
-              </a>
-              <a
-                href="https://twitter.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between p-3 rounded-xl hover:bg-background-tertiary transition-colors"
-              >
-                <span className="text-sm">Twitter Updates</span>
-                <ExternalLink className="w-4 h-4 text-text-tertiary" />
-              </a>
+            <CardContent className="pt-0 space-y-2">
+              {technicalResources.map((resource) => {
+                const Icon = resource.icon;
+                return (
+                  <a
+                    key={resource.title}
+                    href={resource.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-3 rounded-xl hover:bg-background-tertiary transition-colors group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Icon className="w-5 h-5 text-text-tertiary group-hover:text-prmx-cyan" />
+                      <span className="text-text-secondary group-hover:text-text-primary">{resource.title}</span>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-text-tertiary" />
+                  </a>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Community Resources */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center">
+                  <MessageCircle className="w-5 h-5 text-success" />
+                </div>
+                <h2 className="text-lg font-semibold">Community</h2>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0 space-y-2">
+              {communityResources.map((resource) => (
+                <a
+                  key={resource.title}
+                  href={resource.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between p-3 rounded-xl hover:bg-background-tertiary transition-colors group"
+                >
+                  <div>
+                    <span className="text-text-secondary group-hover:text-text-primary block">{resource.title}</span>
+                    <span className="text-xs text-text-tertiary">{resource.description}</span>
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-text-tertiary" />
+                </a>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Contact Support */}
+          <Card className="lg:col-span-2 bg-gradient-to-r from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-6">
+                <div className="w-16 h-16 rounded-full bg-prmx-gradient flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-8 h-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg mb-1">Need Direct Support?</h3>
+                  <p className="text-sm text-text-secondary mb-3">
+                    Our team is available to help with technical issues, account questions, or general inquiries.
+                  </p>
+                  <Button>
+                    Contact Support Team
+                  </Button>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 }

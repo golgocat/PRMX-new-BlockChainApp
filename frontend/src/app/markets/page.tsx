@@ -48,9 +48,9 @@ export default function MarketsPage() {
     centerLongitude: '',
     strikeValue: '50',
     daoMarginBp: '2000',
-    minDurationDays: '1',
+    minDurationDays: '0',  // 0 for testing (allows immediate coverage)
     maxDurationDays: '7',
-    minLeadTimeDays: '21',
+    minLeadTimeDays: '0',  // 0 for testing (no lead time required)
   });
 
   const filteredMarkets = markets.filter((market) => {
@@ -102,9 +102,9 @@ export default function MarketsPage() {
         centerLongitude: '',
         strikeValue: '50',
         daoMarginBp: '2000',
-        minDurationDays: '1',
+        minDurationDays: '0',
         maxDurationDays: '7',
-        minLeadTimeDays: '21',
+        minLeadTimeDays: '0',
       });
       refresh();
     } catch (err) {

@@ -21,6 +21,8 @@ sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "po
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
 sp-io = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
+sp-keystore = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
+sp-application-crypto = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
 frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false, optional = true }
 
 # Local dependencies
@@ -42,6 +44,8 @@ std = [
     "sp-std/std",
     "sp-core/std",
     "sp-io/std",
+    "sp-keystore/std",
+    "sp-application-crypto/std",
     "frame-benchmarking?/std",
     "pallet-prmx-markets/std",
 ]

@@ -28,6 +28,7 @@ pallet-prmx-markets = { path = "../prmx-markets", default-features = false }
 pallet-prmx-quote = { path = "../prmx-quote", default-features = false }
 pallet-prmx-holdings = { path = "../prmx-holdings", default-features = false }
 pallet-prmx-orderbook-lp = { path = "../prmx-orderbook-lp", default-features = false }
+pallet-prmx-oracle = { path = "../prmx-oracle", default-features = false }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
@@ -50,6 +51,7 @@ std = [
     "pallet-prmx-quote/std",
     "pallet-prmx-holdings/std",
     "pallet-prmx-orderbook-lp/std",
+    "pallet-prmx-oracle/std",
 ]
 runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",

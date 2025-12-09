@@ -18,7 +18,10 @@ import {
   Droplets,
   CloudRain,
   Wallet,
-  ArrowRight
+  ArrowRight,
+  Copy,
+  Check,
+  Lock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -43,8 +46,19 @@ export default function PolicyDetailPage() {
   const [policy, setPolicy] = useState<Policy | null>(null);
   const [market, setMarket] = useState<Market | null>(null);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
+  const [poolInfo, setPoolInfo] = useState<{ address: string; balance: bigint } | null>(null);
   const [loading, setLoading] = useState(true);
   const [settling, setSettling] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAddress = async () => {
+    if (poolInfo?.address) {
+      await navigator.clipboard.writeText(poolInfo.address);
+      setCopied(true);
+      toast.success('Pool address copied!');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   useEffect(() => {
     if (isNaN(policyId) || policyId < 0) {
@@ -69,6 +83,13 @@ export default function PolicyDetailPage() {
         } else {
           const m = await api.getMarket(found.marketId);
           setMarket(m);
+        }
+        // Load pool info (address + balance)
+        try {
+          const pool = await api.getPolicyPoolInfo(policyId);
+          setPoolInfo(pool);
+        } catch (poolErr) {
+          console.error('Failed to load pool info:', poolErr);
         }
         // Load settlement result if policy is settled
         if (found.status === 'Settled') {
@@ -224,7 +245,7 @@ export default function PolicyDetailPage() {
                 <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
                   <div>
                     <span className="text-text-secondary">Strike Value</span>
-                    <p className="font-medium">{market.strikeValue} mm rainfall</p>
+                    <p className="font-medium">{market.strikeValue} mm (24h rolling)</p>
                   </div>
                   <div>
                     <span className="text-text-secondary">Payout per Share</span>
@@ -305,6 +326,59 @@ export default function PolicyDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Pool Account Info */}
+          {poolInfo && (
+            <Card className="border-prmx-purple/30">
+              <CardHeader className="pb-2">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-prmx-purple" />
+                  Locked Funds
+                </h2>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Pool Balance */}
+                <div className="p-4 rounded-xl bg-prmx-purple/10 border border-prmx-purple/30">
+                  <span className="text-sm text-text-secondary">Pool Balance</span>
+                  <p className="text-2xl font-bold text-prmx-purple-light">
+                    {formatUSDT(poolInfo.balance)}
+                  </p>
+                </div>
+                
+                {/* Pool Address */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-secondary">Pool Address</span>
+                    <button
+                      onClick={handleCopyAddress}
+                      className="flex items-center gap-1 text-xs text-prmx-cyan hover:text-prmx-cyan/80 transition-colors"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="p-3 rounded-lg bg-background-tertiary/50 border border-border-secondary">
+                    <p className="font-mono text-xs break-all text-text-secondary">
+                      {poolInfo.address}
+                    </p>
+                  </div>
+                </div>
+                
+                <p className="text-xs text-text-tertiary">
+                  Funds are locked in this derived account until policy settlement.
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Settlement Actions (DAO only) */}
           {canSettle && (

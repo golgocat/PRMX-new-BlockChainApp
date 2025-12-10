@@ -41,7 +41,7 @@ import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory,
 import * as api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
-import type { LpAskOrder, Policy } from '@/types';
+import type { LpAskOrder, Policy, DaoSolvencyInfo, PolicyDefiInfo } from '@/types';
 import { encodeAddress, decodeAddress } from '@polkadot/util-crypto';
 
 // Helper to compare addresses (handles different encodings)
@@ -99,6 +99,42 @@ export default function LpTradingPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  
+  // DeFi solvency state
+  const [solvencyInfo, setSolvencyInfo] = useState<DaoSolvencyInfo | null>(null);
+  const [policyDefiInfoMap, setPolicyDefiInfoMap] = useState<Map<number, PolicyDefiInfo>>(new Map());
+  
+  // Load DAO solvency info on mount
+  useEffect(() => {
+    const loadSolvencyInfo = async () => {
+      try {
+        const info = await api.getDaoSolvencyInfo();
+        setSolvencyInfo(info);
+      } catch (err) {
+        console.error('Failed to load solvency info:', err);
+      }
+    };
+    loadSolvencyInfo();
+  }, []);
+  
+  // Load DeFi info for holdings
+  useEffect(() => {
+    const loadDefiInfo = async () => {
+      const newMap = new Map<number, PolicyDefiInfo>();
+      for (const holding of holdings) {
+        try {
+          const defiInfo = await api.getPolicyDefiInfo(holding.policyId);
+          newMap.set(holding.policyId, defiInfo);
+        } catch (err) {
+          console.error(`Failed to load DeFi info for policy ${holding.policyId}:`, err);
+        }
+      }
+      setPolicyDefiInfoMap(newMap);
+    };
+    if (holdings.length > 0) {
+      loadDefiInfo();
+    }
+  }, [holdings]);
   const [selectedOrder, setSelectedOrder] = useState<LpAskOrder | null>(null);
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
   const [sellQuantity, setSellQuantity] = useState('1');
@@ -712,11 +748,27 @@ export default function LpTradingPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
+                  {/* DAO Solvency Warning */}
+                  {solvencyInfo && !solvencyInfo.isSolvent && (
+                    <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                        <div className="text-xs">
+                          <p className="font-medium text-warning">DAO Solvency Warning</p>
+                          <p className="text-text-secondary mt-1">
+                            DAO may not fully cover DeFi losses. Some positions may have reduced payouts.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
                   {holdings.filter(h => h.shares > 0).map((holding, index) => {
                     const policy = getPolicyById(holding.policyId);
                     const market = policy ? getMarketById(policy.marketId) : null;
                     const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
                     const potentialPayout = holding.shares * (market?.payoutPerShare || BigInt(100_000_000));
+                    const defiInfo = policyDefiInfoMap.get(holding.policyId);
                     
                     return (
                     <div
@@ -726,7 +778,15 @@ export default function LpTradingPage() {
                     >
                       <div className="flex items-center justify-between mb-2">
                         <div>
+                          <div className="flex items-center gap-2">
                           <span className="font-medium group-hover:text-prmx-cyan transition-colors">Policy #{holding.policyId}</span>
+                            {/* DeFi Allocation Indicator */}
+                            {defiInfo?.isAllocatedToDefi && (
+                              <Badge variant="success" className="text-xs px-1.5 py-0.5">
+                                📈 DeFi
+                              </Badge>
+                            )}
+                          </div>
                           {market && (
                             <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5">
                               <MapPin className="w-3 h-3" />
@@ -758,6 +818,15 @@ export default function LpTradingPage() {
                           </div>
                         )}
                       </div>
+                      {/* DeFi Principal Display */}
+                      {defiInfo?.position && (
+                        <div className="mt-2 pt-2 border-t border-border-secondary/50 text-xs">
+                          <span className="text-text-tertiary">DeFi Allocated: </span>
+                          <span className="text-prmx-purple-light font-medium">
+                            {formatUSDT(defiInfo.position.principalUsdt)}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );})}
                 </div>
@@ -1541,14 +1610,67 @@ export default function LpTradingPage() {
               </div>
             )}
 
+            {/* DeFi Allocation Info */}
+            {(() => {
+              const defiInfo = policyDefiInfoMap.get(selectedHoldingPolicyId);
+              if (!defiInfo?.isAllocatedToDefi) return null;
+              
+              return (
+                <div className="p-4 rounded-xl bg-prmx-purple/5 border border-prmx-purple/20">
+                  <h4 className="font-semibold mb-2 flex items-center gap-2 text-prmx-purple-light">
+                    <TrendingUp className="w-4 h-4" />
+                    DeFi Yield Strategy Active
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">Status</span>
+                      <Badge variant="success" className="text-xs">Allocated to DeFi</Badge>
+                    </div>
+                    {defiInfo.position && (
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">Principal in DeFi</span>
+                        <span className="font-medium">{formatUSDT(defiInfo.position.principalUsdt)}</span>
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-xs text-text-tertiary mt-3 pt-2 border-t border-prmx-purple/20">
+                    Pool funds are generating yield via Hydration Stableswap. 
+                    The DAO provides loss coverage.
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* DAO Solvency Warning in Modal */}
+            {solvencyInfo && !solvencyInfo.isSolvent && policyDefiInfoMap.get(selectedHoldingPolicyId)?.isAllocatedToDefi && (
+              <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-warning mt-0.5 flex-shrink-0" />
+                  <div className="text-xs">
+                    <span className="text-warning font-medium">Solvency Notice: </span>
+                    <span className="text-text-secondary">
+                      DAO coverage may be limited. If DeFi incurs significant losses, 
+                      full payout may not be guaranteed.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Risk Warning */}
             <div className="p-3 rounded-lg bg-error/5 border border-error/20">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-error mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-text-secondary">
-                  <span className="text-error font-medium">Risk: </span>
+                  <span className="text-error font-medium">Event Risk: </span>
                   If the 24h rolling rainfall exceeds {market?.strikeValue || 50}mm during the coverage period, 
                   your LP tokens will pay out to the policy holder and you will lose your investment.
+                  {policyDefiInfoMap.get(selectedHoldingPolicyId)?.isAllocatedToDefi && (
+                    <span className="block mt-1">
+                      <span className="text-prmx-purple-light font-medium">DeFi Risk: </span>
+                      Pool funds in DeFi may experience additional yield/loss. The DAO covers DeFi losses when solvent.
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

@@ -31,7 +31,7 @@ import { useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
 import { formatUSDT, formatDate, formatAddress, formatCoordinates, formatTimeRemaining } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import type { Policy, Market } from '@/types';
+import type { Policy, Market, PolicyDefiInfo } from '@/types';
 import type { SettlementResult } from '@/lib/api';
 
 export default function PolicyDetailPage() {
@@ -47,6 +47,7 @@ export default function PolicyDetailPage() {
   const [market, setMarket] = useState<Market | null>(null);
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
   const [poolInfo, setPoolInfo] = useState<{ address: string; balance: bigint } | null>(null);
+  const [defiInfo, setDefiInfo] = useState<PolicyDefiInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [settling, setSettling] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -90,6 +91,13 @@ export default function PolicyDetailPage() {
           setPoolInfo(pool);
         } catch (poolErr) {
           console.error('Failed to load pool info:', poolErr);
+        }
+        // Load DeFi allocation info
+        try {
+          const defi = await api.getPolicyDefiInfo(policyId);
+          setDefiInfo(defi);
+        } catch (defiErr) {
+          console.error('Failed to load DeFi info:', defiErr);
         }
         // Load settlement result if policy is settled
         if (found.status === 'Settled') {
@@ -380,6 +388,71 @@ export default function PolicyDetailPage() {
             </Card>
           )}
 
+          {/* DeFi Allocation Card */}
+          {defiInfo && (
+            <Card className={defiInfo.isAllocatedToDefi ? 'border-success/30' : 'border-border-secondary'}>
+              <CardHeader className="pb-2">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5 text-success" />
+                  DeFi Yield Strategy
+                </h2>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Investment Status */}
+                <div className={`p-4 rounded-xl ${
+                  defiInfo.isAllocatedToDefi 
+                    ? 'bg-success/10 border border-success/30' 
+                    : 'bg-background-tertiary/50 border border-border-secondary'
+                }`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-text-secondary">Status</span>
+                    <Badge 
+                      variant={defiInfo.isAllocatedToDefi ? 'success' : 'default'}
+                      className="text-xs"
+                    >
+                      {defiInfo.investmentStatus === 'Invested' && '🟢 Allocated to DeFi'}
+                      {defiInfo.investmentStatus === 'NotInvested' && '⚪ Not Allocated'}
+                      {defiInfo.investmentStatus === 'Unwinding' && '🔄 Unwinding'}
+                      {defiInfo.investmentStatus === 'Settled' && '✓ Settled'}
+                      {defiInfo.investmentStatus === 'Failed' && '❌ Failed'}
+                    </Badge>
+                  </div>
+                  {defiInfo.isAllocatedToDefi && (
+                    <p className="text-xs text-text-secondary">
+                      Locked funds are generating yield via Hydration Stableswap
+                    </p>
+                  )}
+                </div>
+
+                {/* Position Details (if allocated) */}
+                {defiInfo.position && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary text-sm">Principal Allocated</span>
+                      <span className="font-medium text-success">
+                        {formatUSDT(defiInfo.position.principalUsdt)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary text-sm">LP Shares</span>
+                      <span className="font-medium">
+                        {Number(defiInfo.position.lpShares).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info tooltip */}
+                <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
+                  <p className="text-xs text-text-secondary">
+                    💡 Policy funds may be allocated to DeFi strategies to generate yield. 
+                    The DAO guarantees coverage of potential losses.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Settlement Actions (DAO only) */}
           {canSettle && (
             <Card>
@@ -442,9 +515,29 @@ export default function PolicyDetailPage() {
                       </div>
                     </div>
 
+                    {/* DeFi Position Unwound Indicator */}
+                    {defiInfo && defiInfo.investmentStatus === 'Settled' && defiInfo.position && (
+                      <div className="p-3 rounded-lg bg-prmx-purple/5 border border-prmx-purple/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp className="w-4 h-4 text-prmx-purple" />
+                          <span className="text-sm font-medium">DeFi Position Unwound</span>
+                        </div>
+                        <div className="space-y-1 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-text-secondary">Principal Invested</span>
+                            <span className="font-medium">{formatUSDT(defiInfo.position.principalUsdt)}</span>
+                          </div>
+                          <p className="text-xs text-text-tertiary mt-2">
+                            Position was unwound from DeFi strategy at settlement
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Financial Outcome */}
                     <div className="space-y-3">
                       {settlementResult.eventOccurred ? (
+                        <>
                         <div className="p-3 rounded-lg bg-success/5 border border-success/20">
                           <div className="flex items-center gap-2 mb-1">
                             <Wallet className="w-4 h-4 text-success" />
@@ -460,7 +553,24 @@ export default function PolicyDetailPage() {
                             </span>
                           </div>
                         </div>
+                          
+                          {/* Partial Payout Warning (when payout < maxPayout) */}
+                          {settlementResult.payoutToHolder < policy.maxPayout && (
+                            <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
+                              <div className="flex items-start gap-2">
+                                <XCircle className="w-4 h-4 text-warning mt-0.5" />
+                                <div>
+                                  <p className="text-sm font-medium text-warning">Partial Payout</p>
+                                  <p className="text-xs text-text-secondary mt-1">
+                                    Payout was {formatUSDT(settlementResult.payoutToHolder)} instead of the full {formatUSDT(policy.maxPayout)} due to DeFi losses that exceeded DAO coverage capacity.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
                       ) : (
+                        <>
                         <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
                           <div className="flex items-center gap-2 mb-1">
                             <TrendingUp className="w-4 h-4 text-prmx-cyan" />
@@ -470,8 +580,34 @@ export default function PolicyDetailPage() {
                             {formatUSDT(settlementResult.returnedToLps)}
                           </p>
                         </div>
+
+                          {/* LP Loss Warning (when returned < expected pool balance) */}
+                          {defiInfo?.position && settlementResult.returnedToLps < defiInfo.position.principalUsdt && (
+                            <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
+                              <div className="flex items-start gap-2">
+                                <XCircle className="w-4 h-4 text-warning mt-0.5" />
+                                <div>
+                                  <p className="text-sm font-medium text-warning">LP Loss Absorbed</p>
+                                  <p className="text-xs text-text-secondary mt-1">
+                                    LPs received {formatUSDT(settlementResult.returnedToLps)} instead of full principal due to DeFi losses. 
+                                    The DAO covered what it could.
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
+
+                    {/* DAO Contribution Note (show when DeFi was involved) */}
+                    {defiInfo?.position && (
+                      <div className="p-2 rounded-lg bg-prmx-cyan/5">
+                        <p className="text-xs text-text-secondary text-center">
+                          🛡️ DAO provided loss coverage for DeFi-allocated funds
+                        </p>
+                      </div>
+                    )}
 
                     {/* Settlement Time */}
                     <div className="pt-2 border-t border-border-secondary">

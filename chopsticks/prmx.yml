@@ -1,0 +1,44 @@
+# Chopsticks configuration for PRMX local chain
+#
+# This config uses the local PRMX dev node for XCM testing
+# PRMX is configured as para ID 2000 for testing purposes
+#
+# Usage:
+#   1. Start PRMX dev node: ./target/release/prmx-node --dev
+#   2. Then: chopsticks --config chopsticks/prmx.yml
+#
+# Note: For Chopsticks to work with PRMX, you need the node running first
+
+endpoint: ws://127.0.0.1:9944
+mock-signature-host: true
+db: ./db/prmx.db
+port: 8002
+
+# Configure as parachain for XCM testing
+# para-id: 2000
+
+# Storage overrides for testing
+import-storage:
+  System:
+    Account:
+      # Alice (DAO account) - ensure has enough balance
+      - - "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"
+        - providers: 1
+          data:
+            free: "1000000000000000000000"  # 1000 PRMX
+            
+  # Give DAO account USDT for testing
+  Assets:
+    Account:
+      # USDT (asset 1) for Alice/DAO
+      - - [1, "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"]
+        - balance: "1000000000000"  # 1,000,000 USDT (6 decimals)
+          status: "Liquid"
+          reason: "Consumer"
+          extra: null
+      # Bob (policy holder) with some USDT
+      - - [1, "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"]
+        - balance: "100000000000"  # 100,000 USDT
+          status: "Liquid"
+          reason: "Consumer"
+          extra: null

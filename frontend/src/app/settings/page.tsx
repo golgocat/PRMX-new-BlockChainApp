@@ -2,12 +2,10 @@
 
 import { useState } from 'react';
 import { 
-  Settings, 
   User, 
   Bell, 
   Shield,
   Palette,
-  Globe,
   Wallet,
   Save,
   Moon,

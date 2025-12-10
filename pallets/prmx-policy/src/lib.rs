@@ -8,6 +8,7 @@
 //! - Each policy locks capital (user premium + DAO contribution) in a per-policy pool.
 //! - LP tokens are minted to the DAO when policies are created.
 //! - Policies can be settled based on oracle data.
+//! - Capital can be invested in DeFi (Hydration Pool 102) via CapitalApi integration.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -20,8 +21,104 @@ use frame_support::traits::fungibles::{Inspect, Mutate};
 use frame_support::traits::tokens::Preservation;
 use pallet_prmx_holdings::HoldingsApi;
 use pallet_prmx_quote::QuoteAccess;
+use sp_runtime::DispatchError;
 
 use pallet_prmx_orderbook_lp::LpOrderbookApi;
+
+// Re-export PolicyId for external use
+pub type PolicyId = u64;
+
+// =============================================================================
+//                              Traits
+// =============================================================================
+
+/// Trait for deriving policy pool accounts.
+///
+/// This is implemented by pallet_prmx_policy to allow other pallets
+/// (like pallet_prmx_xcm_capital) to derive the on-chain account used
+/// for each policy pool.
+pub trait PolicyPoolAccountApi<AccountId> {
+    fn policy_pool_account(policy_id: PolicyId) -> AccountId;
+}
+
+/// Capital management API used by pallet_prmx_policy.
+///
+/// This trait abstracts capital management operations. In v1, it is implemented
+/// by pallet_prmx_xcm_capital to manage DeFi investments (Hydration Pool 102).
+pub trait CapitalApi<AccountId> {
+    type Balance;
+
+    /// Allocate capital of a policy into the DeFi strategy (Hydration Pool 102).
+    ///
+    /// This is called by a DAO-controlled extrinsic, not by users.
+    fn allocate_to_defi(
+        policy_id: PolicyId,
+        amount: Self::Balance,
+    ) -> Result<(), DispatchError>;
+
+    /// Automatically allocate policy capital to DeFi based on configured percentage.
+    /// Called after policy creation. Uses the configured allocation percentage.
+    fn auto_allocate_policy_capital(
+        policy_id: PolicyId,
+        pool_balance: Self::Balance,
+    ) -> Result<(), DispatchError>;
+
+    /// Ensure that the given policy pool has at least `required_local`
+    /// USDT available locally on PRMX and that all DeFi LP exposure
+    /// for this policy has been fully unwound.
+    ///
+    /// If the realised value from unwinding is less than `required_local`,
+    /// the DAO must cover the shortfall by transferring USDT into the policy pool.
+    fn ensure_local_liquidity(
+        policy_id: PolicyId,
+        required_local: Self::Balance,
+    ) -> Result<(), DispatchError>;
+
+    /// Notification that a policy is fully settled.
+    /// Implementations can use this to perform any final cleanup.
+    fn on_policy_settled(policy_id: PolicyId) -> Result<(), DispatchError>;
+}
+
+/// No-op implementation of CapitalApi for when yield management is disabled.
+pub struct NoOpCapitalApi<AccountId, Balance>(
+    core::marker::PhantomData<(AccountId, Balance)>,
+);
+
+impl<AccountId, Balance> CapitalApi<AccountId> for NoOpCapitalApi<AccountId, Balance>
+where
+    Balance: Default,
+{
+    type Balance = Balance;
+
+    fn allocate_to_defi(
+        _policy_id: PolicyId,
+        _amount: Self::Balance,
+    ) -> Result<(), DispatchError> {
+        // No-op: capital stays in policy pool
+        Ok(())
+    }
+
+    fn auto_allocate_policy_capital(
+        _policy_id: PolicyId,
+        _pool_balance: Self::Balance,
+    ) -> Result<(), DispatchError> {
+        // No-op: no auto-allocation without yield pallet
+        Ok(())
+    }
+
+    fn ensure_local_liquidity(
+        _policy_id: PolicyId,
+        _required_local: Self::Balance,
+    ) -> Result<(), DispatchError> {
+        // No-op: all capital is already local
+        Ok(())
+    }
+
+    fn on_policy_settled(_policy_id: PolicyId) -> Result<(), DispatchError> {
+        // No-op: nothing to clean up
+        Ok(())
+    }
+}
 
 /// Stub implementation for when orderbook is not yet implemented
 pub struct StubLpOrderbook<AccountId, Balance>(
@@ -54,7 +151,8 @@ pub mod pallet {
     //                                  Types
     // =========================================================================
 
-    pub type PolicyId = u64;
+    // Re-export PolicyId from module level
+    pub use super::PolicyId;
 
     /// Policy status
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, Default)]
@@ -155,6 +253,10 @@ pub mod pallet {
         /// Maximum policies per market
         #[pallet::constant]
         type MaxPoliciesPerMarket: Get<u32>;
+
+        /// Capital management API for DeFi yield strategy integration (Hydration Pool 102).
+        /// Use NoOpCapitalApi if yield management is not enabled.
+        type CapitalApi: CapitalApi<Self::AccountId, Balance = Self::Balance>;
     }
 
     // =========================================================================
@@ -439,6 +541,19 @@ pub mod pallet {
                 quantity: shares,
             });
 
+            // Auto-allocate policy capital to DeFi strategy (Hydration Pool 102)
+            // Uses the configured allocation percentage (default 100%)
+            if let Err(e) = T::CapitalApi::auto_allocate_policy_capital(policy_id, max_payout) {
+                log::warn!(
+                    target: "prmx-policy",
+                    "⚠️ Auto-allocation to DeFi failed for policy {}: {:?}",
+                    policy_id,
+                    e
+                );
+                // Don't fail policy creation if auto-allocation fails
+                // The DAO can manually allocate later
+            }
+
             Ok(())
         }
 
@@ -588,18 +703,56 @@ pub mod pallet {
 
             let now = Self::current_timestamp();
 
-            // Get pool account and balance
+            // Get pool account
             let pool_account = Self::policy_pool_account(policy_id);
-            let pool_balance = PolicyRiskPoolBalance::<T>::get(policy_id);
+
+            // =========================================================================
+            // DeFi Integration: Ensure local liquidity before settlement
+            // =========================================================================
+            // Before settlement, we need to ensure the policy pool has enough
+            // local USDT to fulfill obligations. This unwinds any LP positions
+            // and has the DAO top up any shortfall from DeFi losses.
+            log::info!(
+                target: "prmx-policy",
+                "💰 Ensuring local liquidity for policy {} (required: {} USDT)",
+                policy_id,
+                policy.max_payout.into()
+            );
+
+            T::CapitalApi::ensure_local_liquidity(policy_id, policy.max_payout)?;
+
+            // After unwinding, get the ACTUAL on-chain pool balance
+            // This may be less than max_payout if DAO couldn't cover full DeFi loss
+            let pool_balance = T::Assets::balance(T::UsdtAssetId::get(), &pool_account);
+            
+            log::info!(
+                target: "prmx-policy",
+                "📊 Pool balance after DeFi unwind: {} USDT (max_payout was {})",
+                pool_balance.into(),
+                policy.max_payout.into()
+            );
 
             let payout_to_holder: T::Balance;
 
             if event_occurred {
                 // Event occurred - pay out to policy holder
-                let payout = policy.max_payout;
+                // In case of DAO insolvency, pool may have less than max_payout
+                // Pay out what's available in the pool
+                let payout = if pool_balance < policy.max_payout {
+                    log::warn!(
+                        target: "prmx-policy",
+                        "⚠️ Pool has {} USDT but max_payout is {} USDT - paying out available balance",
+                        pool_balance.into(),
+                        policy.max_payout.into()
+                    );
+                    pool_balance
+                } else {
+                    policy.max_payout
+                };
                 payout_to_holder = payout;
 
-                // Transfer from pool to holder
+                // Transfer from pool to holder (only if there's something to transfer)
+                if payout > T::Balance::zero() {
                 T::Assets::transfer(
                     T::UsdtAssetId::get(),
                     &pool_account,
@@ -607,6 +760,7 @@ pub mod pallet {
                     payout,
                     frame_support::traits::tokens::Preservation::Expendable,
                 ).map_err(|_| Error::<T>::TransferFailed)?;
+                }
 
                 // Update storage
                 PolicyRiskPoolBalance::<T>::insert(policy_id, T::Balance::zero());
@@ -662,6 +816,12 @@ pub mod pallet {
                 });
             }
 
+            // =========================================================================
+            // DeFi Integration: Notify CapitalApi of settlement completion
+            // =========================================================================
+            // Perform any final cleanup for the policy's capital management state.
+            T::CapitalApi::on_policy_settled(policy_id)?;
+
             Ok(payout_to_holder)
         }
 
@@ -709,5 +869,15 @@ impl<T: Config> pallet_prmx_oracle::PolicySettlement<T::AccountId> for Pallet<T>
         // Call internal settlement function with event_occurred = true
         let payout = pallet::Pallet::<T>::do_settle_policy(policy_id, true)?;
         Ok(payout.into())
+    }
+}
+
+// =============================================================================
+//                       PolicyPoolAccountApi Implementation
+// =============================================================================
+
+impl<T: Config> PolicyPoolAccountApi<T::AccountId> for Pallet<T> {
+    fn policy_pool_account(policy_id: PolicyId) -> T::AccountId {
+        pallet::Pallet::<T>::policy_pool_account(policy_id)
     }
 }

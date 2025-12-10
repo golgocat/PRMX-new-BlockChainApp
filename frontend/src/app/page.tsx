@@ -11,7 +11,10 @@ import {
   Activity,
   Clock,
   Plus,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle,
+  CheckCircle2,
+  DollarSign
 } from 'lucide-react';
 import Link from 'next/link';
 import { StatCard } from '@/components/ui/StatCard';
@@ -24,6 +27,8 @@ import { formatUSDT, formatTimeRemaining, formatAddress } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { useMarkets, usePolicies, useLpOrders, useDashboardStats } from '@/hooks/useChainData';
 import { cn } from '@/lib/utils';
+import * as api from '@/lib/api';
+import type { DaoSolvencyInfo } from '@/types';
 
 export default function DashboardPage() {
   const { isConnected, selectedAccount, isChainConnected, currentBlock } = useWalletStore();
@@ -36,10 +41,37 @@ export default function DashboardPage() {
   const { stats, loading: statsLoading, refresh: refreshStats } = useDashboardStats();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // DAO Solvency State
+  const [solvencyInfo, setSolvencyInfo] = useState<DaoSolvencyInfo | null>(null);
+  const [loadingSolvency, setLoadingSolvency] = useState(false);
+  
+  // Load DAO solvency info
+  const loadSolvencyInfo = async () => {
+    setLoadingSolvency(true);
+    try {
+      const info = await api.getDaoSolvencyInfo();
+      setSolvencyInfo(info);
+    } catch (err) {
+      console.error('Failed to load solvency info:', err);
+    } finally {
+      setLoadingSolvency(false);
+    }
+  };
+  
+  useEffect(() => {
+    if (isDao) {
+      loadSolvencyInfo();
+    }
+  }, [isDao]);
 
   const handleRefreshAll = async () => {
     setIsRefreshing(true);
-    await Promise.all([refreshMarkets(), refreshPolicies(), refreshStats()]);
+    const refreshPromises = [refreshMarkets(), refreshPolicies(), refreshStats()];
+    if (isDao) {
+      refreshPromises.push(loadSolvencyInfo());
+    }
+    await Promise.all(refreshPromises);
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
@@ -201,6 +233,149 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* DAO DeFi Strategy Dashboard */}
+      {isDao && (
+        <Card className="border-prmx-cyan/30">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-prmx-cyan/10 flex items-center justify-center">
+                  <TrendingUp className="w-5 h-5 text-prmx-cyan" />
+                </div>
+                <div>
+                  <h2 className="font-semibold">DeFi Strategy Dashboard</h2>
+                  <p className="text-sm text-text-secondary">DeFi yield strategy status & DAO solvency</p>
+                </div>
+              </div>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                onClick={loadSolvencyInfo}
+                disabled={loadingSolvency}
+                icon={<RefreshCw className={cn('w-4 h-4', loadingSolvency && 'animate-spin')} />}
+              >
+                Refresh
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {loadingSolvency && !solvencyInfo ? (
+              <div className="flex items-center justify-center py-8">
+                <RefreshCw className="w-6 h-6 animate-spin text-prmx-cyan" />
+              </div>
+            ) : solvencyInfo ? (
+              <div className="space-y-4">
+                {/* Solvency Status Banner */}
+                <div className={cn(
+                  'p-4 rounded-xl border',
+                  solvencyInfo.isSolvent 
+                    ? 'bg-success/10 border-success/30' 
+                    : 'bg-warning/10 border-warning/30'
+                )}>
+                  <div className="flex items-center gap-3">
+                    {solvencyInfo.isSolvent ? (
+                      <CheckCircle2 className="w-6 h-6 text-success" />
+                    ) : (
+                      <AlertTriangle className="w-6 h-6 text-warning" />
+                    )}
+                    <div className="flex-1">
+                      <p className="font-semibold">
+                        {solvencyInfo.isSolvent ? 'DAO is Solvent' : 'Solvency Warning'}
+                      </p>
+                      <p className="text-xs text-text-secondary">
+                        {solvencyInfo.isSolvent 
+                          ? 'DAO can cover all potential DeFi losses' 
+                          : 'DAO may not cover all potential DeFi losses'}
+                      </p>
+                    </div>
+                    <Badge 
+                      variant={solvencyInfo.isSolvent ? 'success' : 'warning'}
+                    >
+                      {solvencyInfo.isSolvent ? '🟢 Solvent' : '🟡 At Risk'}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Stats Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 rounded-xl bg-background-tertiary/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="w-4 h-4 text-success" />
+                      <span className="text-sm text-text-secondary">DAO Balance</span>
+                    </div>
+                    <p className="text-xl font-bold text-success">
+                      {formatUSDT(solvencyInfo.daoBalance)}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-background-tertiary/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-prmx-purple" />
+                      <span className="text-sm text-text-secondary">Total in DeFi</span>
+                    </div>
+                    <p className="text-xl font-bold text-prmx-purple-light">
+                      {formatUSDT(solvencyInfo.totalAllocatedCapital)}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-background-tertiary/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Activity className="w-4 h-4 text-prmx-cyan" />
+                      <span className="text-sm text-text-secondary">Active Positions</span>
+                    </div>
+                    <p className="text-xl font-bold">{solvencyInfo.activePositionsCount}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-background-tertiary/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-4 h-4 text-text-secondary" />
+                      <span className="text-sm text-text-secondary">Allocation Rate</span>
+                    </div>
+                    <p className="text-xl font-bold">
+                      {(solvencyInfo.allocationPercentagePpm / 10000).toFixed(0)}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Coverage Ratio */}
+                <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-text-secondary">Coverage Ratio</span>
+                    <span className="text-sm font-mono">
+                      {solvencyInfo.totalAllocatedCapital > BigInt(0)
+                        ? `${((Number(solvencyInfo.daoBalance) / Number(solvencyInfo.totalAllocatedCapital)) * 100).toFixed(1)}%`
+                        : 'N/A'
+                      }
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-background-secondary rounded-full overflow-hidden">
+                    <div 
+                      className={cn(
+                        'h-full transition-all',
+                        solvencyInfo.isSolvent ? 'bg-success' : 'bg-warning'
+                      )}
+                      style={{ 
+                        width: solvencyInfo.totalAllocatedCapital > BigInt(0)
+                          ? `${Math.min(100, (Number(solvencyInfo.daoBalance) / Number(solvencyInfo.totalAllocatedCapital)) * 100)}%`
+                          : '0%'
+                      }}
+                    />
+                  </div>
+                  <p className="text-xs text-text-tertiary mt-2">
+                    DAO Balance / Total Allocated Capital (100% = full coverage)
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <TrendingUp className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
+                <p className="text-text-secondary">Unable to load solvency data</p>
+                <Button variant="secondary" size="sm" className="mt-3" onClick={loadSolvencyInfo}>
+                  Try Again
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Main Content Grid */}

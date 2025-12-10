@@ -1,0 +1,25 @@
+# Chopsticks Multi-Chain Configuration for XCM Testing
+#
+# This configuration runs a multi-chain environment for testing
+# XCM transfers between PRMX, Asset Hub, and Hydration.
+#
+# Usage:
+#   chopsticks xcm -r polkadot.yml -p asset-hub.yml -p hydration.yml
+#
+# Or run chains individually:
+#   chopsticks --config asset-hub.yml
+#   chopsticks --config hydration.yml
+#
+# Architecture:
+#   Polkadot Relay Chain (forked)
+#       ├── Asset Hub (para 1000) - USDT reserve
+#       ├── Hydration (para 2034) - Pool 102
+#       └── PRMX (para 2000) - Our chain
+#
+# XCM Route:
+#   PRMX ──> Asset Hub ──> Hydration
+#              (USDT)      (Pool 102)
+
+# Note: This file is documentation only.
+# Use the command-line format for XCM mode:
+#   chopsticks xcm -r polkadot.yml -p asset-hub.yml -p hydration.yml

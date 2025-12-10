@@ -1,0 +1,37 @@
+# Chopsticks configuration for forking Polkadot Relay Chain
+#
+# This config forks Polkadot to provide relay chain for XCM testing.
+#
+# Usage:
+#   chopsticks --config chopsticks/polkadot.yml
+
+endpoint: wss://rpc.polkadot.io
+mock-signature-host: true
+db: ./db/polkadot.db
+port: 9000
+
+# Storage overrides for relay chain
+import-storage:
+  # Ensure HRMP channels exist for PRMX
+  Hrmp:
+    HrmpChannels:
+      # PRMX -> Asset Hub channel
+      - - [2000, 1000]
+        - maxCapacity: 8
+          maxTotalSize: 8192
+          maxMessageSize: 1048576
+          msgCount: 0
+          totalSize: 0
+          mqcHead: null
+          senderDeposit: 0
+          recipientDeposit: 0
+      # Asset Hub -> PRMX channel
+      - - [1000, 2000]
+        - maxCapacity: 8
+          maxTotalSize: 8192
+          maxMessageSize: 1048576
+          msgCount: 0
+          totalSize: 0
+          mqcHead: null
+          senderDeposit: 0
+          recipientDeposit: 0

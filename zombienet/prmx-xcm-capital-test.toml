@@ -1,0 +1,96 @@
+# Zombienet configuration for PRMX XCM Capital integration testing
+#
+# This configuration sets up a local multi-chain environment for testing
+# cross-chain capital management with Hydration Stableswap Pool 102.
+#
+# Usage:
+#   zombienet spawn prmx-xcm-capital-test.toml
+#
+# Prerequisites:
+#   1. Install zombienet: https://github.com/paritytech/zombienet
+#   2. Build PRMX node: cargo build --release
+#   3. Have polkadot binary available (for relay chain)
+
+[settings]
+timeout = 1000
+
+[relaychain]
+default_command = "polkadot"
+default_args = ["-lparachain=debug"]
+chain = "rococo-local"
+
+[[relaychain.nodes]]
+name = "alice"
+validator = true
+args = ["-lparachain=debug"]
+
+[[relaychain.nodes]]
+name = "bob"
+validator = true
+args = ["-lparachain=debug"]
+
+# =============================================================================
+# PRMX Parachain
+# =============================================================================
+[[parachains]]
+id = 2000
+chain = "prmx-local"
+cumulus_based = true
+
+[[parachains.collators]]
+name = "prmx-collator01"
+command = "../target/release/prmx-node"
+args = ["-lruntime=debug,prmx=debug,prmx-xcm-capital=debug"]
+
+[[parachains.collators]]
+name = "prmx-collator02"
+command = "../target/release/prmx-node"
+args = ["-lruntime=debug,prmx=debug,prmx-xcm-capital=debug"]
+
+# =============================================================================
+# Asset Hub (for XCM via Asset Hub route)
+# =============================================================================
+# Note: In v1, we use a mock XCM interface that doesn't require
+# a real Asset Hub or Hydration. This section is prepared for future
+# integration when real XCM calls are implemented.
+#
+# Uncomment and configure when ready to test with real Asset Hub:
+#
+# [[parachains]]
+# id = 1000
+# chain = "asset-hub-rococo-local"
+# cumulus_based = true
+#
+# [[parachains.collators]]
+# name = "asset-hub-collator01"
+# command = "polkadot-parachain"
+# args = ["-lruntime=debug"]
+
+# =============================================================================
+# Hydration Parachain (for future XCM integration)
+# =============================================================================
+# Note: In v1, we use a mock XCM strategy interface that doesn't require
+# a real Hydration parachain. This section is prepared for future
+# integration when real XCM calls to Pool 102 are implemented.
+#
+# Uncomment and configure when ready to test with real Hydration:
+#
+# [[parachains]]
+# id = 2034
+# chain = "hydration-local"
+# cumulus_based = true
+#
+# [[parachains.collators]]
+# name = "hydration-collator01"
+# command = "hydration-node"
+# args = ["-lruntime=debug"]
+
+# =============================================================================
+# Test Assertions
+# =============================================================================
+# These assertions verify the network is running correctly
+
+[relaychain.genesis.runtimeGenesis.patch.configuration.config]
+# Reduce session length for faster testing
+validation_upgrade_delay = 5
+validation_upgrade_cooldown = 5

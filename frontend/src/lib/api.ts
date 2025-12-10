@@ -1317,3 +1317,182 @@ export async function getCurrentBlock(): Promise<number> {
   const header = await api.rpc.chain.getHeader();
   return header.number.toNumber();
 }
+
+// ============================================================================
+// XCM Capital Strategy (prmxXcmCapital pallet) - Hydration Stableswap Pool 102
+// ============================================================================
+
+import type { LpPosition, InvestmentStatus, DaoSolvencyInfo, PolicyDefiInfo } from '@/types';
+
+// DAO account address (Alice in test environment)
+export const DAO_ACCOUNT_ADDRESS = TEST_ACCOUNTS.alice.address;
+
+/**
+ * Get LP position for a policy (Hydration Pool 102)
+ */
+export async function getLpPosition(policyId: number): Promise<LpPosition | null> {
+  const api = await getApi();
+  try {
+    const position = await api.query.prmxXcmCapital.policyLpPositions(policyId);
+    
+    if ((position as any).isNone) return null;
+    
+    const data = (position as any).unwrap().toJSON();
+    return {
+      policyId,
+      lpShares: BigInt(data.lpShares || data.lp_shares || '0'),
+      principalUsdt: BigInt(data.principalUsdt || data.principal_usdt || '0'),
+    };
+  } catch (err) {
+    console.error(`Failed to get LP position for policy ${policyId}:`, err);
+    return null;
+  }
+}
+
+/**
+ * Get investment status for a policy
+ */
+export async function getInvestmentStatus(policyId: number): Promise<InvestmentStatus> {
+  const api = await getApi();
+  try {
+    const status = await api.query.prmxXcmCapital.policyInvestmentStatus(policyId);
+    const statusStr = normalizeStatus(status.toJSON(), 'NotInvested');
+    
+    // Map chain status to our InvestmentStatus type
+    switch (statusStr) {
+      case 'Invested':
+        return 'Invested';
+      case 'Unwinding':
+        return 'Unwinding';
+      case 'Settled':
+        return 'Settled';
+      case 'Failed':
+        return 'Failed';
+      default:
+        return 'NotInvested';
+    }
+  } catch (err) {
+    console.error(`Failed to get investment status for policy ${policyId}:`, err);
+    return 'NotInvested';
+  }
+}
+
+/**
+ * Get total capital allocated to DeFi strategy (Hydration Pool 102)
+ */
+export async function getTotalAllocatedCapital(): Promise<bigint> {
+  const api = await getApi();
+  try {
+    const total = await api.query.prmxXcmCapital.totalAllocatedCapital();
+    return BigInt(total.toString());
+  } catch (err) {
+    console.error('Failed to get total allocated capital:', err);
+    return BigInt(0);
+  }
+}
+
+/**
+ * Get current allocation percentage (in parts per million)
+ */
+export async function getAllocationPercentagePpm(): Promise<number> {
+  const api = await getApi();
+  try {
+    const ppm = await api.query.prmxXcmCapital.allocationPercentagePpm();
+    return (ppm as any).toNumber?.() ?? Number(ppm.toString());
+  } catch (err) {
+    console.error('Failed to get allocation percentage:', err);
+    return 1_000_000; // Default to 100%
+  }
+}
+
+/**
+ * Get DAO's USDT balance
+ */
+export async function getDaoUsdtBalance(): Promise<bigint> {
+  return getUsdtBalance(DAO_ACCOUNT_ADDRESS);
+}
+
+/**
+ * Get full DeFi info for a policy (position + status)
+ */
+export async function getPolicyDefiInfo(policyId: number): Promise<PolicyDefiInfo> {
+  const [position, investmentStatus] = await Promise.all([
+    getLpPosition(policyId),
+    getInvestmentStatus(policyId),
+  ]);
+  
+  return {
+    investmentStatus,
+    position,
+    isAllocatedToDefi: position !== null && investmentStatus === 'Invested',
+  };
+}
+
+/**
+ * Get DAO solvency information
+ */
+export async function getDaoSolvencyInfo(): Promise<DaoSolvencyInfo> {
+  const api = await getApi();
+  
+  const [daoBalance, totalAllocated, allocationPpm, totalShares] = await Promise.all([
+    getDaoUsdtBalance(),
+    getTotalAllocatedCapital(),
+    getAllocationPercentagePpm(),
+    (async () => {
+      try {
+        const shares = await api.query.prmxXcmCapital.totalLpShares();
+        return BigInt(shares.toString());
+      } catch {
+        return BigInt(0);
+      }
+    })(),
+  ]);
+  
+  // Count active positions
+  let activePositionsCount = 0;
+  try {
+    const entries = await api.query.prmxXcmCapital.policyLpPositions.entries();
+    activePositionsCount = entries.length;
+  } catch {
+    activePositionsCount = 0;
+  }
+  
+  // DAO is solvent if it can cover all allocated capital (potential 100% loss)
+  const isSolvent = daoBalance >= totalAllocated;
+  
+  return {
+    daoBalance,
+    totalAllocatedCapital: totalAllocated,
+    totalLpShares: totalShares,
+    activePositionsCount,
+    allocationPercentagePpm: allocationPpm,
+    isSolvent,
+  };
+}
+
+/**
+ * Get all LP positions across all policies (Hydration Pool 102)
+ */
+export async function getAllLpPositions(): Promise<LpPosition[]> {
+  const api = await getApi();
+  const positions: LpPosition[] = [];
+  
+  try {
+    const entries = await api.query.prmxXcmCapital.policyLpPositions.entries();
+    
+    for (const [key, value] of entries) {
+      const policyId = (key.args[0] as any).toNumber();
+      const data = (value as any).toJSON();
+      
+      positions.push({
+        policyId,
+        lpShares: BigInt(data.lpShares || data.lp_shares || '0'),
+        principalUsdt: BigInt(data.principalUsdt || data.principal_usdt || '0'),
+      });
+    }
+  } catch (err) {
+    console.error('Failed to get all LP positions:', err);
+  }
+  
+  return positions;
+}

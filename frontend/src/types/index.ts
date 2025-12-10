@@ -175,3 +175,27 @@ export interface Notification {
   timestamp: number;
   read: boolean;
 }
+
+// DeFi Strategy Types (Hydration Stableswap Pool 102)
+export type InvestmentStatus = 'NotInvested' | 'Invested' | 'Unwinding' | 'Settled' | 'Failed';
+
+export interface LpPosition {
+  policyId: number;
+  lpShares: bigint;
+  principalUsdt: bigint;
+}
+
+export interface DaoSolvencyInfo {
+  daoBalance: bigint;
+  totalAllocatedCapital: bigint;
+  totalLpShares: bigint;
+  activePositionsCount: number;
+  allocationPercentagePpm: number; // parts per million, 1_000_000 = 100%
+  isSolvent: boolean; // true if DAO can cover all potential losses
+}
+
+export interface PolicyDefiInfo {
+  investmentStatus: InvestmentStatus;
+  position: LpPosition | null;
+  isAllocatedToDefi: boolean;
+}

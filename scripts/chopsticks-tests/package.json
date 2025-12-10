@@ -1,0 +1,28 @@
+{
+  "name": "prmx-xcm-chopsticks-tests",
+  "version": "1.0.0",
+  "description": "Chopsticks-based XCM integration tests for PRMX",
+  "type": "module",
+  "scripts": {
+    "chopsticks": "chopsticks",
+    "chopsticks:xcm": "chopsticks xcm -r ../../chopsticks/polkadot.yml -p ../../chopsticks/asset-hub.yml -p ../../chopsticks/hydration.yml",
+    "chopsticks:hydration": "chopsticks --config ../../chopsticks/hydration.yml",
+    "chopsticks:asset-hub": "chopsticks --config ../../chopsticks/asset-hub.yml",
+    "test:hrmp": "node setup-hrmp-channels.mjs",
+    "test:deposit": "node test-xcm-deposit.mjs",
+    "test:withdraw": "node test-xcm-withdraw.mjs",
+    "test:full": "node test-full-xcm-cycle.mjs",
+    "test:all": "npm run test:hrmp && npm run test:deposit && npm run test:withdraw && npm run test:full"
+  },
+  "dependencies": {
+    "@polkadot/api": "^14.0.0",
+    "@polkadot/keyring": "^13.0.0",
+    "@polkadot/util": "^13.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@acala-network/chopsticks": "^1.2.5"
+  }
+}

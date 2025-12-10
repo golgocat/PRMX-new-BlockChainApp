@@ -60,3 +60,5 @@ try-runtime = [
     "frame-support/try-runtime",
     "frame-system/try-runtime",
 ]
+# Development mode - enables test API keys for R pricing model
+dev-mode = []

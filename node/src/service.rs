@@ -17,6 +17,9 @@ use std::sync::Arc;
 /// Oracle authority key type (must match pallet_prmx_oracle::KEY_TYPE)
 const ORACLE_KEY_TYPE: sp_runtime::KeyTypeId = sp_runtime::KeyTypeId(*b"orcl");
 
+/// Quote authority key type (must match pallet_prmx_quote::KEY_TYPE)
+const QUOTE_KEY_TYPE: sp_runtime::KeyTypeId = sp_runtime::KeyTypeId(*b"quot");
+
 /// Insert oracle authority key into keystore for offchain worker transaction signing.
 /// In dev mode, this uses Alice's key.
 fn insert_oracle_authority_key(keystore: &KeystorePtr) -> Result<(), ServiceError> {
@@ -34,6 +37,29 @@ fn insert_oracle_authority_key(keystore: &KeystorePtr) -> Result<(), ServiceErro
     
     log::info!(
         "🔐 Oracle authority key inserted into keystore (seed: {})",
+        seed
+    );
+    
+    Ok(())
+}
+
+/// Insert quote authority key into keystore for offchain worker transaction signing.
+/// In dev mode, this uses Alice's key.
+fn insert_quote_authority_key(keystore: &KeystorePtr) -> Result<(), ServiceError> {
+    use sp_keystore::Keystore;
+    
+    // In dev mode, use Alice's seed (same as used in dev chain spec)
+    // This ensures the quote key matches Alice's account which is a quote provider
+    let seed = "//Alice";
+    
+    // Generate key from seed and insert into keystore
+    keystore.sr25519_generate_new(
+        QUOTE_KEY_TYPE,
+        Some(seed),
+    ).map_err(|e| ServiceError::Other(format!("Failed to insert quote authority key: {:?}", e)))?;
+    
+    log::info!(
+        "🔐 Quote authority key inserted into keystore (seed: {})",
         seed
     );
     
@@ -166,10 +192,11 @@ pub fn new_full(config: Configuration) -> Result<TaskManager, ServiceError> {
         other: (block_import, grandpa_link, mut telemetry),
     } = new_partial(&config)?;
 
-    // Insert oracle authority key into keystore for offchain worker signed transactions
-    // This allows the offchain worker to sign transactions as an oracle provider
+    // Insert authority keys into keystore for offchain worker signed transactions
+    // This allows the offchain workers to sign transactions as providers
     if config.role.is_authority() {
         insert_oracle_authority_key(&keystore_container.keystore())?;
+        insert_quote_authority_key(&keystore_container.keystore())?;
     }
 
     let grandpa_protocol_name = sc_consensus_grandpa::protocol_standard_name(

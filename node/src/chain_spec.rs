@@ -194,5 +194,17 @@ fn testnet_genesis(
                 endowed_accounts[0].clone(), // Alice
             ],
         },
+        // PRMX Quote - R Pricing API Configuration
+        // Configure the R actuarial pricing model API for quote calculations
+        "prmxQuote": {
+            // R pricing API key (test key for development)
+            "pricingApiKey": b"test_api_key".to_vec(),
+            // R pricing API URL
+            "pricingApiUrl": b"http://34.51.195.144:19090/pricing".to_vec(),
+            // Quote providers (accounts authorized to submit quote results from OCW)
+            "quoteProviders": vec![
+                endowed_accounts[0].clone(), // Alice
+            ],
+        },
     })
 }

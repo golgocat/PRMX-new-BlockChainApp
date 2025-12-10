@@ -59,8 +59,8 @@ substrate-wasm-builder = { git = "https://github.com/paritytech/polkadot-sdk.git
 
 [features]
 default = ["std", "dev-mode"]
-# Development mode - enables test API keys in oracle (DO NOT USE IN PRODUCTION)
-dev-mode = ["pallet-prmx-oracle/dev-mode"]
+# Development mode - enables test API keys in oracle and quote pallets (DO NOT USE IN PRODUCTION)
+dev-mode = ["pallet-prmx-oracle/dev-mode", "pallet-prmx-quote/dev-mode"]
 std = [
     "codec/std",
     "scale-info/std",

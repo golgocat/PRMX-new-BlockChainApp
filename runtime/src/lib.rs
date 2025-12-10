@@ -341,8 +341,8 @@ impl pallet_prmx_holdings::Config for Runtime {
 parameter_types! {
     /// Quote is valid for 1 hour (3600 seconds)
     pub const QuoteValiditySeconds: u64 = 3600;
-    /// Mock API URL for development
-    pub const ProbabilityApiUrl: &'static str = "mock://probability-api";
+    /// R pricing API URL
+    pub const ProbabilityApiUrl: &'static str = "http://34.51.195.144:19090/pricing";
     /// Maximum pending quotes
     pub const MaxPendingQuotes: u32 = 100;
 }
@@ -354,6 +354,8 @@ impl pallet_prmx_quote::Config for Runtime {
     type QuoteValiditySeconds = QuoteValiditySeconds;
     type ProbabilityApiUrl = ProbabilityApiUrl;
     type MaxPendingQuotes = MaxPendingQuotes;
+    /// Quote authority ID for signing offchain worker transactions
+    type AuthorityId = pallet_prmx_quote::crypto::QuoteAuthId;
 }
 
 // =============================================================================

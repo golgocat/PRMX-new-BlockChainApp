@@ -98,6 +98,9 @@ pub const MAX_FUTURE_DRIFT_SECS: u64 = 2 * 3600;
 /// Maximum rainfall value sanity check (1000mm per hour is absurd)
 pub const MAX_RAINFALL_MM: u32 = 10000; // 1000mm scaled by 10
 
+/// Base timestamp for block-to-time conversion (Dec 8, 2025 00:00 UTC approximate)
+pub const BASE_TIMESTAMP_SECS: u64 = 1733616000;
+
 /// Blocks per hour (assuming ~6 second block time)
 /// 3600 seconds / 6 seconds = 600 blocks
 pub const BLOCKS_PER_HOUR: u32 = 600;
@@ -548,24 +551,12 @@ pub mod pallet {
             );
 
             // Get current time for drift validation
-            // In offchain context, use offchain timestamp
-            // In on-chain context, use block number as approximation
+            // Use block number * 6 seconds + base timestamp for approximation
             let now = {
-                #[cfg(feature = "std")]
-                {
-                    // In std/test mode, use current unix time
-                    use sp_runtime::traits::UniqueSaturatedInto;
-                    let block_num: u64 = frame_system::Pallet::<T>::block_number().unique_saturated_into();
-                    // Assume 6 second blocks, add genesis timestamp approximation
-                    block_num * 6
-                }
-                #[cfg(not(feature = "std"))]
-                {
-                    // In WASM, use block number as approximation
-                    use sp_runtime::traits::UniqueSaturatedInto;
-                    let block_num: u64 = frame_system::Pallet::<T>::block_number().unique_saturated_into();
-                    block_num * 6
-                }
+                use sp_runtime::traits::UniqueSaturatedInto;
+                let block_num: u64 = frame_system::Pallet::<T>::block_number().unique_saturated_into();
+                // Use consistent timestamp calculation: base + (block_num * 6 seconds)
+                BASE_TIMESTAMP_SECS + (block_num * 6)
             };
 
             // Validate timestamp drift (allow any timestamp in dev mode if now is 0)
@@ -688,8 +679,7 @@ pub mod pallet {
             // Get current timestamp approximation
             use sp_runtime::traits::UniqueSaturatedInto;
             let block_num: u64 = frame_system::Pallet::<T>::block_number().unique_saturated_into();
-            let base_ts = 1733616000u64; // Dec 8, 2025 approximate
-            let now_ts = base_ts + (block_num * 6);
+            let now_ts = BASE_TIMESTAMP_SECS + (block_num * 6);
             let bucket_idx = bucket_index_for_timestamp(now_ts);
 
             // Store rainfall bucket
@@ -1296,9 +1286,8 @@ pub mod pallet {
                     if !RollingState::<T>::contains_key(market_id) 
                     {
                         // Get current timestamp - use a realistic approximation
-                        // Assume chain started recently, use block number * 6 seconds + a base timestamp
-                        let base_ts = 1733616000u64; // Dec 8, 2025 approximate
-                        let now_ts = base_ts + (block_num as u64 * 6);
+                        // Use block number * 6 seconds + base timestamp
+                        let now_ts = BASE_TIMESTAMP_SECS + (block_num as u64 * 6);
                         let bucket_idx = bucket_index_for_timestamp(now_ts);
                         
                         // Add some test rainfall data (simulated 24h history)

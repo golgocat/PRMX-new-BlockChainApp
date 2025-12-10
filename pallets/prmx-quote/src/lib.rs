@@ -19,6 +19,70 @@ pub use pallet::*;
 
 use alloc::vec::Vec;
 
+// =============================================================================
+//                     Quote Authority Crypto Types
+// =============================================================================
+
+/// Key type for quote authority (used for signing offchain transactions)
+pub const KEY_TYPE: sp_runtime::KeyTypeId = sp_runtime::KeyTypeId(*b"quot");
+
+/// Crypto module for quote authority signatures
+pub mod crypto {
+    use super::KEY_TYPE;
+    use sp_core::sr25519::Signature as Sr25519Signature;
+    use sp_runtime::{
+        app_crypto::{app_crypto, sr25519},
+        traits::Verify,
+        MultiSignature, MultiSigner,
+    };
+
+    app_crypto!(sr25519, KEY_TYPE);
+
+    /// Quote authority ID (public key)
+    pub struct QuoteAuthId;
+
+    impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for QuoteAuthId {
+        type RuntimeAppPublic = Public;
+        type GenericPublic = sp_core::sr25519::Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+    }
+
+    impl frame_system::offchain::AppCrypto<<Sr25519Signature as Verify>::Signer, Sr25519Signature>
+        for QuoteAuthId
+    {
+        type RuntimeAppPublic = Public;
+        type GenericPublic = sp_core::sr25519::Public;
+        type GenericSignature = sp_core::sr25519::Signature;
+    }
+}
+
+// =============================================================================
+//                          Constants
+// =============================================================================
+
+/// Offchain storage key for R pricing API key
+pub const R_PRICING_API_KEY_STORAGE: &[u8] = b"prmx-quote::pricing-api-key";
+
+/// Offchain storage key for R pricing API URL
+pub const R_PRICING_API_URL_STORAGE: &[u8] = b"prmx-quote::pricing-api-url";
+
+/// Default R pricing API URL (can be overridden via genesis or extrinsic)
+pub const DEFAULT_R_PRICING_API_URL: &str = "http://34.51.195.144:19090/pricing";
+
+/// Default number of simulations for R model
+pub const DEFAULT_NUMBER_OF_SIMULATIONS: u32 = 100_000;
+
+/// Default ROC (Return on Capital) for R model
+pub const DEFAULT_ROC: f64 = 0.08;
+
+/// Test R pricing API key for development (DO NOT USE IN PRODUCTION)
+#[cfg(feature = "dev-mode")]
+pub const TEST_R_PRICING_API_KEY: &[u8] = b"test_api_key";
+
+/// Test R pricing API URL for development
+#[cfg(feature = "dev-mode")]
+pub const TEST_R_PRICING_API_URL: &[u8] = b"http://34.51.195.144:19090/pricing";
+
 /// Trait for accessing quote data from other pallets
 pub trait QuoteAccess<AccountId, Balance> {
     /// Get quote request by ID
@@ -111,7 +175,11 @@ pub mod pallet {
     // =========================================================================
 
     #[pallet::config]
-    pub trait Config: frame_system::Config + pallet_timestamp::Config {
+    pub trait Config: 
+        frame_system::Config 
+        + pallet_timestamp::Config 
+        + frame_system::offchain::CreateSignedTransaction<Call<Self>>
+    {
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
         /// Balance type
@@ -131,6 +199,9 @@ pub mod pallet {
         /// Maximum pending quotes
         #[pallet::constant]
         type MaxPendingQuotes: Get<u32>;
+
+        /// Quote authority ID for signing offchain worker transactions
+        type AuthorityId: frame_system::offchain::AppCrypto<Self::Public, Self::Signature>;
     }
 
     // =========================================================================
@@ -183,6 +254,65 @@ pub mod pallet {
     #[pallet::getter(fn pending_quotes)]
     pub type PendingQuotes<T: Config> = StorageValue<_, BoundedVec<QuoteId, T::MaxPendingQuotes>, ValueQuery>;
 
+    /// Quote providers (accounts authorized to submit quote results)
+    #[pallet::storage]
+    #[pallet::getter(fn quote_providers)]
+    pub type QuoteProviders<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        T::AccountId,
+        bool,
+        ValueQuery,
+    >;
+
+    // =========================================================================
+    //                           Genesis Configuration
+    // =========================================================================
+
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T: Config> {
+        /// R pricing API key (stored in offchain index at genesis)
+        pub pricing_api_key: Vec<u8>,
+        /// R pricing API URL (stored in offchain index at genesis)
+        pub pricing_api_url: Vec<u8>,
+        /// Initial quote providers (accounts authorized to submit quote results)
+        pub quote_providers: Vec<T::AccountId>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            // Store API key in offchain index
+            if !self.pricing_api_key.is_empty() {
+                sp_io::offchain_index::set(R_PRICING_API_KEY_STORAGE, &self.pricing_api_key);
+                log::info!(
+                    target: "prmx-quote",
+                    "🔑 Genesis: R pricing API key configured (length: {} bytes)",
+                    self.pricing_api_key.len()
+                );
+            }
+
+            // Store API URL in offchain index
+            if !self.pricing_api_url.is_empty() {
+                sp_io::offchain_index::set(R_PRICING_API_URL_STORAGE, &self.pricing_api_url);
+                log::info!(
+                    target: "prmx-quote",
+                    "🌐 Genesis: R pricing API URL configured"
+                );
+            }
+
+            // Register initial quote providers
+            for account in &self.quote_providers {
+                QuoteProviders::<T>::insert(account, true);
+                log::info!(
+                    target: "prmx-quote",
+                    "🔐 Genesis: Registered quote provider"
+                );
+            }
+        }
+    }
+
     // =========================================================================
     //                                  Events
     // =========================================================================
@@ -208,6 +338,14 @@ pub mod pallet {
         /// Quote expired. [quote_id]
         QuoteExpired {
             quote_id: QuoteId,
+        },
+        /// Quote provider added
+        QuoteProviderAdded {
+            account: T::AccountId,
+        },
+        /// Quote provider removed
+        QuoteProviderRemoved {
+            account: T::AccountId,
         },
     }
 
@@ -243,6 +381,8 @@ pub mod pallet {
         ApiFetchError,
         /// Arithmetic overflow.
         ArithmeticOverflow,
+        /// Not a quote provider.
+        NotQuoteProvider,
     }
 
     // =========================================================================
@@ -362,7 +502,7 @@ pub mod pallet {
             Ok(())
         }
 
-        /// Submit a quote result (called by offchain worker as unsigned transaction).
+        /// Submit a quote result (called by offchain worker or authorized provider).
         /// 
         /// - `quote_id`: The quote ID.
         /// - `probability_ppm`: Probability in parts per million (e.g., 5% = 50,000 ppm).
@@ -376,6 +516,216 @@ pub mod pallet {
             // Allow manual submission for testing (simulate offchain worker)
             let _ = ensure_signed(origin)?;
 
+            Self::do_submit_quote(quote_id, probability_ppm)
+        }
+
+        /// Submit a quote result from offchain worker (signed transaction).
+        /// Only authorized quote providers can call this.
+        #[pallet::call_index(2)]
+        #[pallet::weight(10_000)]
+        pub fn submit_quote_from_ocw(
+            origin: OriginFor<T>,
+            quote_id: QuoteId,
+            probability_ppm: PartsPerMillion,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // Verify signer is an authorized quote provider
+            ensure!(
+                QuoteProviders::<T>::get(&who),
+                Error::<T>::NotQuoteProvider
+            );
+
+            log::info!(
+                target: "prmx-quote",
+                "🤖 OCW signed tx: submitting quote {} with probability {} ppm",
+                quote_id,
+                probability_ppm
+            );
+
+            Self::do_submit_quote(quote_id, probability_ppm)
+        }
+
+        /// Store R pricing API key in offchain storage.
+        /// Only callable by Root/Sudo.
+        #[pallet::call_index(3)]
+        #[pallet::weight(10_000)]
+        pub fn set_pricing_api_key(
+            origin: OriginFor<T>,
+            api_key: Vec<u8>,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            sp_io::offchain_index::set(R_PRICING_API_KEY_STORAGE, &api_key);
+
+            log::info!(
+                target: "prmx-quote",
+                "🔑 R pricing API key stored (length: {} bytes)",
+                api_key.len()
+            );
+
+            Ok(())
+        }
+
+        /// Store R pricing API URL in offchain storage.
+        /// Only callable by Root/Sudo.
+        #[pallet::call_index(4)]
+        #[pallet::weight(10_000)]
+        pub fn set_pricing_api_url(
+            origin: OriginFor<T>,
+            api_url: Vec<u8>,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            sp_io::offchain_index::set(R_PRICING_API_URL_STORAGE, &api_url);
+
+            log::info!(
+                target: "prmx-quote",
+                "🌐 R pricing API URL stored"
+            );
+
+            Ok(())
+        }
+
+        /// Add a quote provider account.
+        /// Only callable by Root/Sudo.
+        #[pallet::call_index(5)]
+        #[pallet::weight(10_000)]
+        pub fn add_quote_provider(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            QuoteProviders::<T>::insert(&account, true);
+
+            Self::deposit_event(Event::QuoteProviderAdded { account });
+
+            Ok(())
+        }
+
+        /// Remove a quote provider account.
+        /// Only callable by Root/Sudo.
+        #[pallet::call_index(6)]
+        #[pallet::weight(10_000)]
+        pub fn remove_quote_provider(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            ensure_root(origin)?;
+
+            QuoteProviders::<T>::remove(&account);
+
+            Self::deposit_event(Event::QuoteProviderRemoved { account });
+
+            Ok(())
+        }
+    }
+
+    // =========================================================================
+    //                           Offchain Worker
+    // =========================================================================
+
+    #[pallet::hooks]
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+        fn offchain_worker(block_number: BlockNumberFor<T>) {
+            use sp_runtime::traits::UniqueSaturatedInto;
+            let block_num: u32 = block_number.unique_saturated_into();
+
+            // Process pending quotes
+            let pending = PendingQuotes::<T>::get();
+            
+            if pending.is_empty() {
+                return;
+            }
+
+            log::info!(
+                target: "prmx-quote",
+                "📊 Offchain worker at block {}: {} pending quotes",
+                block_num,
+                pending.len()
+            );
+
+            // Get API key from offchain storage
+            let api_key = match Self::get_pricing_api_key() {
+                Some(key) => key,
+                None => {
+                    log::warn!(
+                        target: "prmx-quote",
+                        "⚠️ R pricing API key not configured. Skipping quote processing."
+                    );
+                    return;
+                }
+            };
+
+            // Get API URL from offchain storage or use default
+            let api_url = Self::get_pricing_api_url()
+                .unwrap_or_else(|| DEFAULT_R_PRICING_API_URL.as_bytes().to_vec());
+
+            for quote_id in pending.iter() {
+                if let Some(req) = QuoteRequests::<T>::get(quote_id) {
+                    // Only process pending quotes
+                    if QuoteStatuses::<T>::get(quote_id) != QuoteStatus::Pending {
+                        continue;
+                    }
+
+                    log::info!(
+                        target: "prmx-quote",
+                        "🔄 Processing quote {} for market {}",
+                        quote_id,
+                        req.market_id
+                    );
+
+                    match Self::fetch_probability_from_r_api(&req, &api_key, &api_url) {
+                        Ok(probability_ppm) => {
+                            log::info!(
+                                target: "prmx-quote",
+                                "✅ Got probability {} ppm for quote {}",
+                                probability_ppm,
+                                quote_id
+                            );
+
+                            // Submit signed transaction to update on-chain
+                            if let Err(e) = Self::submit_quote_signed_tx(*quote_id, probability_ppm) {
+                                log::warn!(
+                                    target: "prmx-quote",
+                                    "❌ Failed to submit quote {}: {}",
+                                    quote_id,
+                                    e
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                target: "prmx-quote",
+                                "❌ Failed to fetch probability for quote {}: {}",
+                                quote_id,
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    //                           Helper Functions
+    // =========================================================================
+
+    impl<T: Config> Pallet<T> {
+        /// Get current timestamp (simplified - in production use pallet-timestamp)
+        fn current_timestamp() -> u64 {
+            // Get timestamp from pallet_timestamp (returns milliseconds)
+            let now_ms: u64 = pallet_timestamp::Pallet::<T>::now()
+                .try_into()
+                .unwrap_or(0);
+            // Convert to seconds
+            now_ms / 1000
+        }
+
+        /// Internal function to submit quote result
+        fn do_submit_quote(quote_id: QuoteId, probability_ppm: PartsPerMillion) -> DispatchResult {
             // Load quote request
             let req = QuoteRequests::<T>::get(quote_id)
                 .ok_or(Error::<T>::QuoteNotFound)?;
@@ -435,124 +785,333 @@ pub mod pallet {
 
             Ok(())
         }
-    }
 
-    // =========================================================================
-    //                           Offchain Worker
-    // =========================================================================
+        /// Get R pricing API key from offchain storage or test fallback
+        fn get_pricing_api_key() -> Option<Vec<u8>> {
+            // Try offchain local storage first
+            let storage = sp_io::offchain::local_storage_get(
+                sp_core::offchain::StorageKind::PERSISTENT,
+                R_PRICING_API_KEY_STORAGE,
+            );
 
-    #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        fn offchain_worker(_block_number: BlockNumberFor<T>) {
-            // Process pending quotes (Logging Only)
-            let pending = PendingQuotes::<T>::get();
-            
-            for quote_id in pending.iter() {
-                if QuoteRequests::<T>::contains_key(quote_id) {
-                    log::info!(
-                        target: "prmx-quote",
-                        "Pending quote {} ready for probability fetch (Simulate via submit_quote)",
-                        quote_id
-                    );
+            if let Some(key) = storage {
+                if !key.is_empty() {
+                    return Some(key);
                 }
             }
-        }
-    }
 
-    // =========================================================================
-    //                           Helper Functions
-    // =========================================================================
+            // Fallback: Use test API key in dev mode
+            #[cfg(feature = "dev-mode")]
+            {
+                log::info!(
+                    target: "prmx-quote",
+                    "Using test R pricing API key (dev-mode)"
+                );
+                return Some(TEST_R_PRICING_API_KEY.to_vec());
+            }
 
-    impl<T: Config> Pallet<T> {
-        /// Get current timestamp (simplified - in production use pallet-timestamp)
-        fn current_timestamp() -> u64 {
-            // Get timestamp from pallet_timestamp (returns milliseconds)
-            let now_ms: u64 = pallet_timestamp::Pallet::<T>::now()
-                .try_into()
-                .unwrap_or(0);
-            // Convert to seconds
-            now_ms / 1000
+            #[cfg(not(feature = "dev-mode"))]
+            None
         }
 
-        /// Fetch probability from external API
-        /// Note: Currently unused, reserved for future external probability API integration
-        #[cfg(feature = "std")]
-        #[allow(dead_code)]
-        fn fetch_probability(req: &QuoteRequest<T>) -> Result<PartsPerMillion, &'static str> {
-            // Convert lat/lon to floats
+        /// Get R pricing API URL from offchain storage or test fallback
+        fn get_pricing_api_url() -> Option<Vec<u8>> {
+            // Try offchain local storage first
+            let storage = sp_io::offchain::local_storage_get(
+                sp_core::offchain::StorageKind::PERSISTENT,
+                R_PRICING_API_URL_STORAGE,
+            );
+
+            if let Some(url) = storage {
+                if !url.is_empty() {
+                    return Some(url);
+                }
+            }
+
+            // Fallback: Use test API URL in dev mode
+            #[cfg(feature = "dev-mode")]
+            {
+                log::info!(
+                    target: "prmx-quote",
+                    "Using test R pricing API URL (dev-mode)"
+                );
+                return Some(TEST_R_PRICING_API_URL.to_vec());
+            }
+
+            #[cfg(not(feature = "dev-mode"))]
+            None
+        }
+
+        /// Fetch probability from R pricing API
+        /// 
+        /// API parameters per pricing-model.md:
+        /// - lat, lon: Geographic location
+        /// - startdate: Coverage start as Unix timestamp
+        /// - duration_in_hours: 24 (fixed for v1)
+        /// - threshold: Strike value in mm
+        /// - coverage: payout_per_share × shares
+        /// - number_of_simulations: 100000
+        /// - ROC: 0.08
+        fn fetch_probability_from_r_api(
+            req: &QuoteRequest<T>,
+            api_key: &[u8],
+            api_url: &[u8],
+        ) -> Result<PartsPerMillion, &'static str> {
+            // Get market data
+            let strike_mm = T::MarketsApi::strike_value(req.market_id)
+                .map_err(|_| "Market not found")?;
+            let payout_per_share = T::MarketsApi::payout_per_share(req.market_id)
+                .map_err(|_| "Market not found")?;
+
+            // Convert lat/lon to floats (stored as scaled by 1e6)
             let lat = req.latitude as f64 / 1_000_000.0;
             let lon = req.longitude as f64 / 1_000_000.0;
 
-            // Build request body
-            let body = alloc::format!(
-                r#"{{"lat":{},"lon":{},"start":{},"end":{}}}"#,
-                lat, lon, req.coverage_start, req.coverage_end
+            // Calculate coverage amount in whole units (API expects dollars, not micro-dollars)
+            // Balance has 6 decimal places, so divide by 1_000_000
+            let payout_u128: u128 = payout_per_share.into();
+            let coverage_raw = payout_u128.saturating_mul(req.shares);
+            let coverage = coverage_raw / 1_000_000; // Convert to whole dollars
+
+            // Convert strike_mm (stored as mm * 10 for oracle) to actual mm
+            // The R API expects threshold in mm
+            let threshold_mm = strike_mm as f64 / 10.0;
+
+            // Calculate duration in hours from coverage period
+            let duration_in_hours = if req.coverage_end > req.coverage_start {
+                (req.coverage_end - req.coverage_start) / 3600 // Convert seconds to hours
+            } else {
+                24 // Default to 24 hours if invalid range
+            };
+
+            // Build request URL with query parameters
+            // The R API uses GET with query params, not POST with JSON body
+            let api_url_str = core::str::from_utf8(api_url)
+                .map_err(|_| "Invalid API URL encoding")?;
+            let api_key_str = core::str::from_utf8(api_key)
+                .map_err(|_| "Invalid API key encoding")?;
+
+            // Build full URL with query parameters
+            let full_url = alloc::format!(
+                "{}?lat={}&lon={}&startdate={}&duration_in_hours={}&threshold={}&coverage={}&number_of_simulations={}&ROC={}",
+                api_url_str,
+                lat,
+                lon,
+                req.coverage_start,
+                duration_in_hours,
+                threshold_mm,
+                coverage,
+                DEFAULT_NUMBER_OF_SIMULATIONS,
+                DEFAULT_ROC
             );
 
-            let api_url = T::ProbabilityApiUrl::get();
-            
-            // For development, use mock API that returns 5%
-            if api_url.contains("mock") || api_url.is_empty() {
-                return Ok(50_000); // 5% = 50,000 ppm
-            }
+            log::info!(
+                target: "prmx-quote",
+                "📤 Calling R API: {}",
+                full_url
+            );
 
-            // Make HTTP request
-            let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(5000));
-            
-            let request = http::Request::post(api_url, alloc::vec![body.as_bytes().to_vec()])
-                .add_header("Content-Type", "application/json");
+            // Make HTTP GET request
+            let deadline = sp_io::offchain::timestamp().add(Duration::from_millis(30_000));
+
+            let request = http::Request::get(&full_url)
+                .add_header("X-API-Key", api_key_str);
 
             let pending = request
                 .deadline(deadline)
                 .send()
-                .map_err(|_| "Failed to send request")?;
+                .map_err(|_| "Failed to send HTTP request")?;
 
             let response = pending
                 .try_wait(deadline)
-                .map_err(|_| "Request timeout")?
-                .map_err(|_| "Request failed")?;
+                .map_err(|_| "HTTP request timeout")?
+                .map_err(|_| "HTTP request failed")?;
 
             if response.code != 200 {
-                return Err("API returned error");
+                log::warn!(
+                    target: "prmx-quote",
+                    "R API returned status code {}",
+                    response.code
+                );
+                return Err("R API returned error");
             }
 
-            let body_bytes = response.body().collect::<Vec<u8>>();
+            let response_body = response.body().collect::<Vec<u8>>();
             
-            // Parse JSON response: { "probability": 0.05 }
-            // Simple parsing without full JSON library in no_std
-            let body_str = core::str::from_utf8(&body_bytes)
-                .map_err(|_| "Invalid UTF-8")?;
+            log::info!(
+                target: "prmx-quote",
+                "📥 R API response: {}",
+                core::str::from_utf8(&response_body).unwrap_or("invalid utf8")
+            );
             
-            // Extract probability value (simplified parsing)
-            if let Some(start) = body_str.find("probability") {
-                if let Some(colon) = body_str[start..].find(':') {
-                    let value_start = start + colon + 1;
-                    let value_str = body_str[value_start..]
-                        .trim()
-                        .trim_start_matches(|c: char| c == '"' || c.is_whitespace())
-                        .split(|c: char| c == ',' || c == '}' || c == '"')
-                        .next()
-                        .ok_or("Missing probability value")?;
-                    
-                    let probability: f64 = value_str
-                        .trim()
-                        .parse()
-                        .map_err(|_| "Invalid probability format")?;
-                    
-                    // Convert to parts per million
-                    let ppm = (probability * 1_000_000.0).round() as u32;
-                    return Ok(ppm);
+            // Parse response and calculate probability
+            // Pass coverage (in whole dollars, same units as sent to API) for probability calculation
+            Self::parse_r_api_response(&response_body, coverage)
+        }
+
+        /// Parse R API response and calculate probability
+        /// 
+        /// Expected response format:
+        /// {
+        ///   "avg_cost": 5.25,
+        ///   "recommended_premium": 6.3,
+        ///   "closest_point": {...},
+        ///   "dist_closest_point_km": 12.5
+        /// }
+        /// 
+        /// Probability calculation per pricing-model.md:
+        /// p = avg_cost / coverage
+        /// probability_ppm = p * 1_000_000
+        fn parse_r_api_response(json: &[u8], coverage: u128) -> Result<PartsPerMillion, &'static str> {
+            let json_str = core::str::from_utf8(json)
+                .map_err(|_| "Invalid JSON encoding")?;
+
+            log::debug!(
+                target: "prmx-quote",
+                "📥 R API response: {}",
+                json_str
+            );
+
+            // Extract avg_cost value from JSON
+            // Look for "avg_cost": followed by a number
+            let avg_cost = Self::extract_json_number(json_str, "avg_cost")
+                .ok_or("Could not find avg_cost in response")?;
+
+            log::info!(
+                target: "prmx-quote",
+                "📊 avg_cost = {}, coverage = {}",
+                avg_cost,
+                coverage
+            );
+
+            if coverage == 0 {
+                return Err("Coverage cannot be zero");
+            }
+
+            // Calculate probability: p = avg_cost / coverage
+            // Then convert to parts per million
+            // Note: avg_cost is in the same units as coverage (e.g., USDT with 6 decimals)
+            let probability = avg_cost / (coverage as f64);
+            // Manual rounding: add 0.5 and truncate (f64::round not available in no_std)
+            let probability_ppm = (probability * 1_000_000.0 + 0.5) as u32;
+
+            // Sanity check: probability should be between 0% and 100%
+            if probability_ppm > 1_000_000u32 {
+                log::warn!(
+                    target: "prmx-quote",
+                    "⚠️ Calculated probability {} ppm exceeds 100%, capping at 1,000,000",
+                    probability_ppm
+                );
+                return Ok(1_000_000);
+            }
+
+            log::info!(
+                target: "prmx-quote",
+                "✅ Calculated probability: {}% ({} ppm)",
+                probability * 100.0,
+                probability_ppm
+            );
+
+            Ok(probability_ppm)
+        }
+
+        /// Extract a numeric value from JSON by key name
+        fn extract_json_number(json: &str, key: &str) -> Option<f64> {
+            // Try both regular JSON format ("key":) and escaped format (\"key\":)
+            // The R API returns double-encoded JSON: ["{\"avg_cost\":0.902,...}"]
+            
+            // First try escaped format: \"key\":
+            let escaped_pattern = alloc::format!("\\\"{}\\\"", key);
+            if let Some(key_start) = json.find(&escaped_pattern) {
+                let after_key = &json[key_start + escaped_pattern.len()..];
+                if let Some(colon_pos) = after_key.find(':') {
+                    let value_part = &after_key[colon_pos + 1..];
+                    let value_trimmed = value_part.trim_start();
+                    // For escaped JSON, values end at \, or \" or }
+                    let end_pos = value_trimmed
+                        .find(|c: char| c == ',' || c == '\\' || c == '}' || c == ']')
+                        .unwrap_or(value_trimmed.len());
+                    let value_str = value_trimmed[..end_pos].trim();
+                    if let Ok(val) = value_str.parse::<f64>() {
+                        return Some(val);
+                    }
+                }
+            }
+            
+            // Fallback to regular format: "key":
+            let pattern = alloc::format!("\"{}\"", key);
+            let key_start = json.find(&pattern)?;
+            
+            // Find the colon after the key
+            let after_key = &json[key_start + pattern.len()..];
+            let colon_pos = after_key.find(':')?;
+            
+            // Get the value part (after the colon)
+            let value_part = &after_key[colon_pos + 1..];
+            
+            // Skip whitespace
+            let value_trimmed = value_part.trim_start();
+            
+            // Find the end of the number (comma, }, or whitespace)
+            let end_pos = value_trimmed
+                .find(|c: char| c == ',' || c == '}' || c == ']' || c == '\n')
+                .unwrap_or(value_trimmed.len());
+            
+            let value_str = value_trimmed[..end_pos].trim();
+            
+            value_str.parse::<f64>().ok()
+        }
+
+        /// Submit a signed transaction to update on-chain quote result
+        fn submit_quote_signed_tx(
+            quote_id: QuoteId,
+            probability_ppm: PartsPerMillion,
+        ) -> Result<(), &'static str> {
+            use frame_system::offchain::{SendSignedTransaction, Signer};
+
+            // Get signer from keystore
+            let signer = Signer::<T, T::AuthorityId>::all_accounts();
+
+            if !signer.can_sign() {
+                log::warn!(
+                    target: "prmx-quote",
+                    "⚠️ No quote authority keys found in keystore. Cannot submit signed tx."
+                );
+                return Err("No quote authority keys in keystore");
+            }
+
+            // Create the call
+            let call = Call::<T>::submit_quote_from_ocw {
+                quote_id,
+                probability_ppm,
+            };
+
+            // Send signed transaction
+            let results = signer.send_signed_transaction(|_account| call.clone());
+
+            for (acc, result) in &results {
+                match result {
+                    Ok(()) => {
+                        log::info!(
+                            target: "prmx-quote",
+                            "✅ Signed tx sent from account {:?} for quote {}",
+                            acc.id,
+                            quote_id
+                        );
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            target: "prmx-quote",
+                            "❌ Signed tx from account {:?} failed: {:?}",
+                            acc.id,
+                            e
+                        );
+                    }
                 }
             }
 
-            Err("Failed to parse probability")
-        }
-
-        /// Fetch probability (no_std version - always returns mock)
-        #[cfg(not(feature = "std"))]
-        fn fetch_probability(_req: &QuoteRequest<T>) -> Result<PartsPerMillion, &'static str> {
-            // In no_std environment, return mock probability (5%)
-            Ok(50_000)
+            Err("All signed transactions failed")
         }
 
         /// Mark a quote as consumed

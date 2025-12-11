@@ -15,37 +15,5 @@ mock-signature-host: true
 db: ./db/asset-hub.db
 port: 8001
 
-# Optional: Fork at a specific block for reproducibility
-# block: 7000000
-
-# Storage overrides to set up test accounts
-import-storage:
-  System:
-    Account:
-      # PRMX sovereign account (derived from para ID 2000)
-      # Sibling sovereign: 0x7369626cd0070000000000000000000000000000000000000000000000000000
-      - - "13YMK2ecGjKBmGBhLZxXfnWJDXAWR5UYPmSpDUJuWrpS6yvk"
-        - providers: 1
-          data:
-            free: "10000000000000"  # 10,000 DOT for XCM fees
-            
-  # Give PRMX sovereign account USDT for testing
-  Assets:
-    Account:
-      # USDT (asset 1984) balance for PRMX sovereign
-      - - [1984, "13YMK2ecGjKBmGBhLZxXfnWJDXAWR5UYPmSpDUJuWrpS6yvk"]
-        - balance: "100000000000"  # 100,000 USDT (6 decimals)
-          status: "Liquid"
-          reason: "Consumer"
-          extra: null
-      # USDC (asset 1337) balance for PRMX sovereign
-      - - [1337, "13YMK2ecGjKBmGBhLZxXfnWJDXAWR5UYPmSpDUJuWrpS6yvk"]
-        - balance: "100000000000"  # 100,000 USDC (6 decimals)
-          status: "Liquid"
-          reason: "Consumer"
-          extra: null
-          
-  # Hydration sovereign account also needs some USDT for return transfers
-  # Hydration para ID: 2034
-  # - - [1984, "Hydration_Sovereign_Account_Here"]
-  #   - balance: "50000000000"
+# Note: Storage overrides can be added later once basic connectivity works
+# For testing, we'll use existing mainnet state

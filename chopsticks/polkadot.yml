@@ -10,28 +10,7 @@ mock-signature-host: true
 db: ./db/polkadot.db
 port: 9000
 
-# Storage overrides for relay chain
-import-storage:
-  # Ensure HRMP channels exist for PRMX
-  Hrmp:
-    HrmpChannels:
-      # PRMX -> Asset Hub channel
-      - - [2000, 1000]
-        - maxCapacity: 8
-          maxTotalSize: 8192
-          maxMessageSize: 1048576
-          msgCount: 0
-          totalSize: 0
-          mqcHead: null
-          senderDeposit: 0
-          recipientDeposit: 0
-      # Asset Hub -> PRMX channel
-      - - [1000, 2000]
-        - maxCapacity: 8
-          maxTotalSize: 8192
-          maxMessageSize: 1048576
-          msgCount: 0
-          totalSize: 0
-          mqcHead: null
-          senderDeposit: 0
-          recipientDeposit: 0
+# Note: HRMP channels between Asset Hub (1000) and Hydration (2034) 
+# already exist on mainnet, so we don't need to override them.
+# For PRMX (2000) channels, we would need to set them up via governance
+# or use the existing channels via Asset Hub as a hop.

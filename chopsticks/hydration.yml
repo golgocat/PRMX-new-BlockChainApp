@@ -15,29 +15,5 @@ mock-signature-host: true
 db: ./db/hydration.db
 port: 8000
 
-# Optional: Fork at a specific block for reproducibility
-# block: 6000000
-
-# Storage overrides to set up test accounts
-import-storage:
-  System:
-    Account:
-      # PRMX sovereign account (derived from para ID 2000)
-      # This is where XCM-transferred assets will land
-      - - "7LCt6dFqtxdsotg68SJGc4X7FG8gfXC6Sz7P8SLk2tMnhPmB"
-        - providers: 1
-          data:
-            free: "100000000000000000"  # 100M HDX for gas
-            
-  # Give PRMX sovereign account USDT for testing withdrawals
-  Tokens:
-    Accounts:
-      # USDT (asset 10) balance for PRMX sovereign
-      - - ["7LCt6dFqtxdsotg68SJGc4X7FG8gfXC6Sz7P8SLk2tMnhPmB", 10]
-        - free: "10000000000"  # 10,000 USDT (6 decimals)
-      # USDC (asset 22) balance for PRMX sovereign  
-      - - ["7LCt6dFqtxdsotg68SJGc4X7FG8gfXC6Sz7P8SLk2tMnhPmB", 22]
-        - free: "10000000000"  # 10,000 USDC (6 decimals)
-      # LP token (asset 102) balance for PRMX sovereign (for withdrawal tests)
-      - - ["7LCt6dFqtxdsotg68SJGc4X7FG8gfXC6Sz7P8SLk2tMnhPmB", 102]
-        - free: "5000000000"   # 5,000 LP shares
+# Note: Storage overrides can be added later once basic connectivity works
+# For testing, we'll use existing mainnet state

@@ -20,7 +20,7 @@ export const CHAINS = {
     },
     assetHub: {
         name: 'Asset Hub',
-        endpoint: 'ws://127.0.0.1:8002', // Chopsticks default when starting single chain
+        endpoint: 'ws://127.0.0.1:8001', // Chopsticks XCM mode port for Asset Hub
         paraId: 1000,
     },
     hydration: {

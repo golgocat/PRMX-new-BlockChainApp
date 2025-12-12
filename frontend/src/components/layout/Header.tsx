@@ -1,12 +1,14 @@
 'use client';
 
-import { Wifi, WifiOff } from 'lucide-react';
+import { Wifi, WifiOff, Sun, Moon } from 'lucide-react';
 import { useWalletStore } from '@/stores/walletStore';
+import { useThemeStore } from '@/stores/themeStore';
 import { AccountSelector } from '@/components/features/AccountSelector';
 import { cn } from '@/lib/utils';
 
 export function Header() {
   const { isChainConnected, currentBlock } = useWalletStore();
+  const { theme, toggleTheme } = useThemeStore();
 
   return (
     <header className="fixed top-0 right-0 left-64 z-30 bg-background-primary/80 backdrop-blur-xl border-b border-border-secondary">
@@ -32,6 +34,19 @@ export function Header() {
               </>
             )}
           </div>
+
+          {/* Theme Toggle */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center justify-center w-10 h-10 rounded-lg border border-border-primary bg-background-secondary hover:bg-background-tertiary transition-colors"
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-5 h-5 text-prmx-gold" />
+            ) : (
+              <Moon className="w-5 h-5 text-prmx-purple" />
+            )}
+          </button>
 
           {/* Account Selector */}
           <AccountSelector />

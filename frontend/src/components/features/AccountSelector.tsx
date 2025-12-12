@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   ChevronDown, 
   User, 
@@ -59,6 +59,19 @@ export function AccountSelector() {
   const [isOpen, setIsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Calculate dropdown position when opening
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 8, // 8px gap
+        right: window.innerWidth - rect.right,
+      });
+    }
+  }, [isOpen]);
 
   const handleSelectAccount = async (key: AccountKey) => {
     try {
@@ -121,9 +134,10 @@ export function AccountSelector() {
   const RoleIcon = roleIcons[selectedAccount?.role || 'Customer'] || User;
 
   return (
-    <div className="relative">
+    <>
       {/* Account Button */}
       <button
+        ref={buttonRef}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-background-secondary border border-border-primary hover:border-prmx-cyan/30 transition-colors"
       >
@@ -147,13 +161,19 @@ export function AccountSelector() {
         <ChevronDown className={cn('w-4 h-4 text-text-tertiary transition-transform', isOpen && 'rotate-180')} />
       </button>
 
-      {/* Dropdown Menu */}
+      {/* Dropdown Menu - Fixed position portal */}
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full right-0 mt-2 w-80 glass-card z-50 shadow-xl max-h-[calc(100vh-120px)] flex flex-col">
-            {/* Current Account Header - Fixed */}
-            <div className="p-4 border-b border-border-secondary bg-background-tertiary/50 flex-shrink-0">
+          <div 
+            className="fixed w-80 glass-card z-50 shadow-xl max-h-[70vh] flex flex-col"
+            style={{ 
+              top: dropdownPosition.top,
+              right: dropdownPosition.right,
+            }}
+          >
+            {/* Current Account Header */}
+            <div className="p-4 border-b border-border-secondary bg-background-tertiary/50 flex-shrink-0 rounded-t-2xl">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium">Current Account</span>
                 <div className="flex items-center gap-2">
@@ -275,8 +295,8 @@ export function AccountSelector() {
               )}
             </div>
 
-            {/* Footer with Disconnect - Fixed */}
-            <div className="p-3 border-t border-border-secondary flex-shrink-0 bg-background-card">
+            {/* Footer with Disconnect */}
+            <div className="p-3 border-t border-border-secondary flex-shrink-0 bg-background-card rounded-b-2xl">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-text-tertiary">
                   {walletMode === 'dev' ? 'Dev Mode' : 'Polkadot.js'}
@@ -293,6 +313,6 @@ export function AccountSelector() {
           </div>
         </>
       )}
-    </div>
+    </>
   );
 }

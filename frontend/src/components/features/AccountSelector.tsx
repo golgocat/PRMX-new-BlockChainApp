@@ -151,9 +151,9 @@ export function AccountSelector() {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 mt-2 w-80 glass-card z-50 overflow-hidden">
-            {/* Current Account Header */}
-            <div className="p-4 border-b border-border-secondary bg-background-tertiary/50">
+          <div className="absolute top-full right-0 mt-2 w-80 glass-card z-50 shadow-xl max-h-[calc(100vh-120px)] flex flex-col">
+            {/* Current Account Header - Fixed */}
+            <div className="p-4 border-b border-border-secondary bg-background-tertiary/50 flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium">Current Account</span>
                 <div className="flex items-center gap-2">
@@ -180,105 +180,103 @@ export function AccountSelector() {
               </div>
             </div>
 
-            {/* Dev Mode - Account List */}
-            {walletMode === 'dev' && (
-              <div className="p-2">
-                <p className="px-2 py-1 text-xs font-semibold text-text-tertiary uppercase">
-                  Switch Account
-                </p>
-                <div className="space-y-1 mt-1">
-                  {accounts.map((account) => {
-                    const Icon = roleIcons[account.role] || User;
-                    const isSelected = account.key === selectedAccountKey;
-                    
-                    return (
-                      <button
-                        key={account.key}
-                        onClick={() => handleSelectAccount(account.key!)}
-                        className={cn(
-                          'w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all',
-                          isSelected 
-                            ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
-                            : 'hover:bg-background-tertiary border border-transparent'
-                        )}
-                      >
-                        <div className={cn(
-                          'w-10 h-10 rounded-lg flex items-center justify-center',
-                          (roleColors[account.role] || roleColors['Customer']).split(' ')[0]
-                        )}>
-                          <Icon className="w-5 h-5" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{account.name}</span>
-                            <span className={cn(
-                              'text-xs px-1.5 py-0.5 rounded',
-                              roleColors[account.role] || roleColors['Customer']
-                            )}>
-                              {account.role}
-                            </span>
+            {/* Scrollable Account List */}
+            <div className="flex-1 overflow-y-auto">
+              {/* Dev Mode - Account List */}
+              {walletMode === 'dev' && (
+                <div className="p-2">
+                  <p className="px-2 py-1 text-xs font-semibold text-text-tertiary uppercase">
+                    Switch Account
+                  </p>
+                  <div className="space-y-1 mt-1">
+                    {accounts.map((account) => {
+                      const Icon = roleIcons[account.role] || User;
+                      const isSelected = account.key === selectedAccountKey;
+                      
+                      return (
+                        <button
+                          key={account.key}
+                          onClick={() => handleSelectAccount(account.key!)}
+                          className={cn(
+                            'w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all',
+                            isSelected 
+                              ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
+                              : 'hover:bg-background-tertiary border border-transparent'
+                          )}
+                        >
+                          <div className={cn(
+                            'w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0',
+                            (roleColors[account.role] || roleColors['Customer']).split(' ')[0]
+                          )}>
+                            <Icon className="w-4 h-4" />
                           </div>
-                          <p className="text-xs text-text-tertiary truncate">
-                            {formatAddress(account.address, 8)}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <Check className="w-5 h-5 text-prmx-cyan flex-shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Polkadot.js Mode - Extension Account List */}
-            {walletMode === 'polkadotjs' && extensionAccounts.length > 1 && (
-              <div className="p-2">
-                <p className="px-2 py-1 text-xs font-semibold text-text-tertiary uppercase">
-                  Switch Account
-                </p>
-                <div className="space-y-1 mt-1">
-                  {extensionAccounts.map((account, index) => {
-                    const isSelected = account.address === selectedExtensionAccount?.address;
-                    
-                    return (
-                      <button
-                        key={account.address}
-                        onClick={() => handleSelectExtensionAccount(account)}
-                        className={cn(
-                          'w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all',
-                          isSelected 
-                            ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
-                            : 'hover:bg-background-tertiary border border-transparent'
-                        )}
-                      >
-                        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-prmx-magenta/20">
-                          <Wallet className="w-5 h-5 text-prmx-magenta" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{account.meta.name || `Account ${index + 1}`}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm">{account.name}</span>
+                              <span className={cn(
+                                'text-xs px-1.5 py-0.5 rounded',
+                                roleColors[account.role] || roleColors['Customer']
+                              )}>
+                                {account.role}
+                              </span>
+                            </div>
+                            <p className="text-xs text-text-tertiary truncate">
+                              {formatAddress(account.address, 8)}
+                            </p>
                           </div>
-                          <p className="text-xs text-text-tertiary truncate">
-                            {formatAddress(account.address, 8)}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {account.meta.source}
-                          </p>
-                        </div>
-                        {isSelected && (
-                          <Check className="w-5 h-5 text-prmx-cyan flex-shrink-0" />
-                        )}
-                      </button>
-                    );
-                  })}
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-prmx-cyan flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Footer with Disconnect */}
-            <div className="p-3 border-t border-border-secondary">
+              {/* Polkadot.js Mode - Extension Account List */}
+              {walletMode === 'polkadotjs' && extensionAccounts.length > 1 && (
+                <div className="p-2">
+                  <p className="px-2 py-1 text-xs font-semibold text-text-tertiary uppercase">
+                    Switch Account
+                  </p>
+                  <div className="space-y-1 mt-1">
+                    {extensionAccounts.map((account, index) => {
+                      const isSelected = account.address === selectedExtensionAccount?.address;
+                      
+                      return (
+                        <button
+                          key={account.address}
+                          onClick={() => handleSelectExtensionAccount(account)}
+                          className={cn(
+                            'w-full flex items-center gap-3 p-2.5 rounded-xl text-left transition-all',
+                            isSelected 
+                              ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
+                              : 'hover:bg-background-tertiary border border-transparent'
+                          )}
+                        >
+                          <div className="w-9 h-9 rounded-lg flex items-center justify-center bg-prmx-magenta/20 flex-shrink-0">
+                            <Wallet className="w-4 h-4 text-prmx-magenta" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium text-sm block">{account.meta.name || `Account ${index + 1}`}</span>
+                            <p className="text-xs text-text-tertiary truncate">
+                              {formatAddress(account.address, 8)}
+                            </p>
+                          </div>
+                          {isSelected && (
+                            <Check className="w-4 h-4 text-prmx-cyan flex-shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer with Disconnect - Fixed */}
+            <div className="p-3 border-t border-border-secondary flex-shrink-0 bg-background-card">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-text-tertiary">
                   {walletMode === 'dev' ? 'Dev Mode' : 'Polkadot.js'}

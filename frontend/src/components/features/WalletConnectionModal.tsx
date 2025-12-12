@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Wallet, Code, ExternalLink, AlertCircle, User, Shield } from 'lucide-react';
 import { useWalletStore, TEST_ACCOUNTS, AccountKey } from '@/stores/walletStore';
 import { cn, formatAddress } from '@/lib/utils';
@@ -47,7 +48,8 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  // Don't render on server or if not open
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const handlePolkadotJs = async () => {
     setStep('polkadotjs-loading');
@@ -86,16 +88,16 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
     onClose();
   };
 
-  return (
+  const modalContent = (
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
         onClick={handleClose}
       />
       
       {/* Modal */}
-      <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="fixed inset-0 z-[100] overflow-y-auto">
         <div className="min-h-full flex items-center justify-center p-4">
           <div 
             className="glass-card w-full max-w-md"
@@ -284,4 +286,7 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
       </div>
     </>
   );
+
+  // Use portal to render modal outside of parent DOM hierarchy
+  return createPortal(modalContent, document.body);
 }

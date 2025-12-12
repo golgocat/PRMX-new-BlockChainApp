@@ -18,11 +18,12 @@
 //! 2. InitiateReserveWithdraw to Asset Hub
 //! 3. DepositReserveAsset to PRMX
 
-use crate::{xcm_config, Config, XcmStrategyInterface};
+use crate::{Config, XcmStrategyInterface};
 use alloc::vec;
 use alloc::vec::Vec;
 use codec::Encode;
 use frame_support::traits::Get;
+use frame_support::weights::Weight;
 use sp_runtime::DispatchError;
 use xcm::latest::prelude::*;
 
@@ -232,7 +233,7 @@ pub fn build_deposit_xcm(
                         // Execute stableswap.add_liquidity
                         Transact {
                             origin_kind: OriginKind::SovereignAccount,
-                            require_weight_at_most: Weight::from_parts(1_000_000_000, 100_000),
+                            fallback_max_weight: Some(Weight::from_parts(1_000_000_000, 100_000)),
                             call: add_liquidity_call.into(),
                         },
                         
@@ -291,7 +292,7 @@ pub fn build_withdraw_xcm(
         // 1. Execute remove_liquidity to get USDT
         Transact {
             origin_kind: OriginKind::SovereignAccount,
-            require_weight_at_most: Weight::from_parts(1_000_000_000, 100_000),
+            fallback_max_weight: Some(Weight::from_parts(1_000_000_000, 100_000)),
             call: remove_liquidity_call.into(),
         },
         
@@ -423,16 +424,20 @@ where
 //                       Utility Functions
 // =============================================================================
 
-/// Calculate PRMX sovereign account on a sibling parachain
-pub fn prmx_sovereign_account<AccountId>() -> AccountId
-where
-    AccountId: From<[u8; 32]>,
-{
-    use polkadot_parachain_primitives::primitives::Sibling;
-    use sp_runtime::traits::AccountIdConversion;
-    
-    Sibling::from(PRMX_PARA_ID).into_account_truncating()
-}
+// NOTE: prmx_sovereign_account function requires polkadot_parachain_primitives
+// which adds significant compilation overhead. It's commented out for dev builds.
+// Uncomment when deploying as a real parachain.
+//
+// /// Calculate PRMX sovereign account on a sibling parachain
+// pub fn prmx_sovereign_account<AccountId>() -> AccountId
+// where
+//     AccountId: From<[u8; 32]>,
+// {
+//     use polkadot_parachain_primitives::primitives::Sibling;
+//     use sp_runtime::traits::AccountIdConversion;
+//     
+//     Sibling::from(PRMX_PARA_ID).into_account_truncating()
+// }
 
 /// Estimate XCM fees for a deposit operation (in USDT base units)
 pub fn estimate_deposit_fees() -> u128 {

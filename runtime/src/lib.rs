@@ -3,10 +3,8 @@
 //! The PRMX Runtime is a Substrate-based runtime for parametric rainfall insurance.
 //! It integrates all PRMX pallets with standard Substrate pallets.
 //!
-//! ## XCM Integration
-//!
-//! This runtime includes XCM support for cross-chain capital management
-//! with Hydration Pool 102 via Asset Hub.
+//! This is a standalone dev chain configuration. XCM/Hydration logic is preserved
+//! in pallet-prmx-xcm-capital for future parachain deployment.
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit.
@@ -17,9 +15,6 @@
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
 extern crate alloc;
-
-// XCM configuration module
-pub mod xcm_config;
 
 use alloc::vec::Vec;
 use codec::Encode;
@@ -537,56 +532,6 @@ impl pallet_prmx_xcm_capital::Config for Runtime {
     type PolicyPoolAccount = PrmxPolicy;
 }
 
-// =============================================================================
-//                          Parachain System Configuration
-// =============================================================================
-
-parameter_types! {
-    pub const ReservedXcmpWeight: Weight = Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND / 4, 0);
-    pub const ReservedDmpWeight: Weight = Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND / 4, 0);
-}
-
-impl cumulus_pallet_parachain_system::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type OnSystemEvent = ();
-    type SelfParaId = parachain_info::Pallet<Runtime>;
-    type OutboundXcmpMessageSource = cumulus_pallet_xcmp_queue::Pallet<Runtime>;
-    type DmpQueue = frame_support::traits::EnqueueWithOrigin<MessageQueue, xcm_config::RelayChainOrigin>;
-    type ReservedDmpWeight = ReservedDmpWeight;
-    type XcmpMessageHandler = cumulus_pallet_xcmp_queue::Pallet<Runtime>;
-    type ReservedXcmpWeight = ReservedXcmpWeight;
-    type CheckAssociatedRelayNumber = cumulus_pallet_parachain_system::RelayNumberMonotonicallyIncreases;
-    type ConsensusHook = cumulus_pallet_parachain_system::ExpectParentIncluded;
-    type WeightInfo = ();
-    type SelectCore = cumulus_pallet_parachain_system::DefaultCoreSelector<Runtime>;
-}
-
-impl parachain_info::Config for Runtime {}
-
-// =============================================================================
-//                          Message Queue Configuration
-// =============================================================================
-
-parameter_types! {
-    pub MessageQueueServiceWeight: Weight = Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND / 10, 64 * 1024);
-}
-
-impl pallet_message_queue::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
-    type WeightInfo = ();
-    type MessageProcessor = xcm_builder::ProcessXcmMessage<
-        xcm_config::UniversalLocation,
-        xcm_executor::XcmExecutor<xcm_config::XcmConfig>,
-        RuntimeCall,
-    >;
-    type Size = u32;
-    type QueueChangeHandler = ();
-    type QueuePausedQuery = ();
-    type HeapSize = ConstU32<{ 64 * 1024 }>;
-    type MaxStale = ConstU32<8>;
-    type ServiceWeight = MessageQueueServiceWeight;
-    type IdleMaxServiceWeight = ();
-}
 
 // =============================================================================
 //                          Helper Types
@@ -604,11 +549,7 @@ construct_runtime!(
         System: frame_system,
         Timestamp: pallet_timestamp,
         
-        // Parachain System
-        ParachainSystem: cumulus_pallet_parachain_system,
-        ParachainInfo: parachain_info,
-        
-        // Consensus (keeping for dev mode, will be replaced by parachain consensus)
+        // Consensus (Aura + Grandpa for standalone dev chain)
         Aura: pallet_aura,
         Grandpa: pallet_grandpa,
         
@@ -616,14 +557,6 @@ construct_runtime!(
         Balances: pallet_balances,
         TransactionPayment: pallet_transaction_payment,
         Assets: pallet_assets,
-        
-        // Message Queue (for XCM)
-        MessageQueue: pallet_message_queue,
-        
-        // XCM
-        PolkadotXcm: pallet_xcm,
-        CumulusXcm: cumulus_pallet_xcm,
-        XcmpQueue: cumulus_pallet_xcmp_queue,
         
         // Governance
         Sudo: pallet_sudo,

@@ -46,22 +46,6 @@ pallet-transaction-payment = { git = "https://github.com/paritytech/polkadot-sdk
 pallet-transaction-payment-rpc-runtime-api = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
 pallet-assets = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
 
-# XCM dependencies
-xcm = { package = "staging-xcm", git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-xcm-builder = { package = "staging-xcm-builder", git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-xcm-executor = { package = "staging-xcm-executor", git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-pallet-xcm = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-pallet-message-queue = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-
-# Cumulus (parachain support)
-cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-cumulus-pallet-xcm = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-cumulus-pallet-xcmp-queue = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-cumulus-pallet-parachain-system = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-parachain-info = { package = "staging-parachain-info", git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-polkadot-parachain-primitives = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
-
 # PRMX pallets
 pallet-prmx-markets = { path = "../pallets/prmx-markets", default-features = false }
 pallet-prmx-holdings = { path = "../pallets/prmx-holdings", default-features = false }
@@ -108,20 +92,6 @@ std = [
     "pallet-transaction-payment/std",
     "pallet-transaction-payment-rpc-runtime-api/std",
     "pallet-assets/std",
-    "pallet-message-queue/std",
-    # XCM
-    "xcm/std",
-    "xcm-builder/std",
-    "xcm-executor/std",
-    "pallet-xcm/std",
-    # Cumulus
-    "cumulus-primitives-core/std",
-    "cumulus-pallet-xcm/std",
-    "cumulus-pallet-xcmp-queue/std",
-    "cumulus-pallet-parachain-system/std",
-    "parachain-info/std",
-    "polkadot-parachain-primitives/std",
-    "polkadot-runtime-common/std",
     # PRMX
     "pallet-prmx-markets/std",
     "pallet-prmx-holdings/std",

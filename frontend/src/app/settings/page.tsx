@@ -3,8 +3,6 @@
 import { useState } from 'react';
 import { 
   User, 
-  Bell, 
-  Shield,
   Palette,
   Wallet,
   Save,
@@ -13,7 +11,6 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
 import { useWalletStore } from '@/stores/walletStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { formatAddress } from '@/lib/utils';
@@ -23,15 +20,6 @@ export default function SettingsPage() {
   const { isConnected, selectedAccount } = useWalletStore();
   const { theme, setTheme } = useThemeStore();
   const [saving, setSaving] = useState(false);
-  
-  // Settings state
-  const [notifications, setNotifications] = useState({
-    policyUpdates: true,
-    settlementAlerts: true,
-    lpActivity: true,
-    marketNews: false,
-    email: '',
-  });
 
   const handleSave = async () => {
     setSaving(true);
@@ -108,57 +96,6 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Notifications Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-prmx-purple/10 flex items-center justify-center">
-              <Bell className="w-5 h-5 text-prmx-purple-light" />
-            </div>
-            <div>
-              <h2 className="font-semibold">Notifications</h2>
-              <p className="text-sm text-text-secondary">Configure how you receive alerts</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3">
-            {[
-              { key: 'policyUpdates', label: 'Policy Updates', desc: 'Get notified about your policy status changes' },
-              { key: 'settlementAlerts', label: 'Settlement Alerts', desc: 'Receive alerts when policies are settled' },
-              { key: 'lpActivity', label: 'LP Activity', desc: 'Notifications about LP token trades and distributions' },
-              { key: 'marketNews', label: 'Market News', desc: 'Updates about new markets and changes' },
-            ].map((item) => (
-              <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-background-tertiary/50">
-                <div>
-                  <p className="font-medium">{item.label}</p>
-                  <p className="text-sm text-text-secondary">{item.desc}</p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={notifications[item.key as keyof typeof notifications] as boolean}
-                    onChange={(e) => setNotifications({ ...notifications, [item.key]: e.target.checked })}
-                  />
-                  <div className="w-11 h-6 bg-background-secondary rounded-full peer peer-checked:bg-prmx-cyan peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-                </label>
-              </div>
-            ))}
-          </div>
-          
-          <div className="pt-4 border-t border-border-secondary">
-            <Input
-              label="Email for notifications (optional)"
-              type="email"
-              placeholder="your@email.com"
-              value={notifications.email}
-              onChange={(e) => setNotifications({ ...notifications, email: e.target.value })}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Display Section */}
       <Card>
         <CardHeader>
@@ -187,10 +124,7 @@ export default function SettingsPage() {
                 return (
                   <button
                     key={themeOption.value}
-                    onClick={() => {
-                      console.log('Theme button clicked:', themeOption.value);
-                      setTheme(themeOption.value);
-                    }}
+                    onClick={() => setTheme(themeOption.value)}
                     className={`flex-1 p-4 rounded-xl border-2 transition-all ${
                       theme === themeOption.value
                         ? 'border-prmx-cyan bg-prmx-cyan/10'
@@ -202,42 +136,6 @@ export default function SettingsPage() {
                   </button>
                 );
               })}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Security Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-warning/10 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-warning" />
-            </div>
-            <div>
-              <h2 className="font-semibold">Security</h2>
-              <p className="text-sm text-text-secondary">Protect your account</p>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-4 rounded-xl bg-background-tertiary/50">
-              <div>
-                <p className="font-medium">Transaction Signing</p>
-                <p className="text-sm text-text-secondary">Always confirm transactions in your wallet</p>
-              </div>
-              <span className="text-success text-sm font-medium">Enabled</span>
-            </div>
-            <div className="flex items-center justify-between p-4 rounded-xl bg-background-tertiary/50">
-              <div>
-                <p className="font-medium">Auto-disconnect</p>
-                <p className="text-sm text-text-secondary">Disconnect wallet after 30 minutes of inactivity</p>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" className="sr-only peer" defaultChecked />
-                <div className="w-11 h-6 bg-background-secondary rounded-full peer peer-checked:bg-prmx-cyan peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-              </label>
             </div>
           </div>
         </CardContent>

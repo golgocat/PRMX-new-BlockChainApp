@@ -9,18 +9,19 @@ import {
   Wallet,
   Save,
   Moon,
-  Sun,
-  Monitor
+  Sun
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useWalletStore } from '@/stores/walletStore';
+import { useThemeStore } from '@/stores/themeStore';
 import { formatAddress } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
   const { isConnected, selectedAccount } = useWalletStore();
+  const { theme, setTheme } = useThemeStore();
   const [saving, setSaving] = useState(false);
   
   // Settings state
@@ -30,12 +31,6 @@ export default function SettingsPage() {
     lpActivity: true,
     marketNews: false,
     email: '',
-  });
-  
-  const [display, setDisplay] = useState({
-    theme: 'dark',
-    currency: 'USD',
-    language: 'en',
   });
 
   const handleSave = async () => {
@@ -177,60 +172,31 @@ export default function SettingsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           {/* Theme */}
           <div>
             <label className="block text-sm font-medium text-text-secondary mb-3">Theme</label>
             <div className="flex gap-3">
               {[
-                { value: 'light', label: 'Light', icon: Sun },
-                { value: 'dark', label: 'Dark', icon: Moon },
-                { value: 'system', label: 'System', icon: Monitor },
-              ].map((theme) => {
-                const Icon = theme.icon;
+                { value: 'light' as const, label: 'Light', icon: Sun },
+                { value: 'dark' as const, label: 'Dark', icon: Moon },
+              ].map((themeOption) => {
+                const Icon = themeOption.icon;
                 return (
                   <button
-                    key={theme.value}
-                    onClick={() => setDisplay({ ...display, theme: theme.value })}
+                    key={themeOption.value}
+                    onClick={() => setTheme(themeOption.value)}
                     className={`flex-1 p-4 rounded-xl border-2 transition-all ${
-                      display.theme === theme.value
+                      theme === themeOption.value
                         ? 'border-prmx-cyan bg-prmx-cyan/10'
                         : 'border-border-primary hover:border-prmx-cyan/50'
                     }`}
                   >
                     <Icon className="w-5 h-5 mx-auto mb-2" />
-                    <p className="text-sm font-medium">{theme.label}</p>
+                    <p className="text-sm font-medium">{themeOption.label}</p>
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Currency & Language */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Currency</label>
-              <select
-                className="select-field"
-                value={display.currency}
-                onChange={(e) => setDisplay({ ...display, currency: e.target.value })}
-              >
-                <option value="USD">USD ($)</option>
-                <option value="EUR">EUR (€)</option>
-                <option value="PHP">PHP (₱)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-2">Language</label>
-              <select
-                className="select-field"
-                value={display.language}
-                onChange={(e) => setDisplay({ ...display, language: e.target.value })}
-              >
-                <option value="en">English</option>
-                <option value="fil">Filipino</option>
-                <option value="zh">中文</option>
-              </select>
             </div>
           </div>
         </CardContent>

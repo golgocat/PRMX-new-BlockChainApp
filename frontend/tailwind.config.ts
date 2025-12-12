@@ -6,6 +6,7 @@ const config: Config = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -20,21 +21,21 @@ const config: Config = {
           magenta: '#E040FB',
           'magenta-light': '#EA80FC',
         },
-        // UI Colors
+        // UI Colors (Dark mode - default)
         background: {
-          primary: '#0A0E17',
-          secondary: '#111827',
-          tertiary: '#1F2937',
-          card: '#151C2C',
+          primary: 'var(--bg-primary)',
+          secondary: 'var(--bg-secondary)',
+          tertiary: 'var(--bg-tertiary)',
+          card: 'var(--bg-card)',
         },
         text: {
-          primary: '#FFFFFF',
-          secondary: '#9CA3AF',
-          tertiary: '#6B7280',
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)',
         },
         border: {
-          primary: '#374151',
-          secondary: '#1F2937',
+          primary: 'var(--border-primary)',
+          secondary: 'var(--border-secondary)',
         },
         // Status Colors
         success: '#10B981',

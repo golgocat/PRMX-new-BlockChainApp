@@ -32,12 +32,25 @@ The runtime currently runs as a **standalone dev chain** with:
 - No cumulus/parachain pallets in the runtime
 - XCM logic preserved in `pallet_prmx_xcm_capital` for future parachain deployment
 
-**Future Parachain Migration:**
+**Future Parachain Migration Checklist:**
 
 When ready to deploy as a Polkadot parachain via Tanssi:
-1. Re-add cumulus pallets to the runtime
-2. Switch `MockXcmStrategyInterface` to `LiveXcmStrategyInterface`
-3. Configure HRMP channels with Asset Hub and Hydration
+
+1. Re-add cumulus dependencies to `runtime/Cargo.toml`
+2. Re-create `runtime/src/xcm_config.rs` with XCM executor configuration
+3. Add cumulus pallets back to `construct_runtime!`:
+   - `cumulus_pallet_parachain_system`
+   - `parachain_info`
+   - `pallet_message_queue`
+   - `pallet_xcm`
+   - `cumulus_pallet_xcm`
+   - `cumulus_pallet_xcmp_queue`
+4. Switch strategy in runtime config:
+   ```rust
+   type XcmStrategyInterface = pallet_prmx_xcm_capital::LiveXcmStrategyInterface<Runtime>;
+   ```
+5. Configure HRMP channels with Asset Hub (para 1000) and Hydration (para 2034)
+6. Fund sovereign accounts for XCM execution
 
 **Assumptions:**
 
@@ -1226,6 +1239,40 @@ AllocationPpm: u32;
 
 /// Mock yield rate for testing (ppm, can be negative)
 MockYieldRatePpm: i32;
+```
+
+### 14.5 Capital Flow Integration
+
+**Policy Creation Flow:**
+
+```
+policy_creation:
+  1. User pays premium → policy pool account
+  2. DAO contributes required_capital → policy pool account
+  3. pallet_prmx_xcm_capital::allocate_capital() called
+     - v1 (MockXcmStrategyInterface): Simulates DeFi deposit, tracks LP shares
+     - Future (LiveXcmStrategyInterface): Real XCM to Hydration Pool 102
+```
+
+**Settlement Flow:**
+
+```
+settlement:
+  1. pallet_prmx_xcm_capital::withdraw_capital() called
+     - v1 (Mock): Returns principal ± mock yield
+     - Future (Live): Real XCM withdrawal from Hydration
+  2. If event occurred: payout to policyholder
+  3. If no event: distribute to LP holders
+```
+
+### 14.6 Mock Yield Configuration
+
+For testing different scenarios:
+
+```rust
+// Set mock yield rate (extrinsic)
+PrmxXcmCapital::set_mock_yield_rate(50_000); // +5% yield
+PrmxXcmCapital::set_mock_yield_rate(-20_000); // -2% loss
 ```
 
 ---

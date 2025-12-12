@@ -79,10 +79,10 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
       />
       
       {/* Modal */}
-      <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md z-50">
-        <div className="glass-card overflow-hidden">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="glass-card overflow-hidden w-full max-w-md max-h-[90vh] flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-border-secondary">
+          <div className="flex items-center justify-between p-4 border-b border-border-secondary flex-shrink-0">
             <h2 className="text-lg font-semibold">
               {step === 'choose' && 'Connect Wallet'}
               {step === 'dev-accounts' && 'Select Dev Account'}
@@ -97,8 +97,8 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
             </button>
           </div>
 
-          {/* Content */}
-          <div className="p-4">
+          {/* Content - Scrollable */}
+          <div className="p-4 overflow-y-auto flex-1">
             {/* Step: Choose Connection Type */}
             {step === 'choose' && (
               <div className="space-y-3">

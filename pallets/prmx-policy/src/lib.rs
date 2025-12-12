@@ -870,6 +870,25 @@ impl<T: Config> pallet_prmx_oracle::PolicySettlement<T::AccountId> for Pallet<T>
         let payout = pallet::Pallet::<T>::do_settle_policy(policy_id, true)?;
         Ok(payout.into())
     }
+    
+    fn get_expired_policies(current_time: u64) -> Vec<pallet_prmx_oracle::PolicyId> {
+        let next_id = pallet::NextPolicyId::<T>::get();
+        (0..next_id)
+            .filter(|&policy_id| {
+                if let Some(policy) = pallet::Policies::<T>::get(policy_id) {
+                    policy.status == pallet::PolicyStatus::Active && current_time > policy.coverage_end
+                } else {
+                    false
+                }
+            })
+            .collect()
+    }
+    
+    fn settle_expired_policy(policy_id: pallet_prmx_oracle::PolicyId, event_occurred: bool) -> Result<u128, sp_runtime::DispatchError> {
+        // Call internal settlement function with the determined event outcome
+        let payout = pallet::Pallet::<T>::do_settle_policy(policy_id, event_occurred)?;
+        Ok(payout.into())
+    }
 }
 
 // =============================================================================

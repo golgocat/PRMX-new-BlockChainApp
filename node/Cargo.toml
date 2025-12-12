@@ -74,3 +74,7 @@ runtime-benchmarks = [
 try-runtime = [
     "prmx-runtime/try-runtime",
 ]
+# Test mode - bypasses coverage duration and lead-time validation for rapid testing
+test-mode = [
+    "prmx-runtime/test-mode",
+]

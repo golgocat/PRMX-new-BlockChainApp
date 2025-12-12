@@ -166,6 +166,14 @@ pub trait PolicySettlement<AccountId> {
     /// Trigger immediate settlement for a policy (called when threshold exceeded)
     /// Returns Ok(payout_amount_u128) on success
     fn trigger_immediate_settlement(policy_id: PolicyId) -> Result<u128, sp_runtime::DispatchError>;
+    
+    /// Get all active policies that have expired (coverage_end < current_time)
+    /// Used for automated expiration settlement
+    fn get_expired_policies(current_time: u64) -> Vec<PolicyId>;
+    
+    /// Settle an expired policy with the determined event outcome
+    /// Returns Ok(payout_amount_u128) on success
+    fn settle_expired_policy(policy_id: PolicyId, event_occurred: bool) -> Result<u128, sp_runtime::DispatchError>;
 }
 
 #[frame_support::pallet]
@@ -408,6 +416,12 @@ pub mod pallet {
         RainfallFetchCompleted {
             market_id: MarketId,
             records_updated: u32,
+        },
+        /// Policy automatically settled after coverage expiration
+        PolicyExpirationSettled {
+            policy_id: super::PolicyId,
+            event_occurred: bool,
+            payout_amount: u128,
         },
     }
 
@@ -1248,6 +1262,122 @@ pub mod pallet {
             
             weight
         }
+        
+        /// Maximum number of expired policies to settle per block
+        /// Limits block weight while ensuring backlog is cleared within reasonable time
+        const MAX_EXPIRATION_SETTLEMENTS_PER_BLOCK: u32 = 10;
+        
+        /// Check all expired policies and settle them automatically
+        /// This is called from on_initialize every BLOCKS_PER_SETTLEMENT_CHECK blocks
+        pub fn check_and_settle_expired_policies(block_number: BlockNumberFor<T>) -> Weight {
+            let current_time = T::PolicySettlement::current_time();
+            let mut weight = Weight::from_parts(5_000, 0);
+            let mut settlements_count = 0u32;
+            
+            // Get all expired policies (coverage ended, still active)
+            let expired_policies = T::PolicySettlement::get_expired_policies(current_time);
+            
+            if expired_policies.is_empty() {
+                return weight;
+            }
+            
+            log::info!(
+                target: "prmx-oracle",
+                "📋 Found {} expired policies to settle (current_time={})",
+                expired_policies.len(),
+                current_time
+            );
+            
+            for policy_id in expired_policies {
+                if settlements_count >= Self::MAX_EXPIRATION_SETTLEMENTS_PER_BLOCK {
+                    log::info!(
+                        target: "prmx-oracle",
+                        "⏸️ Reached max settlements per block ({}), deferring remaining to next block",
+                        Self::MAX_EXPIRATION_SETTLEMENTS_PER_BLOCK
+                    );
+                    break; // Defer remaining to next block
+                }
+                
+                // Get policy info to determine event outcome
+                if let Some((_holder, _max_payout, coverage_start, coverage_end, market_id)) = 
+                    T::PolicySettlement::get_policy_info(policy_id) 
+                {
+                    // Get strike threshold for this market
+                    let strike_mm = match T::MarketsApi::strike_value(market_id) {
+                        Ok(strike) => strike,
+                        Err(_) => {
+                            log::warn!(
+                                target: "prmx-oracle",
+                                "❌ Could not get strike value for market {}, skipping policy {}",
+                                market_id,
+                                policy_id
+                            );
+                            continue;
+                        }
+                    };
+                    
+                    // Check if event occurred during coverage window using oracle data
+                    let event_occurred = Self::check_exceeded_threshold_in_window(
+                        market_id,
+                        strike_mm,
+                        coverage_start,
+                        coverage_end,
+                    ).unwrap_or(false);
+                    
+                    log::info!(
+                        target: "prmx-oracle",
+                        "🔍 Policy {} expired: coverage [{}, {}], strike {} mm, event_occurred: {}",
+                        policy_id,
+                        coverage_start,
+                        coverage_end,
+                        strike_mm as f64 / 10.0,
+                        event_occurred
+                    );
+                    
+                    // Settle the policy
+                    match T::PolicySettlement::settle_expired_policy(policy_id, event_occurred) {
+                        Ok(payout) => {
+                            log::info!(
+                                target: "prmx-oracle",
+                                "✅ Auto-settled expired policy {} (event: {}, payout: {})",
+                                policy_id,
+                                event_occurred,
+                                payout
+                            );
+                            
+                            Self::deposit_event(Event::PolicyExpirationSettled {
+                                policy_id,
+                                event_occurred,
+                                payout_amount: payout,
+                            });
+                            
+                            settlements_count += 1;
+                        }
+                        Err(e) => {
+                            log::warn!(
+                                target: "prmx-oracle",
+                                "❌ Failed to auto-settle expired policy {}: {:?}",
+                                policy_id,
+                                e
+                            );
+                        }
+                    }
+                }
+                
+                // Add weight for each policy processed
+                weight = weight.saturating_add(Weight::from_parts(100_000, 0));
+            }
+            
+            if settlements_count > 0 {
+                log::info!(
+                    target: "prmx-oracle",
+                    "🏁 Expiration settlement complete: {} policies auto-settled",
+                    settlements_count
+                );
+            }
+            
+            weight
+        }
     }
 
     // =========================================================================
@@ -1265,6 +1395,7 @@ pub mod pallet {
         /// On initialize hook:
         /// 1. Bootstrap test data for markets without rainfall data (every 50 blocks)
         /// 2. Check for threshold breaches and trigger automatic settlements (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
+        /// 3. Check for expired policies and settle them automatically (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
         fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
             use sp_runtime::traits::UniqueSaturatedInto;
             let block_num: u32 = block_number.unique_saturated_into();
@@ -1338,8 +1469,13 @@ pub mod pallet {
             let should_check_settlements = block_num % BLOCKS_PER_SETTLEMENT_CHECK == 0;
             
             if should_check_settlements {
+                // Check for threshold breaches during active coverage
                 let settlements_weight = Self::check_and_settle_triggered_policies(block_number);
                 weight = weight.saturating_add(settlements_weight);
+                
+                // Check for expired policies that need settlement
+                let expiration_weight = Self::check_and_settle_expired_policies(block_number);
+                weight = weight.saturating_add(expiration_weight);
             }
 
             weight

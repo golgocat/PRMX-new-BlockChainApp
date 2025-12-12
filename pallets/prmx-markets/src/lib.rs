@@ -420,37 +420,56 @@ pub mod pallet {
     // =========================================================================
 
     impl<T: Config> Pallet<T> {
-        /// Validate a coverage window against market rules
+        /// Validate a coverage window against market rules.
+        /// When compiled with `test-mode` feature, only validates that end > start
+        /// and market exists, bypassing duration and lead-time requirements.
         pub fn validate_coverage_window(
             market_id: MarketId,
             coverage_start: u64,
             coverage_end: u64,
+            #[allow(unused_variables)]
             now: u64,
         ) -> DispatchResult {
-            let market = Markets::<T>::get(market_id).ok_or(Error::<T>::MarketNotFound)?;
+            // Always check market exists
+            let _market = Markets::<T>::get(market_id).ok_or(Error::<T>::MarketNotFound)?;
 
+            // Always validate end > start
             ensure!(
                 coverage_start < coverage_end,
                 Error::<T>::InvalidCoverageWindow
             );
 
-            let rules = &market.window_rules;
-            let duration = coverage_end.saturating_sub(coverage_start);
+            // In test-mode, skip duration and lead-time validation
+            #[cfg(not(feature = "test-mode"))]
+            {
+                let market = Markets::<T>::get(market_id).ok_or(Error::<T>::MarketNotFound)?;
+                let rules = &market.window_rules;
+                let duration = coverage_end.saturating_sub(coverage_start);
 
-            ensure!(
-                duration as u32 >= rules.min_duration_secs,
-                Error::<T>::CoverageTooShort
-            );
-            ensure!(
-                duration as u32 <= rules.max_duration_secs,
-                Error::<T>::CoverageTooLong
-            );
+                ensure!(
+                    duration as u32 >= rules.min_duration_secs,
+                    Error::<T>::CoverageTooShort
+                );
+                ensure!(
+                    duration as u32 <= rules.max_duration_secs,
+                    Error::<T>::CoverageTooLong
+                );
 
-            let lead_time = coverage_start.saturating_sub(now);
-            ensure!(
-                (lead_time as u32) >= rules.min_lead_time_secs,
-                Error::<T>::TooLateToApply
-            );
+                let lead_time = coverage_start.saturating_sub(now);
+                ensure!(
+                    (lead_time as u32) >= rules.min_lead_time_secs,
+                    Error::<T>::TooLateToApply
+                );
+            }
+
+            #[cfg(feature = "test-mode")]
+            {
+                log::info!(
+                    target: "prmx-markets",
+                    "🧪 TEST MODE: Bypassing duration/lead-time validation for market {}",
+                    market_id
+                );
+            }
 
             Ok(())
         }

@@ -1,0 +1,342 @@
+@polkadot/util-crypto has multiple versions, ensure that there is only one installed.
+Either remove and explicitly install matching versions or dedupe using your package manager.
+The following conflicting packages were found:
+	esm 14.0.1	node_modules/@polkadot/api/node_modules/@polkadot/util-crypto/
+	esm 14.0.1	node_modules/@polkadot/types/node_modules/@polkadot/util-crypto/
+@polkadot/util-crypto has multiple versions, ensure that there is only one installed.
+Either remove and explicitly install matching versions or dedupe using your package manager.
+The following conflicting packages were found:
+	esm 14.0.1	node_modules/@polkadot/api/node_modules/@polkadot/util-crypto/
+	esm 14.0.1	node_modules/@polkadot/types/node_modules/@polkadot/util-crypto/
+	esm 14.0.1	node_modules/@polkadot/api-derive/node_modules/@polkadot/util-crypto/
+🎧 PRMX Event Listener
+   Connecting to: ws://127.0.0.1:9944
+   Log file: ./test-results.log
+
+2025-12-12 22:55:27        API/INIT: RPC methods not decorated: chainHead_v1_body, chainHead_v1_call, chainHead_v1_continue, chainHead_v1_follow, chainHead_v1_header, chainHead_v1_stopOperation, chainHead_v1_storage, chainHead_v1_unfollow, chainHead_v1_unpin, chainSpec_v1_chainName, chainSpec_v1_genesisHash, chainSpec_v1_properties, transactionWatch_v1_submitAndWatch, transactionWatch_v1_unwatch, transaction_v1_broadcast, transaction_v1_stop
+✅ Connected to node
+📡 Subscribing to events...
+
+👂 Listening for events... (Ctrl+C to stop)
+
+[Block #4] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,429","rainfallMm":"0"}
+[Block #4] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #5] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,429","rainfallMm":"0"}
+[Block #5] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #6] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,429","rainfallMm":"0"}
+[Block #6] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #7] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,429","rainfallMm":"0"}
+[Block #7] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #8] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,429","rainfallMm":"0"}
+[Block #8] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #9] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,429","rainfallMm":"0"}
+[Block #9] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #10] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,429","rainfallMm":"0"}
+[Block #10] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+[Block #23] prmxOracle.MarketLocationBound: {"marketId":"0","accuweatherLocationKey":"3423441"}
+[Block #24] prmxOracle.OracleProviderAdded: {"account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+
+📝 Log written to ./test-results.log
+[Block #25] prmxQuote.QuoteProviderAdded: {"account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #26] prmxQuote.QuoteRequested: {"quoteId":"0","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+
+📝 Log written to ./test-results.log
+[Block #27] prmxQuote.QuoteReady: {"quoteId":"0","totalPremium":"12,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #28] prmxHoldings.LpTokensMinted: {"policyId":"0","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #28] prmxHoldings.LpHolderRegistered: {"policyId":"0","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #28] prmxHoldings.LpTokensLocked: {"policyId":"0","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #28] prmxOrderbookLp.AskPlaced: {"orderId":"0","policyId":"0","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #28] prmxQuote.QuoteConsumed: {"quoteId":"0"}
+[Block #28] prmxPolicy.PolicyCreated: {"policyId":"0","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #28] prmxPolicy.CapitalLocked: {"policyId":"0","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #28] prmxPolicy.LpTokensMinted: {"policyId":"0","shares":"1"}
+[Block #28] prmxPolicy.DaoLpAskPlaced: {"policyId":"0","pricePerShare":"88,000,000","quantity":"1"}
+[Block #28] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"0","allocationAmount":"100,000,000","daoBalance":"99,999,912,000,000","maxPotentialLoss":"100,000,000"}
+[Block #28] prmxXcmCapital.CapitalAllocated: {"policyId":"0","amount":"100,000,000","shares":"100,000,000"}
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+[Block #34] prmxQuote.QuoteRequested: {"quoteId":"1","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+
+📝 Log written to ./test-results.log
+[Block #35] prmxQuote.QuoteReady: {"quoteId":"1","totalPremium":"12,000,000"}
+[Block #36] prmxHoldings.LpTokensMinted: {"policyId":"1","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #36] prmxHoldings.LpHolderRegistered: {"policyId":"1","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #36] prmxHoldings.LpTokensLocked: {"policyId":"1","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #36] prmxOrderbookLp.AskPlaced: {"orderId":"1","policyId":"1","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #36] prmxQuote.QuoteConsumed: {"quoteId":"1"}
+[Block #36] prmxPolicy.PolicyCreated: {"policyId":"1","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #36] prmxPolicy.CapitalLocked: {"policyId":"1","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #36] prmxPolicy.LpTokensMinted: {"policyId":"1","shares":"1"}
+[Block #36] prmxPolicy.DaoLpAskPlaced: {"policyId":"1","pricePerShare":"88,000,000","quantity":"1"}
+[Block #36] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"1","allocationAmount":"100,000,000","daoBalance":"99,999,924,000,000","maxPotentialLoss":"100,000,000"}
+[Block #36] prmxXcmCapital.CapitalAllocated: {"policyId":"1","amount":"100,000,000","shares":"100,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #37] prmxQuote.QuoteRequested: {"quoteId":"2","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+
+📝 Log written to ./test-results.log
+[Block #38] prmxQuote.QuoteReady: {"quoteId":"2","totalPremium":"12,000,000"}
+[Block #39] prmxHoldings.LpTokensMinted: {"policyId":"2","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #39] prmxHoldings.LpHolderRegistered: {"policyId":"2","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #39] prmxHoldings.LpTokensLocked: {"policyId":"2","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #39] prmxOrderbookLp.AskPlaced: {"orderId":"2","policyId":"2","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #39] prmxQuote.QuoteConsumed: {"quoteId":"2"}
+[Block #39] prmxPolicy.PolicyCreated: {"policyId":"2","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #39] prmxPolicy.CapitalLocked: {"policyId":"2","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #39] prmxPolicy.LpTokensMinted: {"policyId":"2","shares":"1"}
+[Block #39] prmxPolicy.DaoLpAskPlaced: {"policyId":"2","pricePerShare":"88,000,000","quantity":"1"}
+[Block #39] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"2","allocationAmount":"100,000,000","daoBalance":"99,999,936,000,000","maxPotentialLoss":"100,000,000"}
+[Block #39] prmxXcmCapital.CapitalAllocated: {"policyId":"2","amount":"100,000,000","shares":"100,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #40] prmxQuote.QuoteRequested: {"quoteId":"3","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+[Block #41] prmxQuote.QuoteReady: {"quoteId":"3","totalPremium":"12,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #42] prmxHoldings.LpTokensMinted: {"policyId":"3","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #42] prmxHoldings.LpHolderRegistered: {"policyId":"3","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #42] prmxHoldings.LpTokensLocked: {"policyId":"3","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #42] prmxOrderbookLp.AskPlaced: {"orderId":"3","policyId":"3","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #42] prmxQuote.QuoteConsumed: {"quoteId":"3"}
+[Block #42] prmxPolicy.PolicyCreated: {"policyId":"3","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #42] prmxPolicy.CapitalLocked: {"policyId":"3","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #42] prmxPolicy.LpTokensMinted: {"policyId":"3","shares":"1"}
+[Block #42] prmxPolicy.DaoLpAskPlaced: {"policyId":"3","pricePerShare":"88,000,000","quantity":"1"}
+[Block #42] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"3","allocationAmount":"100,000,000","daoBalance":"99,999,948,000,000","maxPotentialLoss":"100,000,000"}
+[Block #42] prmxXcmCapital.CapitalAllocated: {"policyId":"3","amount":"100,000,000","shares":"100,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #43] prmxQuote.QuoteRequested: {"quoteId":"4","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+[Block #44] prmxQuote.QuoteReady: {"quoteId":"4","totalPremium":"12,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #45] prmxHoldings.LpTokensMinted: {"policyId":"4","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #45] prmxHoldings.LpHolderRegistered: {"policyId":"4","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #45] prmxHoldings.LpTokensLocked: {"policyId":"4","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #45] prmxOrderbookLp.AskPlaced: {"orderId":"4","policyId":"4","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #45] prmxQuote.QuoteConsumed: {"quoteId":"4"}
+[Block #45] prmxPolicy.PolicyCreated: {"policyId":"4","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #45] prmxPolicy.CapitalLocked: {"policyId":"4","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #45] prmxPolicy.LpTokensMinted: {"policyId":"4","shares":"1"}
+[Block #45] prmxPolicy.DaoLpAskPlaced: {"policyId":"4","pricePerShare":"88,000,000","quantity":"1"}
+[Block #45] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"4","allocationAmount":"100,000,000","daoBalance":"99,999,960,000,000","maxPotentialLoss":"100,000,000"}
+[Block #45] prmxXcmCapital.CapitalAllocated: {"policyId":"4","amount":"100,000,000","shares":"100,000,000"}
+[Block #46] prmxQuote.QuoteRequested: {"quoteId":"5","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+
+📝 Log written to ./test-results.log
+[Block #47] prmxQuote.QuoteReady: {"quoteId":"5","totalPremium":"12,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #48] prmxHoldings.LpTokensMinted: {"policyId":"5","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #48] prmxHoldings.LpHolderRegistered: {"policyId":"5","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #48] prmxHoldings.LpTokensLocked: {"policyId":"5","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #48] prmxOrderbookLp.AskPlaced: {"orderId":"5","policyId":"5","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #48] prmxQuote.QuoteConsumed: {"quoteId":"5"}
+[Block #48] prmxPolicy.PolicyCreated: {"policyId":"5","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #48] prmxPolicy.CapitalLocked: {"policyId":"5","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #48] prmxPolicy.LpTokensMinted: {"policyId":"5","shares":"1"}
+[Block #48] prmxPolicy.DaoLpAskPlaced: {"policyId":"5","pricePerShare":"88,000,000","quantity":"1"}
+[Block #48] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"5","allocationAmount":"100,000,000","daoBalance":"99,999,972,000,000","maxPotentialLoss":"100,000,000"}
+[Block #48] prmxXcmCapital.CapitalAllocated: {"policyId":"5","amount":"100,000,000","shares":"100,000,000"}
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+[Block #54] prmxQuote.QuoteRequested: {"quoteId":"6","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+
+📝 Log written to ./test-results.log
+[Block #55] prmxQuote.QuoteReady: {"quoteId":"6","totalPremium":"12,000,000"}
+[Block #56] prmxHoldings.LpTokensMinted: {"policyId":"6","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #56] prmxHoldings.LpHolderRegistered: {"policyId":"6","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #56] prmxHoldings.LpTokensLocked: {"policyId":"6","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #56] prmxOrderbookLp.AskPlaced: {"orderId":"6","policyId":"6","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #56] prmxQuote.QuoteConsumed: {"quoteId":"6"}
+[Block #56] prmxPolicy.PolicyCreated: {"policyId":"6","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #56] prmxPolicy.CapitalLocked: {"policyId":"6","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #56] prmxPolicy.LpTokensMinted: {"policyId":"6","shares":"1"}
+[Block #56] prmxPolicy.DaoLpAskPlaced: {"policyId":"6","pricePerShare":"88,000,000","quantity":"1"}
+[Block #56] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"6","allocationAmount":"100,000,000","daoBalance":"99,999,984,000,000","maxPotentialLoss":"100,000,000"}
+[Block #56] prmxXcmCapital.CapitalAllocated: {"policyId":"6","amount":"100,000,000","shares":"100,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #57] prmxQuote.QuoteRequested: {"quoteId":"7","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+
+📝 Log written to ./test-results.log
+[Block #58] prmxQuote.QuoteReady: {"quoteId":"7","totalPremium":"12,000,000"}
+[Block #59] prmxHoldings.LpTokensMinted: {"policyId":"7","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #59] prmxHoldings.LpHolderRegistered: {"policyId":"7","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY"}
+[Block #59] prmxHoldings.LpTokensLocked: {"policyId":"7","account":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","amount":"1"}
+[Block #59] prmxOrderbookLp.AskPlaced: {"orderId":"7","policyId":"7","seller":"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY","price":"88,000,000","quantity":"1"}
+[Block #59] prmxQuote.QuoteConsumed: {"quoteId":"7"}
+[Block #59] prmxPolicy.PolicyCreated: {"policyId":"7","marketId":"0","holder":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty","shares":"1"}
+[Block #59] prmxPolicy.CapitalLocked: {"policyId":"7","userPremium":"12,000,000","daoCapital":"88,000,000"}
+[Block #59] prmxPolicy.LpTokensMinted: {"policyId":"7","shares":"1"}
+[Block #59] prmxPolicy.DaoLpAskPlaced: {"policyId":"7","pricePerShare":"88,000,000","quantity":"1"}
+[Block #59] prmxXcmCapital.DaoSolvencyCheckPassed: {"policyId":"7","allocationAmount":"100,000,000","daoBalance":"99,999,996,000,000","maxPotentialLoss":"100,000,000"}
+[Block #59] prmxXcmCapital.CapitalAllocated: {"policyId":"7","amount":"100,000,000","shares":"100,000,000"}
+
+📝 Log written to ./test-results.log
+[Block #60] prmxQuote.QuoteRequested: {"quoteId":"8","marketId":"0","requester":"5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"}
+[Block #61] prmxQuote.QuoteReady: {"quoteId":"8","totalPremium":"12,000,000"}
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+2025-12-12 23:02:27          API-WS: disconnected from ws://127.0.0.1:9944: 1006:: Abnormal Closure
+
+📝 Log written to ./test-results.log
+2025-12-12 23:02:29          API-WS: disconnected from ws://127.0.0.1:9944: 1006:: Abnormal Closure
+[Block #1] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"481,560","rainfallMm":"100"}
+[Block #1] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"100"}
+
+📝 Log written to ./test-results.log
+[Block #2] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #2] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #3] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #3] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #4] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #4] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #5] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #5] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #6] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #6] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #7] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #7] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #8] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #8] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #9] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #9] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #10] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #10] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+2025-12-12 23:04:20          API-WS: disconnected from ws://127.0.0.1:9944: 1006:: Abnormal Closure
+2025-12-12 23:04:23          API-WS: disconnected from ws://127.0.0.1:9944: 1006:: Abnormal Closure
+2025-12-12 23:04:25          API-WS: disconnected from ws://127.0.0.1:9944: 1006:: Abnormal Closure
+
+📝 Log written to ./test-results.log
+[Block #1] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"481,560","rainfallMm":"100"}
+[Block #1] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"100"}
+[Block #2] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #2] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #3] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #3] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #4] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #4] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #5] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #5] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #6] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #6] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #7] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #7] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #8] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #8] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+[Block #9] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #9] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+[Block #10] prmxOracle.RainfallUpdated: {"locationId":"0","bucketIndex":"490,430","rainfallMm":"0"}
+[Block #10] prmxOracle.RollingSumUpdated: {"locationId":"0","rollingSumMm":"0"}
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+📝 Log written to ./test-results.log
+
+
+🛑 Shutting down...
+
+📝 Log written to ./test-results.log

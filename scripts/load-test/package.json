@@ -1,0 +1,21 @@
+{
+  "name": "prmx-load-test",
+  "version": "1.0.0",
+  "description": "PRMX Chain Load Test - 120 policies with LP scenarios",
+  "type": "module",
+  "scripts": {
+    "listener": "node event-listener.mjs",
+    "test": "node load-test.mjs",
+    "test:quick": "node load-test.mjs --policies=10 --interval=10 --duration=30",
+    "test:full": "node load-test.mjs --policies=120 --interval=30 --duration=60"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@polkadot/api": "^16.5.3",
+    "@polkadot/keyring": "^13.5.9",
+    "@polkadot/util-crypto": "^13.5.9"
+  }
+}
+

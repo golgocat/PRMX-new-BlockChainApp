@@ -175,7 +175,9 @@ export default function SettingsPage() {
         <CardContent>
           {/* Theme */}
           <div>
-            <label className="block text-sm font-medium text-text-secondary mb-3">Theme</label>
+            <label className="block text-sm font-medium text-text-secondary mb-3">
+              Theme (Current: <span className="text-prmx-cyan font-mono">{theme}</span>)
+            </label>
             <div className="flex gap-3">
               {[
                 { value: 'light' as const, label: 'Light', icon: Sun },
@@ -185,7 +187,10 @@ export default function SettingsPage() {
                 return (
                   <button
                     key={themeOption.value}
-                    onClick={() => setTheme(themeOption.value)}
+                    onClick={() => {
+                      console.log('Theme button clicked:', themeOption.value);
+                      setTheme(themeOption.value);
+                    }}
                     className={`flex-1 p-4 rounded-xl border-2 transition-all ${
                       theme === themeOption.value
                         ? 'border-prmx-cyan bg-prmx-cyan/10'

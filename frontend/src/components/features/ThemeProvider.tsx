@@ -1,22 +1,18 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useThemeStore } from '@/stores/themeStore';
+import { useEffect, useLayoutEffect } from 'react';
+import { useThemeStore, applyTheme } from '@/stores/themeStore';
+
+// Use useLayoutEffect on client, useEffect on server
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const theme = useThemeStore((state) => state.theme);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    } else {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    }
+  // Apply theme immediately on mount and when theme changes
+  useIsomorphicLayoutEffect(() => {
+    applyTheme(theme);
   }, [theme]);
 
   return <>{children}</>;
 }
-

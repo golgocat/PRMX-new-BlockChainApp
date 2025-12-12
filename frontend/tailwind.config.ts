@@ -21,21 +21,21 @@ const config: Config = {
           magenta: '#E040FB',
           'magenta-light': '#EA80FC',
         },
-        // UI Colors (Dark mode - default)
+        // UI Colors - using RGB format for opacity support
         background: {
-          primary: 'var(--bg-primary)',
-          secondary: 'var(--bg-secondary)',
-          tertiary: 'var(--bg-tertiary)',
-          card: 'var(--bg-card)',
+          primary: 'rgb(var(--bg-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--bg-secondary) / <alpha-value>)',
+          tertiary: 'rgb(var(--bg-tertiary) / <alpha-value>)',
+          card: 'rgb(var(--bg-card) / <alpha-value>)',
         },
         text: {
-          primary: 'var(--text-primary)',
-          secondary: 'var(--text-secondary)',
-          tertiary: 'var(--text-tertiary)',
+          primary: 'rgb(var(--text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
+          tertiary: 'rgb(var(--text-tertiary) / <alpha-value>)',
         },
         border: {
-          primary: 'var(--border-primary)',
-          secondary: 'var(--border-secondary)',
+          primary: 'rgb(var(--border-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--border-secondary) / <alpha-value>)',
         },
         // Status Colors
         success: '#10B981',

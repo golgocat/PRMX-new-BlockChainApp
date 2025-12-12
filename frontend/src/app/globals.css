@@ -7,29 +7,29 @@
 @layer base {
   /* Dark mode (default) */
   :root,
-  .dark {
-    --bg-primary: #0A0E17;
-    --bg-secondary: #111827;
-    --bg-tertiary: #1F2937;
-    --bg-card: #151C2C;
-    --text-primary: #FFFFFF;
-    --text-secondary: #9CA3AF;
-    --text-tertiary: #6B7280;
-    --border-primary: #374151;
-    --border-secondary: #1F2937;
+  html.dark {
+    --bg-primary: 10 14 23;
+    --bg-secondary: 17 24 39;
+    --bg-tertiary: 31 41 55;
+    --bg-card: 21 28 44;
+    --text-primary: 255 255 255;
+    --text-secondary: 156 163 175;
+    --text-tertiary: 107 114 128;
+    --border-primary: 55 65 81;
+    --border-secondary: 31 41 55;
   }
 
   /* Light mode */
-  .light {
-    --bg-primary: #F8FAFC;
-    --bg-secondary: #F1F5F9;
-    --bg-tertiary: #E2E8F0;
-    --bg-card: #FFFFFF;
-    --text-primary: #0F172A;
-    --text-secondary: #475569;
-    --text-tertiary: #94A3B8;
-    --border-primary: #CBD5E1;
-    --border-secondary: #E2E8F0;
+  html.light {
+    --bg-primary: 248 250 252;
+    --bg-secondary: 241 245 249;
+    --bg-tertiary: 226 232 240;
+    --bg-card: 255 255 255;
+    --text-primary: 15 23 42;
+    --text-secondary: 71 85 105;
+    --text-tertiary: 148 163 184;
+    --border-primary: 203 213 225;
+    --border-secondary: 226 232 240;
   }
 
   * {
@@ -38,7 +38,7 @@
 
   body {
     @apply bg-background-primary text-text-primary font-sans antialiased;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   ::-webkit-scrollbar {
@@ -61,7 +61,9 @@
 
 @layer components {
   .glass-card {
-    @apply bg-background-card/80 backdrop-blur-xl border border-border-primary/50 rounded-2xl shadow-card;
+    background-color: rgb(var(--bg-card) / 0.8);
+    border-color: rgb(var(--border-primary) / 0.5);
+    @apply backdrop-blur-xl border rounded-2xl shadow-card;
   }
 
   .glass-card-hover {
@@ -149,7 +151,10 @@
   }
 
   .table-row {
-    @apply border-b border-border-secondary hover:bg-background-tertiary/50 transition-colors;
+    @apply border-b border-border-secondary transition-colors;
+  }
+  .table-row:hover {
+    background-color: rgb(var(--bg-tertiary) / 0.5);
   }
 
   .badge {

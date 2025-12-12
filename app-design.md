@@ -2,15 +2,16 @@
 
 > This document is the **single source of truth** for AI coding assistants (Cursor, Antigravity, etc.) when generating code for the PRMX chain.
 
-PRMX is a Substrate-based Polkadot appchain (to be deployed via Tanssi) that provides **rainfall parametric insurance** with:
+PRMX is a Substrate-based blockchain that provides **rainfall parametric insurance** with:
 
-- Short coverage windows (1–7 days per policy)
+- **v1: Fixed 24-hour coverage window** (1 day per policy for testing)
 - Pricing from an external R-based probability model (HTTP API)
 - Per-policy fully funded capital pools (max payout locked on-chain)
 - Risk-bearing LP tokens tradable via an LP-only orderbook
 - Non-tradable coverage (Policy Token side) represented by policies
 - Market-level geospatial targeting (center latitude / longitude per market)
 - AccuWeather-based rainfall oracle bound per market
+- XCM-based capital management (Hydration Pool 102 integration prepared)
 - Gasless UX on core insurance flows
 - Governance via a native PRMX token
 
@@ -24,12 +25,26 @@ PRMX is a Substrate-based Polkadot appchain (to be deployed via Tanssi) that pro
 
 ## 1. Polkadot SDK Baseline
 
+**Current Deployment Mode: Standalone Dev Chain**
+
+The runtime currently runs as a **standalone dev chain** with:
+- Aura + Grandpa consensus (not parachain consensus)
+- No cumulus/parachain pallets in the runtime
+- XCM logic preserved in `pallet_prmx_xcm_capital` for future parachain deployment
+
+**Future Parachain Migration:**
+
+When ready to deploy as a Polkadot parachain via Tanssi:
+1. Re-add cumulus pallets to the runtime
+2. Switch `MockXcmStrategyInterface` to `LiveXcmStrategyInterface`
+3. Configure HRMP channels with Asset Hub and Hydration
+
 **Assumptions:**
 
 - Runtime uses FRAME v2 macros
 - Node follows standard polkadot-sdk structure
   - Service, chain spec, CLI etc. from the reference repo
-- PRMX pallets are integrated into a custom runtime that later becomes a Tanssi appchain
+- PRMX pallets are integrated into a custom runtime
 
 **Core pallets in this design:**
 
@@ -41,6 +56,7 @@ PRMX is a Substrate-based Polkadot appchain (to be deployed via Tanssi) that pro
 | `pallet_prmx_orderbook_lp` | LP-only orderbook |
 | `pallet_prmx_oracle` | AccuWeather-based rainfall data and 24h rolling sums |
 | `pallet_prmx_quote` | Pricing via external R model and offchain worker |
+| `pallet_prmx_xcm_capital` | XCM-based capital management with Hydration Pool 102 |
 
 ---
 
@@ -250,13 +266,19 @@ pub struct WindowRules {
 }
 ```
 
-**Recommended defaults** (per market and DAO configurable):
+**v1 Configuration (Fixed 24-hour coverage):**
 
-| Parameter | Default Value |
-|-----------|---------------|
-| `min_duration_secs` | 86,400 (1 day) |
-| `max_duration_secs` | 604,800 (7 days) |
-| `min_lead_time_secs` | 1,814,400 (21 days) |
+For v1, coverage duration is fixed to **1 day (24 hours)** to align with the R actuarial model and oracle event definitions. See `pricing-model.md` for details.
+
+| Parameter | v1 Value | Notes |
+|-----------|----------|-------|
+| `min_duration_secs` | 86,400 (1 day) | Fixed for v1 |
+| `max_duration_secs` | 86,400 (1 day) | Fixed for v1 (same as min) |
+| `min_lead_time_secs` | 0 (for testing) | Production: 1,814,400 (21 days) |
+
+**Frontend enforces 1-day duration** - users cannot select different durations in v1.
+
+**v2 will extend to 1-7 days** once the R model and oracle support variable-length windows.
 
 ### 5.3 Payout Per Share
 
@@ -472,8 +494,9 @@ fn validate_coverage_window(
 **Assumptions:**
 
 - `coverage_end` lies in the future when policies are created
-- Coverage length is in [1 day, 7 days]
-- Coverage applications must be at least 21 days before `coverage_start` (DAO configurable)
+- **v1: Coverage length is fixed to 1 day (24 hours)**
+- v2 will extend to [1 day, 7 days]
+- Coverage applications must be at least 21 days before `coverage_start` (DAO configurable, relaxed to 0 for testing)
 
 ---
 
@@ -1120,7 +1143,94 @@ T::HoldingsApi::cleanup_policy_lp_tokens(policy_id)?;
 
 ---
 
-## 14. DAO and Governance
+## 14. XCM Capital Management (`pallet_prmx_xcm_capital`)
+
+This pallet manages capital allocation between on-chain policy pools and external DeFi strategies via XCM.
+
+### 14.1 Strategy Interface
+
+The pallet defines a trait for DeFi strategy implementations:
+
+```rust
+pub trait XcmStrategyInterface {
+    type Balance;
+    type AccountId;
+
+    /// Enter DeFi strategy with principal, returns LP shares
+    fn enter_strategy(principal: Self::Balance) -> Result<u128, DispatchError>;
+
+    /// Exit DeFi strategy with LP shares, returns realized amount
+    fn exit_strategy(
+        shares: u128,
+        pool_account: &Self::AccountId,
+    ) -> Result<Self::Balance, DispatchError>;
+}
+```
+
+### 14.2 Strategy Implementations
+
+**MockXcmStrategyInterface (Active in v1):**
+
+For standalone dev chain testing:
+- Simulates DeFi interactions without real XCM calls
+- Configurable mock yield rate for testing scenarios
+- LP shares = principal (1:1 mapping)
+
+```rust
+type XcmStrategyInterface = pallet_prmx_xcm_capital::MockXcmStrategyInterface<Runtime>;
+```
+
+**LiveXcmStrategyInterface (Preserved for future):**
+
+For parachain deployment with real XCM:
+- Deposits USDT to Hydration Pool 102 via Asset Hub
+- Withdraws with yield/loss from DeFi position
+- Requires cumulus pallets and HRMP channels
+
+```rust
+// Future parachain mode:
+type XcmStrategyInterface = pallet_prmx_xcm_capital::LiveXcmStrategyInterface<Runtime>;
+```
+
+### 14.3 Capital API Trait
+
+The policy pallet uses this trait for capital management:
+
+```rust
+pub trait CapitalApi<AccountId> {
+    type Balance;
+
+    /// Allocate capital to DeFi strategy when policy is created
+    fn allocate_capital(
+        policy_id: PolicyId,
+        pool_account: &AccountId,
+        amount: Self::Balance,
+    ) -> Result<(), DispatchError>;
+
+    /// Withdraw capital from DeFi strategy at settlement
+    fn withdraw_capital(
+        policy_id: PolicyId,
+        pool_account: &AccountId,
+    ) -> Result<Self::Balance, DispatchError>;
+}
+```
+
+### 14.4 Storage
+
+```rust
+/// Per-policy DeFi position tracking
+PolicyDefiPositions: map PolicyId -> Option<DefiPosition>;
+
+/// Global allocation percentage (ppm, 1_000_000 = 100%)
+AllocationPpm: u32;
+
+/// Mock yield rate for testing (ppm, can be negative)
+MockYieldRatePpm: i32;
+```
+
+---
+
+## 15. DAO and Governance
 
 ### Initial Version
 
@@ -1147,7 +1257,7 @@ type GovernanceOrigin = DaoOrigin;
 
 ---
 
-## 15. Transaction Fees and Gasless UX
+## 16. Transaction Fees and Gasless UX
 
 **Goal:**
 
@@ -1172,14 +1282,15 @@ type GovernanceOrigin = DaoOrigin;
 
 ---
 
-## 16. Repository Layout
+## 17. Repository Layout
 
-**Suggested layout:**
+**Current layout:**
 
 ```
 prmx-chain/
   app-design.md
-  oracle_design.md
+  oracle-design.md
+  pricing-model.md
   pallets/
     prmx-markets/
       src/lib.rs
@@ -1193,19 +1304,19 @@ prmx-chain/
       src/lib.rs
     prmx-quote/
       src/lib.rs
+    prmx-xcm-capital/           # XCM capital management
+      src/
+        lib.rs                  # Pallet with MockXcmStrategyInterface
+        xcm_config.rs           # Hydration Pool 102 configuration (preserved)
+        xcm_strategy.rs         # LiveXcmStrategyInterface (preserved)
   runtime/
-    src/lib.rs
+    src/lib.rs                  # Standalone dev chain (no cumulus pallets)
   node/
     src/chain_spec.rs
     src/service.rs
   scripts/
     run-node-dev.sh
-    set-oracle-api-key.mjs
-    test-settlement-at-maturity.mjs      # Test: no event, single LP
-    test-settlement-multiple-lps.mjs     # Test: no event, multiple LP holders
-    test-event-with-unfilled-orders.mjs  # Test: event occurs with unfilled orders
-    test-event-occurs.mjs                # Test: event triggers payout
-    test-full-insurance-cycle.mjs        # Test: complete insurance flow
+    functional-tests/           # JavaScript functional tests
   frontend/
     src/
       app/           # Next.js pages
@@ -1217,7 +1328,7 @@ prmx-chain/
 
 ---
 
-## 17. Example Prompts for AI Tools
+## 18. Example Prompts for AI Tools
 
 ### Example Prompt for Implementing the Policy Pallet
 

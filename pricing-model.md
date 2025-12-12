@@ -2,6 +2,13 @@
 
 This document describes how the existing R-based actuarial rainfall model is integrated into PRMX v1.
 
+**Implementation Status:**
+- ✅ 24-hour fixed coverage window enforced in frontend
+- ✅ R pricing API integration via offchain worker
+- ✅ On-chain pricing logic in `pallet_prmx_quote`
+- ✅ Oracle settlement logic with 24h rolling sum
+- ✅ Mock DeFi strategy via `pallet_prmx_xcm_capital`
+
 v1 intentionally restricts the product to a single 24-hour coverage window so that:
 
 | R Model Event Definition | Oracle Event Definition |
@@ -258,7 +265,45 @@ The spec only requires that the 24h coverage window total be compared to `strike
 
 ---
 
-## 7. v2 Evolution Path (Informative)
+## 7. Capital Management Integration
+
+### DeFi Strategy (v1: Mock Mode)
+
+When a policy is created, the DAO's capital contribution can be allocated to a DeFi strategy:
+
+```
+policy_creation:
+  1. User pays premium → policy pool account
+  2. DAO contributes required_capital → policy pool account
+  3. pallet_prmx_xcm_capital::allocate_capital() called
+     - v1 (MockXcmStrategyInterface): Simulates DeFi deposit, tracks LP shares
+     - Future (LiveXcmStrategyInterface): Real XCM to Hydration Pool 102
+```
+
+At settlement:
+
+```
+settlement:
+  1. pallet_prmx_xcm_capital::withdraw_capital() called
+     - v1 (Mock): Returns principal ± mock yield
+     - Future (Live): Real XCM withdrawal from Hydration
+  2. If event occurred: payout to policyholder
+  3. If no event: distribute to LP holders
+```
+
+### Mock Yield Configuration
+
+For testing different scenarios:
+
+```rust
+// Set mock yield rate (extrinsic)
+PrmxXcmCapital::set_mock_yield_rate(50_000); // +5% yield
+PrmxXcmCapital::set_mock_yield_rate(-20_000); // -2% loss
+```
+
+---
+
+## 8. v2 Evolution Path (Informative)
 
 This v1 design deliberately:
 
@@ -275,7 +320,21 @@ For v2, we can extend **without changing the API boundary**:
 | **R model updates** | Simulate hourly rainfall over the full window; compute the maximum 24h rolling cumulative rainfall within that window; define the event as `max_24h_rolling ≥ strike_mm` |
 | **On-chain oracle** | Track rolling 24h mm across arbitrary windows |
 | **API compatibility** | Keep the same API signature and `probability_ppm` semantics |
+| **Real XCM DeFi** | Switch from `MockXcmStrategyInterface` to `LiveXcmStrategyInterface` for Hydration Pool 102 |
+| **Parachain deployment** | Re-add cumulus pallets, configure HRMP channels |
 
 > This keeps v1 simple and ship-able, while leaving a clear path to a more sophisticated product in v2.
+
+### v2 Parachain Migration Checklist
+
+1. Re-add cumulus dependencies to `runtime/Cargo.toml`
+2. Re-create `runtime/src/xcm_config.rs` with XCM executor configuration
+3. Add cumulus pallets back to `construct_runtime!`
+4. Switch strategy in runtime config:
+   ```rust
+   type XcmStrategyInterface = pallet_prmx_xcm_capital::LiveXcmStrategyInterface<Runtime>;
+   ```
+5. Configure HRMP channels with Asset Hub (para 1000) and Hydration (para 2034)
+6. Fund sovereign accounts for XCM execution
 
 ---

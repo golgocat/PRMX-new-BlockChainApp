@@ -15,10 +15,12 @@ It replaces the previous generic "location-based" design:
 
 - Polkadot SDK `polkadot-stable2506-2`
 - FRAME v2 style
+- **Current mode: Standalone dev chain** (Aura + Grandpa consensus)
 - Integrates with:
   - `pallet_prmx_markets`
   - `pallet_prmx_policy`
   - `pallet_prmx_quote`
+  - `pallet_prmx_xcm_capital` (for capital management)
 
 **AccuWeather API Key:**
 

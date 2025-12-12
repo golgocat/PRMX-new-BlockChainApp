@@ -86,10 +86,11 @@ export default function NewPolicyPage() {
   const handleMarketSelect = (market: Market) => {
     setSelectedMarket(market);
     // Set default values based on market constraints
+    // Coverage duration fixed at 1 day for testing
     setFormData({
       shares: '1',
       coverageStartDays: secondsToDays(market.windowRules.minLeadTimeSecs).toString(),
-      coverageDurationDays: secondsToDays(market.windowRules.maxDurationSecs).toString(),
+      coverageDurationDays: '1', // Fixed at 1 day
     });
     setCurrentStep(2);
   };
@@ -383,11 +384,11 @@ export default function NewPolicyPage() {
               <Input
                 label="Coverage Duration (days)"
                 type="number"
-                min={secondsToDays(selectedMarket.windowRules.minDurationSecs)}
-                max={secondsToDays(selectedMarket.windowRules.maxDurationSecs)}
-                value={formData.coverageDurationDays}
-                onChange={(e) => setFormData({ ...formData, coverageDurationDays: e.target.value })}
-                hint={`${secondsToDays(selectedMarket.windowRules.minDurationSecs)}-${secondsToDays(selectedMarket.windowRules.maxDurationSecs)} days`}
+                min={1}
+                max={1}
+                value="1"
+                readOnly
+                hint="Fixed at 1 day for testing"
               />
             </div>
 

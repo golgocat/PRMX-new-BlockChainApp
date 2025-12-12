@@ -6,25 +6,26 @@ import {
   User, 
   Shield, 
   Wallet, 
-  UserCog,
   Check,
-  RefreshCw
+  RefreshCw,
+  LogOut
 } from 'lucide-react';
 import { 
   useWalletStore, 
   useFormattedBalance, 
   useAvailableAccounts,
-  TEST_ACCOUNTS,
   AccountKey 
 } from '@/stores/walletStore';
 import { formatAddress } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import { WalletConnectionModal } from './WalletConnectionModal';
 
 const roleIcons: Record<string, typeof User> = {
   'DAO Admin': Shield,
   'Customer': User,
   'LP 1': Wallet,
   'LP 2': Wallet,
+  'Polkadot.js': Wallet,
 };
 
 const roleColors: Record<string, string> = {
@@ -32,6 +33,7 @@ const roleColors: Record<string, string> = {
   'Customer': 'bg-prmx-cyan/20 text-prmx-cyan border-prmx-cyan/30',
   'LP 1': 'bg-success/20 text-success border-success/30',
   'LP 2': 'bg-warning/20 text-warning border-warning/30',
+  'Polkadot.js': 'bg-prmx-magenta/20 text-prmx-magenta border-prmx-magenta/30',
 };
 
 export function AccountSelector() {
@@ -40,10 +42,14 @@ export function AccountSelector() {
     isConnecting, 
     selectedAccount, 
     selectedAccountKey,
+    walletMode,
+    extensionAccounts,
+    selectedExtensionAccount,
     currentBlock,
     isChainConnected,
-    connect, 
     selectAccount,
+    selectExtensionAccount,
+    disconnect,
     refreshBalances
   } = useWalletStore();
   
@@ -52,18 +58,20 @@ export function AccountSelector() {
   
   const [isOpen, setIsOpen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-
-  const handleConnect = async () => {
-    try {
-      await connect('alice');
-    } catch (error) {
-      console.error('Connection failed:', error);
-    }
-  };
+  const [showModal, setShowModal] = useState(false);
 
   const handleSelectAccount = async (key: AccountKey) => {
     try {
       await selectAccount(key);
+      setIsOpen(false);
+    } catch (error) {
+      console.error('Account selection failed:', error);
+    }
+  };
+
+  const handleSelectExtensionAccount = async (account: typeof extensionAccounts[0]) => {
+    try {
+      await selectExtensionAccount(account);
       setIsOpen(false);
     } catch (error) {
       console.error('Account selection failed:', error);
@@ -76,29 +84,41 @@ export function AccountSelector() {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
+  const handleDisconnect = () => {
+    disconnect();
+    setIsOpen(false);
+  };
+
+  // Not connected - show connect button
   if (!isConnected) {
     return (
-      <button
-        onClick={handleConnect}
-        disabled={isConnecting}
-        className="btn-primary flex items-center gap-2"
-      >
-        {isConnecting ? (
-          <>
-            <RefreshCw className="w-4 h-4 animate-spin" />
-            Connecting...
-          </>
-        ) : (
-          <>
-            <Wallet className="w-4 h-4" />
-            Connect
-          </>
-        )}
-      </button>
+      <>
+        <button
+          onClick={() => setShowModal(true)}
+          disabled={isConnecting}
+          className="btn-primary flex items-center gap-2"
+        >
+          {isConnecting ? (
+            <>
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Connecting...
+            </>
+          ) : (
+            <>
+              <Wallet className="w-4 h-4" />
+              Connect
+            </>
+          )}
+        </button>
+        <WalletConnectionModal 
+          isOpen={showModal} 
+          onClose={() => setShowModal(false)} 
+        />
+      </>
     );
   }
 
-  const RoleIcon = roleIcons[selectedAccount?.role || 'Customer'];
+  const RoleIcon = roleIcons[selectedAccount?.role || 'Customer'] || User;
 
   return (
     <div className="relative">
@@ -110,7 +130,7 @@ export function AccountSelector() {
         {/* Role Badge */}
         <div className={cn(
           'px-2 py-1 rounded-lg text-xs font-semibold border',
-          roleColors[selectedAccount?.role || 'Customer']
+          roleColors[selectedAccount?.role || 'Customer'] || roleColors['Customer']
         )}>
           <div className="flex items-center gap-1">
             <RoleIcon className="w-3 h-3" />
@@ -160,64 +180,117 @@ export function AccountSelector() {
               </div>
             </div>
 
-            {/* Account List */}
-            <div className="p-2">
-              <p className="px-2 py-1 text-xs font-semibold text-text-tertiary uppercase">
-                Switch Account
-              </p>
-              <div className="space-y-1 mt-1">
-                {accounts.map((account) => {
-                  const Icon = roleIcons[account.role];
-                  const isSelected = account.key === selectedAccountKey;
-                  
-                  return (
-                    <button
-                      key={account.key}
-                      onClick={() => handleSelectAccount(account.key)}
-                      className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all',
-                        isSelected 
-                          ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
-                          : 'hover:bg-background-tertiary border border-transparent'
-                      )}
-                    >
-                      <div className={cn(
-                        'w-10 h-10 rounded-lg flex items-center justify-center',
-                        roleColors[account.role].replace('text-', 'bg-').split(' ')[0]
-                      )}>
-                        <Icon className="w-5 h-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{account.name}</span>
-                          <span className={cn(
-                            'text-xs px-1.5 py-0.5 rounded',
-                            roleColors[account.role]
-                          )}>
-                            {account.role}
-                          </span>
+            {/* Dev Mode - Account List */}
+            {walletMode === 'dev' && (
+              <div className="p-2">
+                <p className="px-2 py-1 text-xs font-semibold text-text-tertiary uppercase">
+                  Switch Account
+                </p>
+                <div className="space-y-1 mt-1">
+                  {accounts.map((account) => {
+                    const Icon = roleIcons[account.role] || User;
+                    const isSelected = account.key === selectedAccountKey;
+                    
+                    return (
+                      <button
+                        key={account.key}
+                        onClick={() => handleSelectAccount(account.key!)}
+                        className={cn(
+                          'w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all',
+                          isSelected 
+                            ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
+                            : 'hover:bg-background-tertiary border border-transparent'
+                        )}
+                      >
+                        <div className={cn(
+                          'w-10 h-10 rounded-lg flex items-center justify-center',
+                          (roleColors[account.role] || roleColors['Customer']).split(' ')[0]
+                        )}>
+                          <Icon className="w-5 h-5" />
                         </div>
-                        <p className="text-xs text-text-tertiary truncate">
-                          {formatAddress(account.address, 8)}
-                        </p>
-                        <p className="text-xs text-text-secondary mt-0.5">
-                          {account.description}
-                        </p>
-                      </div>
-                      {isSelected && (
-                        <Check className="w-5 h-5 text-prmx-cyan flex-shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{account.name}</span>
+                            <span className={cn(
+                              'text-xs px-1.5 py-0.5 rounded',
+                              roleColors[account.role] || roleColors['Customer']
+                            )}>
+                              {account.role}
+                            </span>
+                          </div>
+                          <p className="text-xs text-text-tertiary truncate">
+                            {formatAddress(account.address, 8)}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <Check className="w-5 h-5 text-prmx-cyan flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Footer */}
+            {/* Polkadot.js Mode - Extension Account List */}
+            {walletMode === 'polkadotjs' && extensionAccounts.length > 1 && (
+              <div className="p-2">
+                <p className="px-2 py-1 text-xs font-semibold text-text-tertiary uppercase">
+                  Switch Account
+                </p>
+                <div className="space-y-1 mt-1">
+                  {extensionAccounts.map((account, index) => {
+                    const isSelected = account.address === selectedExtensionAccount?.address;
+                    
+                    return (
+                      <button
+                        key={account.address}
+                        onClick={() => handleSelectExtensionAccount(account)}
+                        className={cn(
+                          'w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all',
+                          isSelected 
+                            ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
+                            : 'hover:bg-background-tertiary border border-transparent'
+                        )}
+                      >
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-prmx-magenta/20">
+                          <Wallet className="w-5 h-5 text-prmx-magenta" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{account.meta.name || `Account ${index + 1}`}</span>
+                          </div>
+                          <p className="text-xs text-text-tertiary truncate">
+                            {formatAddress(account.address, 8)}
+                          </p>
+                          <p className="text-xs text-text-secondary">
+                            {account.meta.source}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <Check className="w-5 h-5 text-prmx-cyan flex-shrink-0" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Footer with Disconnect */}
             <div className="p-3 border-t border-border-secondary">
-              <p className="text-xs text-text-tertiary text-center">
-                Using test accounts for development
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-text-tertiary">
+                  {walletMode === 'dev' ? 'Dev Mode' : 'Polkadot.js'}
+                </p>
+                <button
+                  onClick={handleDisconnect}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-error hover:bg-error/10 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Disconnect
+                </button>
+              </div>
             </div>
           </div>
         </>

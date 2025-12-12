@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useWalletStore, AccountKey } from '@/stores/walletStore';
+import { useWalletStore, AccountKey, WalletMode } from '@/stores/walletStore';
 import { getApi, subscribeToBlocks } from '@/lib/api';
 import { LogoAnimated } from '@/components/ui/Logo';
 
@@ -11,9 +11,9 @@ interface WalletProviderProps {
 
 export function WalletProvider({ children }: WalletProviderProps) {
   const { 
-    selectedAccountKey, 
     isConnected, 
-    connect, 
+    connectDevMode,
+    connectPolkadotJs,
     setChainConnected,
     setCurrentBlock 
   } = useWalletStore();
@@ -26,21 +26,39 @@ export function WalletProvider({ children }: WalletProviderProps) {
 
     const initialize = async () => {
       try {
+        // Connect to chain first
         const api = await getApi();
         setChainConnected(true);
         
+        // Subscribe to new blocks
         unsubscribe = await subscribeToBlocks((block) => {
           setCurrentBlock(block);
         });
 
+        // Check for saved wallet state and auto-reconnect
         const savedState = localStorage.getItem('prmx-wallet-storage');
         if (savedState) {
           try {
             const parsed = JSON.parse(savedState);
-            if (parsed?.state?.selectedAccountKey) {
-              await connect(parsed.state.selectedAccountKey as AccountKey);
+            const walletMode = parsed?.state?.walletMode as WalletMode;
+            const accountKey = parsed?.state?.selectedAccountKey as AccountKey;
+
+            if (walletMode === 'dev' && accountKey) {
+              // Auto-reconnect in dev mode
+              await connectDevMode(accountKey);
+            } else if (walletMode === 'polkadotjs') {
+              // Try to auto-reconnect to Polkadot.js
+              // This will fail silently if user hasn't approved previously
+              try {
+                await connectPolkadotJs();
+              } catch (e) {
+                // Silently fail - user will need to reconnect manually
+                console.log('Polkadot.js auto-reconnect failed, user will need to reconnect');
+              }
             }
-          } catch {}
+          } catch {
+            // Ignore parsing errors
+          }
         }
 
         setIsInitializing(false);
@@ -60,6 +78,7 @@ export function WalletProvider({ children }: WalletProviderProps) {
     };
   }, []);
 
+  // Refresh balances periodically when connected
   useEffect(() => {
     if (!isConnected) return;
     const interval = setInterval(() => {

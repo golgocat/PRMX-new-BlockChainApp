@@ -13,12 +13,14 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useWalletStore } from '@/stores/walletStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
   const { isConnected, selectedAccount } = useWalletStore();
   const { theme, setTheme } = useThemeStore();
   const [saving, setSaving] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
 
   const handleSave = async () => {
     setSaving(true);
@@ -64,9 +66,13 @@ export default function SettingsPage() {
             <div className="text-center py-8">
               <Wallet className="w-12 h-12 mx-auto mb-4 text-text-tertiary" />
               <p className="text-text-secondary mb-4">Connect your wallet to view account settings</p>
-              <Button onClick={() => useWalletStore.getState().connect()}>
+              <Button onClick={() => setShowWalletModal(true)}>
                 Connect Wallet
               </Button>
+              <WalletConnectionModal 
+                isOpen={showWalletModal} 
+                onClose={() => setShowWalletModal(false)} 
+              />
             </div>
           )}
         </CardContent>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { KeyringPair } from '@polkadot/keyring/types';
+import type { InjectedAccountWithMeta } from '@polkadot/extension-inject/types';
 import { 
   TEST_ACCOUNTS, 
   AccountKey, 
@@ -14,21 +15,30 @@ import {
 export type { AccountKey };
 export { TEST_ACCOUNTS };
 
+export type WalletMode = 'polkadotjs' | 'dev' | null;
+
 interface AccountInfo {
-  key: AccountKey;
+  key?: AccountKey;
   name: string;
   role: string;
   address: string;
   description: string;
+  source?: string;
 }
 
 interface WalletState {
   isConnected: boolean;
   isConnecting: boolean;
   connectionError: string | null;
+  walletMode: WalletMode;
+  // Dev mode state
   selectedAccountKey: AccountKey | null;
   selectedAccount: AccountInfo | null;
   keypair: KeyringPair | null;
+  // Polkadot.js state
+  extensionAccounts: InjectedAccountWithMeta[];
+  selectedExtensionAccount: InjectedAccountWithMeta | null;
+  // Common state
   prmxBalance: bigint;
   usdtBalance: bigint;
   currentBlock: number;
@@ -36,7 +46,9 @@ interface WalletState {
 }
 
 interface WalletActions {
-  connect: (accountKey?: AccountKey) => Promise<void>;
+  connectDevMode: (accountKey?: AccountKey) => Promise<void>;
+  connectPolkadotJs: () => Promise<void>;
+  selectExtensionAccount: (account: InjectedAccountWithMeta) => Promise<void>;
   disconnect: () => void;
   selectAccount: (accountKey: AccountKey) => Promise<void>;
   refreshBalances: () => Promise<void>;
@@ -64,15 +76,18 @@ export const useWalletStore = create<WalletStore>()(
       isConnected: false,
       isConnecting: false,
       connectionError: null,
+      walletMode: null,
       selectedAccountKey: null,
       selectedAccount: null,
       keypair: null,
+      extensionAccounts: [],
+      selectedExtensionAccount: null,
       prmxBalance: BigInt(0),
       usdtBalance: BigInt(0),
       currentBlock: 0,
       isChainConnected: false,
 
-      connect: async (accountKey: AccountKey = 'alice') => {
+      connectDevMode: async (accountKey: AccountKey = 'alice') => {
         set({ isConnecting: true, connectionError: null });
 
         try {
@@ -89,6 +104,7 @@ export const useWalletStore = create<WalletStore>()(
             isConnected: true,
             isConnecting: false,
             isChainConnected: true,
+            walletMode: 'dev',
             selectedAccountKey: accountKey,
             selectedAccount: accountInfo,
             keypair,
@@ -107,13 +123,100 @@ export const useWalletStore = create<WalletStore>()(
         }
       },
 
+      connectPolkadotJs: async () => {
+        set({ isConnecting: true, connectionError: null });
+
+        try {
+          // Dynamically import to avoid SSR issues
+          const { web3Enable, web3Accounts } = await import('@polkadot/extension-dapp');
+          
+          // Enable extension
+          const extensions = await web3Enable('PRMX Insurance');
+          
+          if (extensions.length === 0) {
+            throw new Error('No Polkadot.js extension found. Please install it from polkadot.js.org/extension');
+          }
+
+          // Get accounts
+          const accounts = await web3Accounts();
+          
+          if (accounts.length === 0) {
+            throw new Error('No accounts found. Please create an account in your Polkadot.js extension.');
+          }
+
+          // Connect to chain
+          await getApi();
+
+          // Select first account by default
+          const firstAccount = accounts[0];
+          const [prmxBalance, usdtBalance] = await Promise.all([
+            getPrmxBalance(firstAccount.address),
+            getUsdtBalance(firstAccount.address),
+          ]);
+
+          set({
+            isConnected: true,
+            isConnecting: false,
+            isChainConnected: true,
+            walletMode: 'polkadotjs',
+            extensionAccounts: accounts,
+            selectedExtensionAccount: firstAccount,
+            selectedAccount: {
+              name: firstAccount.meta.name || 'Unknown',
+              role: 'Polkadot.js',
+              address: firstAccount.address,
+              description: `Source: ${firstAccount.meta.source}`,
+              source: firstAccount.meta.source,
+            },
+            prmxBalance,
+            usdtBalance,
+          });
+
+        } catch (error) {
+          console.error('Failed to connect Polkadot.js:', error);
+          set({
+            isConnecting: false,
+            connectionError: error instanceof Error ? error.message : 'Failed to connect to Polkadot.js',
+          });
+          throw error;
+        }
+      },
+
+      selectExtensionAccount: async (account: InjectedAccountWithMeta) => {
+        try {
+          const [prmxBalance, usdtBalance] = await Promise.all([
+            getPrmxBalance(account.address),
+            getUsdtBalance(account.address),
+          ]);
+
+          set({
+            selectedExtensionAccount: account,
+            selectedAccount: {
+              name: account.meta.name || 'Unknown',
+              role: 'Polkadot.js',
+              address: account.address,
+              description: `Source: ${account.meta.source}`,
+              source: account.meta.source,
+            },
+            prmxBalance,
+            usdtBalance,
+          });
+        } catch (error) {
+          console.error('Failed to select extension account:', error);
+          throw error;
+        }
+      },
+
       disconnect: () => {
         disconnectApi();
         set({
           isConnected: false,
+          walletMode: null,
           selectedAccountKey: null,
           selectedAccount: null,
           keypair: null,
+          extensionAccounts: [],
+          selectedExtensionAccount: null,
           prmxBalance: BigInt(0),
           usdtBalance: BigInt(0),
           isChainConnected: false,
@@ -122,10 +225,10 @@ export const useWalletStore = create<WalletStore>()(
       },
 
       selectAccount: async (accountKey: AccountKey) => {
-        const { isConnected } = get();
+        const { isConnected, walletMode } = get();
         
-        if (!isConnected) {
-          await get().connect(accountKey);
+        if (!isConnected || walletMode !== 'dev') {
+          await get().connectDevMode(accountKey);
           return;
         }
 
@@ -183,6 +286,7 @@ export const useWalletStore = create<WalletStore>()(
       name: 'prmx-wallet-storage',
       partialize: (state) => ({
         selectedAccountKey: state.selectedAccountKey,
+        walletMode: state.walletMode,
       }),
     }
   )
@@ -202,10 +306,15 @@ export function useFormattedBalance() {
   };
 }
 
-export type UserRole = 'dao' | 'customer' | 'lp';
+export type UserRole = 'dao' | 'customer' | 'lp' | 'user';
 
 export function useUserRole(): UserRole {
-  const { selectedAccountKey } = useWalletStore();
+  const { selectedAccountKey, walletMode } = useWalletStore();
+  
+  // For Polkadot.js users, return generic 'user' role
+  if (walletMode === 'polkadotjs') return 'user';
+  
+  // For dev mode, use role-based accounts
   if (selectedAccountKey === 'alice') return 'dao';
   if (selectedAccountKey === 'bob') return 'customer';
   return 'lp'; // charlie, dave

@@ -37,6 +37,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
 import { formatUSDT, formatAddress, formatDate } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
+import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory, useLpPositionOutcomes, addTradeToHistory } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -70,6 +71,7 @@ export default function LpTradingPage() {
   const { markets } = useMarkets();
   const { trades, loading: tradesLoading, refresh: refreshTrades, addTrade, clearHistory } = useTradeHistory();
   const { outcomes, loading: outcomesLoading, refresh: refreshOutcomes } = useLpPositionOutcomes();
+  const [showWalletModal, setShowWalletModal] = useState(false);
   
   // Active tab state
   const [activeTab, setActiveTab] = useState<'orderbook' | 'history'>('orderbook');
@@ -383,9 +385,13 @@ export default function LpTradingPage() {
             <p className="text-text-secondary mb-6 max-w-md mx-auto">
               Connect your wallet to trade LP tokens
             </p>
-            <Button onClick={() => useWalletStore.getState().connect()}>
+            <Button onClick={() => setShowWalletModal(true)}>
               Connect Wallet
             </Button>
+            <WalletConnectionModal 
+              isOpen={showWalletModal} 
+              onClose={() => setShowWalletModal(false)} 
+            />
           </CardContent>
         </Card>
       </div>

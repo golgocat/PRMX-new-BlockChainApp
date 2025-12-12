@@ -25,6 +25,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, Tabl
 import { formatUSDT, formatTimeRemaining, formatDate, formatCoordinates, formatAddress } from '@/lib/utils';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMyPolicies, usePolicies, useMarkets } from '@/hooks/useChainData';
+import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import * as api from '@/lib/api';
 import type { SettlementResult } from '@/lib/api';
 import toast from 'react-hot-toast';
@@ -45,6 +46,7 @@ export default function PoliciesPage() {
   const [settlingPolicy, setSettlingPolicy] = useState<number | null>(null);
   const [settlementResults, setSettlementResults] = useState<Map<number, SettlementResult>>(new Map());
   const [loadingSettlements, setLoadingSettlements] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
 
   // DAO always sees all policies
   const policies = isDao || activeTab === 'all' ? allPolicies : myPolicies;
@@ -143,9 +145,13 @@ export default function PoliciesPage() {
             <p className="text-text-secondary mb-6 max-w-md mx-auto">
               Connect your wallet to view and manage insurance policies
             </p>
-            <Button onClick={() => useWalletStore.getState().connect()}>
+            <Button onClick={() => setShowWalletModal(true)}>
               Connect Wallet
             </Button>
+            <WalletConnectionModal 
+              isOpen={showWalletModal} 
+              onClose={() => setShowWalletModal(false)} 
+            />
           </CardContent>
         </Card>
       </div>

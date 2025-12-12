@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { useMarkets, useQuoteRequests } from '@/hooks/useChainData';
+import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import * as api from '@/lib/api';
 import { formatUSDT, formatCoordinates, formatDate, secondsToDays } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -50,6 +51,7 @@ export default function NewPolicyPage() {
   const [quoteRequestId, setQuoteRequestId] = useState<number | null>(null);
   const [currentQuote, setCurrentQuote] = useState<QuoteRequest | null>(null);
   const [policyId, setPolicyId] = useState<number | null>(null);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -191,9 +193,13 @@ export default function NewPolicyPage() {
             <p className="text-text-secondary mb-6 max-w-md mx-auto">
               Connect your wallet to request insurance quotes and apply for coverage
             </p>
-            <Button onClick={() => useWalletStore.getState().connect()}>
+            <Button onClick={() => setShowWalletModal(true)}>
               Connect Wallet
             </Button>
+            <WalletConnectionModal 
+              isOpen={showWalletModal} 
+              onClose={() => setShowWalletModal(false)} 
+            />
           </CardContent>
         </Card>
       </div>

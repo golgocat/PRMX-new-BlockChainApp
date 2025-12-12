@@ -4,6 +4,155 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
+/* React Day Picker - PRMX Dark Theme Styles */
+.prmx-rdp {
+  --rdp-cell-size: 36px;
+  --rdp-accent-color: #00E5FF;
+  --rdp-background-color: rgba(0, 229, 255, 0.2);
+  margin: 0;
+  font-family: inherit;
+}
+
+.prmx-rdp .rdp-months {
+  display: flex;
+  flex-direction: column;
+}
+
+.prmx-rdp .rdp-month {
+  background: transparent;
+}
+
+.prmx-rdp .rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.prmx-rdp .rdp-caption_label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.prmx-rdp .rdp-nav {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.prmx-rdp .rdp-nav_button {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  color: #a0a0a0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.prmx-rdp .rdp-nav_button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f0f0f0;
+}
+
+.prmx-rdp .rdp-table {
+  width: 100%;
+  border-collapse: collapse;
+  border-spacing: 0;
+  display: table;
+}
+
+.prmx-rdp .rdp-head {
+  display: table-header-group;
+}
+
+.prmx-rdp .rdp-head_row {
+  display: table-row;
+}
+
+.prmx-rdp .rdp-head_cell {
+  display: table-cell;
+  width: var(--rdp-cell-size);
+  height: 32px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #888;
+  text-align: center;
+  vertical-align: middle;
+  padding: 0;
+}
+
+.prmx-rdp .rdp-tbody {
+  display: table-row-group;
+}
+
+.prmx-rdp .rdp-row {
+  display: table-row;
+}
+
+.prmx-rdp .rdp-cell {
+  display: table-cell;
+  width: var(--rdp-cell-size);
+  height: var(--rdp-cell-size);
+  padding: 2px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.prmx-rdp .rdp-button {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.875rem;
+  border-radius: 0.5rem;
+  color: #e0e0e0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin: 0 auto;
+}
+
+.prmx-rdp .rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
+  background: rgba(0, 229, 255, 0.15);
+}
+
+.prmx-rdp .rdp-day_selected .rdp-button,
+.prmx-rdp .rdp-day_selected {
+  background: #00E5FF !important;
+  color: #000 !important;
+  font-weight: 500;
+}
+
+.prmx-rdp .rdp-day_today:not(.rdp-day_selected) .rdp-button,
+.prmx-rdp .rdp-day_today:not(.rdp-day_selected) {
+  background: rgba(156, 39, 176, 0.25);
+  color: #BA68C8;
+  font-weight: 500;
+}
+
+.prmx-rdp .rdp-button[disabled] {
+  color: #555;
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.prmx-rdp .rdp-button[disabled]:hover {
+  background: transparent;
+}
+
+.prmx-rdp .rdp-day_outside .rdp-button {
+  color: #666;
+  opacity: 0.5;
+}
+
 @layer base {
   /* Dark mode (default) */
   :root,

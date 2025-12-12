@@ -20,6 +20,8 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
+import { DatePicker } from '@/components/ui/DatePicker';
+import { addDays, startOfDay, getUnixTime } from 'date-fns';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { useMarkets, useQuoteRequests } from '@/hooks/useChainData';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
@@ -54,11 +56,9 @@ export default function NewPolicyPage() {
   const [showWalletModal, setShowWalletModal] = useState(false);
   
   // Form state
-  const [formData, setFormData] = useState({
-    shares: '1',
-    coverageStartDays: '0', // Days from now (0 for testing)
-    coverageDurationDays: '1', // 1 day for quick testing
-  });
+  const [shares, setShares] = useState('1');
+  const [coverageStartDate, setCoverageStartDate] = useState<Date | undefined>(undefined);
+  const coverageDurationDays = 1; // Fixed at 1 day for testing
 
   // Poll for quote result
   useEffect(() => {
@@ -78,22 +78,27 @@ export default function NewPolicyPage() {
     return () => clearInterval(pollInterval);
   }, [quoteRequestId, currentStep, quotes, refreshQuotes]);
 
-  // Calculate coverage dates
-  const now = Math.floor(Date.now() / 1000);
-  const coverageStart = now + (parseInt(formData.coverageStartDays) * 86400);
-  const coverageEnd = coverageStart + (parseInt(formData.coverageDurationDays) * 86400);
-  const shares = parseInt(formData.shares) || 1;
-  const maxPayout = shares * 100; // $100 per share
+  // Calculate minimum start date based on market lead time
+  const minLeadTimeDays = selectedMarket 
+    ? secondsToDays(selectedMarket.windowRules.minLeadTimeSecs) 
+    : 0;
+  const minStartDate = addDays(startOfDay(new Date()), minLeadTimeDays);
+  
+  // Calculate coverage dates (Unix timestamps for API)
+  const coverageStart = coverageStartDate 
+    ? getUnixTime(startOfDay(coverageStartDate)) 
+    : 0;
+  const coverageEnd = coverageStart + (coverageDurationDays * 86400);
+  const sharesNum = parseInt(shares) || 1;
+  const maxPayout = sharesNum * 100; // $100 per share
 
   const handleMarketSelect = (market: Market) => {
     setSelectedMarket(market);
     // Set default values based on market constraints
-    // Coverage duration fixed at 1 day for testing
-    setFormData({
-      shares: '1',
-      coverageStartDays: secondsToDays(market.windowRules.minLeadTimeSecs).toString(),
-      coverageDurationDays: '1', // Fixed at 1 day
-    });
+    const leadTimeDays = secondsToDays(market.windowRules.minLeadTimeSecs);
+    const defaultStartDate = addDays(startOfDay(new Date()), leadTimeDays);
+    setShares('1');
+    setCoverageStartDate(defaultStartDate);
     setCurrentStep(2);
   };
 
@@ -115,7 +120,7 @@ export default function NewPolicyPage() {
         coverageEnd,
         latitude: selectedMarket.centerLatitude,
         longitude: selectedMarket.centerLongitude,
-        shares,
+        shares: sharesNum,
       });
       
       if (requestId < 0) {
@@ -375,17 +380,20 @@ export default function NewPolicyPage() {
                 label="Number of Shares"
                 type="number"
                 min="1"
-                value={formData.shares}
-                onChange={(e) => setFormData({ ...formData, shares: e.target.value })}
+                value={shares}
+                onChange={(e) => setShares(e.target.value)}
                 hint={`$100 payout per share (max: $${maxPayout})`}
               />
-              <Input
-                label="Start Date (days from now)"
-                type="number"
-                min={secondsToDays(selectedMarket.windowRules.minLeadTimeSecs)}
-                value={formData.coverageStartDays}
-                onChange={(e) => setFormData({ ...formData, coverageStartDays: e.target.value })}
-                hint={`Min: ${secondsToDays(selectedMarket.windowRules.minLeadTimeSecs)} days lead time`}
+              <DatePicker
+                label="Coverage Start Date"
+                value={coverageStartDate}
+                onChange={setCoverageStartDate}
+                minDate={minStartDate}
+                placeholder="Select start date"
+                hint={minLeadTimeDays > 0 
+                  ? `Minimum ${minLeadTimeDays} day${minLeadTimeDays > 1 ? 's' : ''} lead time required`
+                  : 'Select when coverage begins'
+                }
               />
               <Input
                 label="Coverage Duration (days)"
@@ -415,7 +423,7 @@ export default function NewPolicyPage() {
                 </div>
                 <div>
                   <span className="text-text-secondary">Total Shares</span>
-                  <p className="font-medium">{shares}</p>
+                  <p className="font-medium">{sharesNum}</p>
                 </div>
                 <div>
                   <span className="text-text-secondary">Max Payout</span>

@@ -10,6 +10,7 @@ members = [
     "pallets/prmx-policy",
     "pallets/prmx-orderbook-lp",
     "pallets/prmx-oracle",
+    "pallets/prmx-xcm-capital",
 ]
 
 [profile.release]

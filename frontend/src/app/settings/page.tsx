@@ -13,7 +13,6 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { useWalletStore } from '@/stores/walletStore';
 import { useThemeStore } from '@/stores/themeStore';
-import { formatAddress } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export default function SettingsPage() {
@@ -49,45 +48,22 @@ export default function SettingsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent>
           {isConnected && selectedAccount ? (
-            <>
+            <div className="grid grid-cols-2 gap-4">
               <div className="p-4 rounded-xl bg-background-tertiary/50">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-prmx-gradient flex items-center justify-center">
-                      <span className="text-lg font-bold text-white">
-                        {selectedAccount.name?.[0] || 'A'}
-                      </span>
-                    </div>
-                    <div>
-                      <p className="font-semibold">{selectedAccount.name || 'Account'}</p>
-                      <p className="text-sm text-text-secondary font-mono">
-                        {formatAddress(selectedAccount.address, 12)}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="secondary" size="sm">
-                    <Wallet className="w-4 h-4 mr-2" />
-                    Change Wallet
-                  </Button>
-                </div>
+                <p className="text-sm text-text-secondary">Address</p>
+                <p className="font-medium font-mono text-sm break-all">{selectedAccount.address}</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-background-tertiary/50">
-                  <p className="text-sm text-text-secondary">Source</p>
-                  <p className="font-medium">{selectedAccount.source}</p>
-                </div>
-                <div className="p-4 rounded-xl bg-background-tertiary/50">
-                  <p className="text-sm text-text-secondary">Network</p>
-                  <p className="font-medium">PRMX Testnet</p>
-                </div>
+              <div className="p-4 rounded-xl bg-background-tertiary/50">
+                <p className="text-sm text-text-secondary">Network</p>
+                <p className="font-medium">PRMX Testnet</p>
               </div>
-            </>
+            </div>
           ) : (
             <div className="text-center py-8">
               <Wallet className="w-12 h-12 mx-auto mb-4 text-text-tertiary" />
-              <p className="text-text-secondary mb-4">Connect your wallet to manage account settings</p>
+              <p className="text-text-secondary mb-4">Connect your wallet to view account settings</p>
               <Button onClick={() => useWalletStore.getState().connect()}>
                 Connect Wallet
               </Button>

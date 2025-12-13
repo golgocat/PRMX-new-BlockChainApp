@@ -3,6 +3,7 @@
 //! Command line interface for the PRMX node.
 
 use sc_cli::RunCmd;
+use std::path::PathBuf;
 
 /// PRMX CLI structure
 #[derive(Debug, clap::Parser)]
@@ -45,4 +46,28 @@ pub enum Subcommand {
 
     /// Db meta columns information.
     ChainInfo(sc_cli::ChainInfoCmd),
+
+    /// Inject an API key into offchain local storage.
+    /// This allows offchain workers to access confidential API keys securely.
+    InjectApiKey(InjectApiKeyCmd),
+}
+
+/// Command to inject API keys into offchain local storage
+#[derive(Debug, Clone, clap::Parser)]
+pub struct InjectApiKeyCmd {
+    /// The storage key name (e.g., "prmx-oracle::accuweather-api-key")
+    #[arg(long)]
+    pub key: String,
+
+    /// The API key value to store
+    #[arg(long)]
+    pub value: String,
+
+    /// Specify the database directory path
+    #[arg(long, value_name = "PATH")]
+    pub base_path: Option<PathBuf>,
+
+    /// Specify the chain specification
+    #[arg(long, value_name = "CHAIN_SPEC")]
+    pub chain: Option<String>,
 }

@@ -371,6 +371,17 @@ pub mod pallet {
     pub type PendingFetchRequests<T: Config> =
         StorageMap<_, Blake2_128Concat, MarketId, BlockNumberFor<T>, OptionQuery>;
 
+    /// Flag indicating API key was just configured and immediate fetch should be triggered
+    #[pallet::storage]
+    #[pallet::getter(fn api_key_configured_at)]
+    pub type ApiKeyConfiguredAt<T: Config> = StorageValue<_, BlockNumberFor<T>, OptionQuery>;
+
+    /// Pending API key to be copied to offchain local storage by the OCW.
+    /// This is used to securely transfer the API key from on-chain to offchain.
+    /// The OCW reads this, copies to local storage, and clears it.
+    #[pallet::storage]
+    pub type PendingApiKey<T: Config> = StorageValue<_, BoundedVec<u8, ConstU32<256>>, OptionQuery>;
+
     // =========================================================================
     //                                  Events
     // =========================================================================
@@ -451,6 +462,8 @@ pub mod pallet {
         NotOracleProvider,
         /// Invalid coverage window (end must be after start)
         InvalidCoverageWindow,
+        /// API key is too long
+        InvalidApiKey,
         /// Settlement failed
         SettlementFailed,
         /// Fetch request already pending for this market
@@ -762,13 +775,19 @@ pub mod pallet {
         ) -> DispatchResult {
             T::GovernanceOrigin::ensure_origin(origin)?;
 
-            // Store in offchain index so it can be read by offchain workers
-            // The key will be available to all validators running the offchain worker
-            sp_io::offchain_index::set(ACCUWEATHER_API_KEY_STORAGE, &api_key);
+            // Store the key in on-chain storage for the OCW to pick up
+            // The OCW will copy this to its local storage and clear this storage
+            let bounded_key: BoundedVec<u8, ConstU32<256>> = api_key.clone().try_into()
+                .map_err(|_| Error::<T>::InvalidApiKey)?;
+            PendingApiKey::<T>::put(bounded_key);
+
+            // Set flag to trigger immediate rainfall fetch on next offchain worker run
+            let current_block = <frame_system::Pallet<T>>::block_number();
+            ApiKeyConfiguredAt::<T>::put(current_block);
 
             log::info!(
                 target: "prmx-oracle",
-                "🔑 AccuWeather API key stored (length: {} bytes)",
+                "🔑 AccuWeather API key queued for OCW (length: {} bytes) - immediate fetch scheduled",
                 api_key.len()
             );
 
@@ -1410,7 +1429,7 @@ pub mod pallet {
     #[pallet::hooks]
     impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
         /// On initialize hook:
-        /// 1. Bootstrap test data for markets without rainfall data (every 50 blocks)
+        /// 1. Clear API key configured flag after offchain worker has had time to fetch
         /// 2. Check for threshold breaches and trigger automatic settlements (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
         /// 3. Check for expired policies and settle them automatically (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
         fn on_initialize(block_number: BlockNumberFor<T>) -> Weight {
@@ -1420,68 +1439,19 @@ pub mod pallet {
             let mut weight = Weight::zero();
             
             // =========================================================================
-            // Part 1: Bootstrap test data (dev-mode only, every 50 blocks)
+            // Clear API key configured flag after a few blocks (offchain worker should have run)
             // =========================================================================
-            let should_bootstrap = block_num <= 5 || block_num % 50 == 0;
-            
-            #[cfg(feature = "dev-mode")]
-            if should_bootstrap {
-                let next_id = pallet_prmx_markets::NextMarketId::<T>::get();
-                
-                for market_id in 0..next_id {
-                    // Add test rainfall data if market has no rolling state
-                    // This provides immediate data while waiting for real API data
-                    if !RollingState::<T>::contains_key(market_id) 
-                    {
-                        // Get current timestamp - use a realistic approximation
-                        // Use block number * 6 seconds + base timestamp
-                        let now_ts = BASE_TIMESTAMP_SECS + (block_num as u64 * 6);
-                        let bucket_idx = bucket_index_for_timestamp(now_ts);
-                        
-                        // Add some test rainfall data (simulated 24h history)
-                        // Use varying amounts based on market_id for variety
-                        let base_rainfall = ((market_id % 5) * 50 + 100) as u32; // 100-300 range (10-30mm)
-                        
-                        let bucket = RainBucket {
-                            timestamp: bucket_start_time(bucket_idx),
-                            rainfall_mm: base_rainfall,
-                            block_number: block_num,
-                        };
-                        RainBuckets::<T>::insert(market_id, bucket_idx, bucket);
-
-                        // Initialize rolling state
-                        let state = RollingWindowState {
-                            last_bucket_index: bucket_idx,
-                            oldest_bucket_index: bucket_idx,
-                            rolling_sum_mm: base_rainfall,
-                        };
-                        RollingState::<T>::insert(market_id, state);
-
-                        log::info!(
-                            target: "prmx-oracle",
-                            "🌧️ Added test rainfall data for market {}: {} mm (dev-mode, block {})",
-                            market_id,
-                            base_rainfall as f64 / 10.0,
-                            block_num
-                        );
-
-                        Self::deposit_event(Event::RainfallUpdated {
-                            location_id: market_id,
-                            bucket_index: bucket_idx,
-                            rainfall_mm: base_rainfall,
-                        });
-
-                        Self::deposit_event(Event::RollingSumUpdated {
-                            location_id: market_id,
-                            rolling_sum_mm: base_rainfall,
-                        });
-                    }
+            if let Some(configured_at) = ApiKeyConfiguredAt::<T>::get() {
+                // Clear the flag and pending key after 3 blocks (OCW should have copied it)
+                if block_number > configured_at + 3u32.into() {
+                    ApiKeyConfiguredAt::<T>::kill();
+                    PendingApiKey::<T>::kill(); // Clear the temporary on-chain key
+                    weight = weight.saturating_add(Weight::from_parts(10_000, 0));
                 }
-                weight = weight.saturating_add(Weight::from_parts(10_000, 0));
             }
             
             // =========================================================================
-            // Part 2: Automatic settlement check (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
+            // Automatic settlement check (every BLOCKS_PER_SETTLEMENT_CHECK blocks)
             // =========================================================================
             let should_check_settlements = block_num % BLOCKS_PER_SETTLEMENT_CHECK == 0;
             
@@ -1510,16 +1480,28 @@ pub mod pallet {
             // =========================================================================
             let has_pending_requests = Self::process_pending_fetch_requests(block_number);
 
+            // Check if API key was just configured and immediate fetch is needed
+            let api_key_just_configured = ApiKeyConfiguredAt::<T>::get().is_some();
+            
             // Determine what operations to run based on block number
             // - Rainfall ingestion: once per hour (every 600 blocks), or first 10 blocks for quick startup
             // - Location binding: every ~10 minutes (every 100 blocks) for new markets
+            // - Immediate fetch: when API key is newly configured
             let is_startup_window = block_num < 10; // Run more frequently during startup
-            let should_fetch_rainfall = is_startup_window || block_num % BLOCKS_PER_HOUR == 0;
-            let should_check_bindings = is_startup_window || block_num % BLOCKS_PER_BINDING_CHECK == 0;
+            let should_fetch_rainfall = is_startup_window || block_num % BLOCKS_PER_HOUR == 0 || api_key_just_configured;
+            let should_check_bindings = is_startup_window || block_num % BLOCKS_PER_BINDING_CHECK == 0 || api_key_just_configured;
 
             // Early return if nothing to do this block (and no pending requests processed)
             if !should_fetch_rainfall && !should_check_bindings && !has_pending_requests {
                 return;
+            }
+            
+            // Log if this is an immediate fetch triggered by API key configuration
+            if api_key_just_configured {
+                log::info!(
+                    target: "prmx-oracle",
+                    "🚀 API key configured - triggering immediate rainfall fetch for all markets"
+                );
             }
 
             // Log occasionally to show worker is alive
@@ -1576,58 +1558,61 @@ pub mod pallet {
     // See .env.example for configuration template.
 
     impl<T: Config> Pallet<T> {
-        /// Get AccuWeather API key from offchain storage or environment variable
+        /// Get AccuWeather API key from offchain local storage.
         /// 
-        /// Priority:
-        /// 1. Offchain local storage (set via extrinsic)
-        /// 2. Environment variable ACCUWEATHER_API_KEY (for dev/testing)
+        /// The key can be injected via:
+        /// 1. CLI: `prmx-node inject-api-key --key "prmx-oracle::accuweather-api-key" --value "YOUR_KEY"`
+        /// 2. Extrinsic: `prmxOracle.setAccuweatherApiKey`
+        /// 
+        /// Based on the offchain-utils pattern from polkadot-confidential-offchain-worker.
         fn get_accuweather_api_key() -> Option<Vec<u8>> {
-            // Try offchain local storage first (production method)
+            // Try to read from local storage (PERSISTENT kind)
             let storage = sp_io::offchain::local_storage_get(
                 sp_core::offchain::StorageKind::PERSISTENT,
                 ACCUWEATHER_API_KEY_STORAGE,
             );
 
-            if let Some(key) = storage {
+            if let Some(ref key) = storage {
                 if !key.is_empty() {
-                    log::debug!(
+                    log::info!(
                         target: "prmx-oracle",
-                        "Using AccuWeather API key from offchain storage"
+                        "✅ Using AccuWeather API key from offchain storage (length: {} bytes)",
+                        key.len()
                     );
-                    return Some(key);
+                    return storage;
                 }
             }
-
-            // Fallback: Try environment variable (dev mode only)
-            #[cfg(feature = "dev-mode")]
-            {
-                // Check if key was injected via node startup from env var
-                // The node should set this in offchain index at startup
-                if let Some(key) = sp_io::offchain::local_storage_get(
-                    sp_core::offchain::StorageKind::PERSISTENT,
-                    b"prmx-oracle::accuweather-api-key-env",
-                ) {
-                    if !key.is_empty() {
-                        log::info!(
-                            target: "prmx-oracle",
-                            "Using AccuWeather API key from environment variable"
-                        );
-                        return Some(key);
-                    }
+            
+            // Check if there's a pending API key from on-chain storage
+            // This is set by the set_accuweather_api_key extrinsic
+            if let Some(pending_key) = PendingApiKey::<T>::get() {
+                if !pending_key.is_empty() {
+                    let key_vec: Vec<u8> = pending_key.into();
+                    
+                    // Copy to local storage for persistence
+                    sp_io::offchain::local_storage_set(
+                        sp_core::offchain::StorageKind::PERSISTENT,
+                        ACCUWEATHER_API_KEY_STORAGE,
+                        &key_vec,
+                    );
+                    
+                    log::info!(
+                        target: "prmx-oracle",
+                        "✅ Copied AccuWeather API key from on-chain to local storage (length: {} bytes)",
+                        key_vec.len()
+                    );
+                    
+                    // Note: We can't clear PendingApiKey here because we're in offchain context
+                    // It will be cleared in on_initialize after a few blocks
+                    
+                    return Some(key_vec);
                 }
-                
-                log::warn!(
-                    target: "prmx-oracle",
-                    "⚠️ AccuWeather API key not configured. Set ACCUWEATHER_API_KEY environment variable or use set_accuweather_api_key extrinsic."
-                );
             }
-
-            #[cfg(not(feature = "dev-mode"))]
+            
             log::warn!(
                 target: "prmx-oracle",
-                "⚠️ AccuWeather API key not configured. Use set_accuweather_api_key extrinsic to configure."
+                "⚠️ AccuWeather API key not configured. Inject via CLI or extrinsic."
             );
-
             None
         }
 

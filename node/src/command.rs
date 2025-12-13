@@ -4,7 +4,7 @@
 
 use crate::{
     chain_spec,
-    cli::{Cli, Subcommand},
+    cli::{Cli, Subcommand, InjectApiKeyCmd},
     service,
 };
 use prmx_runtime::Block;
@@ -117,6 +117,10 @@ pub fn run() -> sc_cli::Result<()> {
             runner.sync_run(|config| cmd.run::<Block>(&config))
         }
 
+        Some(Subcommand::InjectApiKey(cmd)) => {
+            inject_api_key(cmd)
+        }
+
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {
@@ -124,4 +128,68 @@ pub fn run() -> sc_cli::Result<()> {
             })
         }
     }
+}
+
+/// Inject an API key into offchain local storage.
+/// This allows offchain workers to access the key securely.
+fn inject_api_key(cmd: &InjectApiKeyCmd) -> sc_cli::Result<()> {
+    // Determine the base path
+    let base_path = cmd.base_path.clone().unwrap_or_else(|| {
+        sc_service::BasePath::from_project("", "", "prmx").path().to_path_buf()
+    });
+    
+    // Determine chain ID
+    let chain_id = cmd.chain.clone().unwrap_or_else(|| "prmx_dev".to_string());
+    
+    // Construct the offchain database path
+    let offchain_db_path = base_path.join("chains").join(&chain_id).join("offchain");
+    
+    println!(
+        "💉 Injecting API key '{}' into offchain storage at {:?}",
+        cmd.key,
+        offchain_db_path
+    );
+    
+    // Create directory if it doesn't exist
+    std::fs::create_dir_all(&offchain_db_path).map_err(|e| {
+        sc_cli::Error::Application(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to create offchain db directory: {}", e),
+        )))
+    })?;
+    
+    // Open the offchain storage using kvdb-rocksdb
+    let db = kvdb_rocksdb::Database::open(
+        &kvdb_rocksdb::DatabaseConfig::with_columns(1),
+        &offchain_db_path,
+    ).map_err(|e| {
+        sc_cli::Error::Application(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to open offchain database: {}", e),
+        )))
+    })?;
+    
+    // Write directly to the database
+    // Column 0 is used for PERSISTENT storage, key format is just the key bytes
+    let mut transaction = db.transaction();
+    transaction.put(0, cmd.key.as_bytes(), cmd.value.as_bytes());
+    db.write(transaction).map_err(|e| {
+        sc_cli::Error::Application(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to write to offchain database: {}", e),
+        )))
+    })?;
+    
+    // Verify it was stored
+    if let Ok(Some(stored)) = db.get(0, cmd.key.as_bytes()) {
+        println!("✅ API key '{}' successfully injected ({} bytes)", cmd.key, stored.len());
+    } else {
+        eprintln!("❌ Failed to verify API key injection");
+        return Err(sc_cli::Error::Application(Box::new(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Failed to verify API key injection",
+        ))));
+    }
+    
+    Ok(())
 }

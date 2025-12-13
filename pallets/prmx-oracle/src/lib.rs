@@ -471,6 +471,8 @@ pub mod pallet {
     pub struct GenesisConfig<T: Config> {
         /// Initial oracle providers (accounts authorized to submit rainfall data)
         pub oracle_providers: Vec<T::AccountId>,
+        /// AccuWeather API key (stored in offchain index at genesis)
+        pub accuweather_api_key: Vec<u8>,
     }
 
     #[pallet::genesis_build]
@@ -482,6 +484,21 @@ pub mod pallet {
                 log::info!(
                     target: "prmx-oracle",
                     "🔐 Genesis: Registered oracle provider"
+                );
+            }
+            
+            // Store AccuWeather API key in offchain index
+            if !self.accuweather_api_key.is_empty() {
+                sp_io::offchain_index::set(ACCUWEATHER_API_KEY_STORAGE, &self.accuweather_api_key);
+                log::info!(
+                    target: "prmx-oracle",
+                    "🔑 Genesis: AccuWeather API key configured (length: {} bytes)",
+                    self.accuweather_api_key.len()
+                );
+            } else {
+                log::warn!(
+                    target: "prmx-oracle",
+                    "⚠️ Genesis: AccuWeather API key not configured. Set ACCUWEATHER_API_KEY environment variable."
                 );
             }
         }
@@ -1554,15 +1571,18 @@ pub mod pallet {
         }
     }
 
-    /// Test API key for development (DO NOT USE IN PRODUCTION)
-    /// This is configured in the node for testing purposes only.
-    #[cfg(feature = "dev-mode")]
-    pub const TEST_ACCUWEATHER_API_KEY: &[u8] = b"zpka_0e2a1931d6fc4529838aeb766c0b1d50_d101de0d";
+    // NOTE: API keys should be configured via environment variable ACCUWEATHER_API_KEY
+    // or set at runtime using the set_accuweather_api_key extrinsic.
+    // See .env.example for configuration template.
 
     impl<T: Config> Pallet<T> {
-        /// Get AccuWeather API key from offchain storage or test fallback
+        /// Get AccuWeather API key from offchain storage or environment variable
+        /// 
+        /// Priority:
+        /// 1. Offchain local storage (set via extrinsic)
+        /// 2. Environment variable ACCUWEATHER_API_KEY (for dev/testing)
         fn get_accuweather_api_key() -> Option<Vec<u8>> {
-            // Try offchain local storage first
+            // Try offchain local storage first (production method)
             let storage = sp_io::offchain::local_storage_get(
                 sp_core::offchain::StorageKind::PERSISTENT,
                 ACCUWEATHER_API_KEY_STORAGE,
@@ -1570,21 +1590,44 @@ pub mod pallet {
 
             if let Some(key) = storage {
                 if !key.is_empty() {
+                    log::debug!(
+                        target: "prmx-oracle",
+                        "Using AccuWeather API key from offchain storage"
+                    );
                     return Some(key);
                 }
             }
 
-            // Fallback: Use test API key in dev mode
+            // Fallback: Try environment variable (dev mode only)
             #[cfg(feature = "dev-mode")]
             {
-                log::info!(
+                // Check if key was injected via node startup from env var
+                // The node should set this in offchain index at startup
+                if let Some(key) = sp_io::offchain::local_storage_get(
+                    sp_core::offchain::StorageKind::PERSISTENT,
+                    b"prmx-oracle::accuweather-api-key-env",
+                ) {
+                    if !key.is_empty() {
+                        log::info!(
+                            target: "prmx-oracle",
+                            "Using AccuWeather API key from environment variable"
+                        );
+                        return Some(key);
+                    }
+                }
+                
+                log::warn!(
                     target: "prmx-oracle",
-                    "Using test AccuWeather API key (dev-mode)"
+                    "⚠️ AccuWeather API key not configured. Set ACCUWEATHER_API_KEY environment variable or use set_accuweather_api_key extrinsic."
                 );
-                return Some(TEST_ACCUWEATHER_API_KEY.to_vec());
             }
 
             #[cfg(not(feature = "dev-mode"))]
+            log::warn!(
+                target: "prmx-oracle",
+                "⚠️ AccuWeather API key not configured. Use set_accuweather_api_key extrinsic to configure."
+            );
+
             None
         }
 

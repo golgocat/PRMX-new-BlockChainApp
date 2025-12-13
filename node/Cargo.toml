@@ -21,6 +21,7 @@ futures = { version = "0.3", features = ["thread-pool"] }
 serde_json = { version = "1.0" }
 jsonrpsee = { version = "0.24", features = ["server"] }
 log = { version = "0.4" }
+dotenvy = "0.15"
 
 # Substrate client
 sc-cli = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }

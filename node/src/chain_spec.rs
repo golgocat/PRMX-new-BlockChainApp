@@ -1,6 +1,15 @@
 //! PRMX Chain Specification
 //!
 //! Defines the genesis configuration and chain parameters.
+//!
+//! ## API Key Configuration
+//!
+//! API keys should be configured via environment variables:
+//! - `ACCUWEATHER_API_KEY` - AccuWeather API key for rainfall data
+//! - `R_PRICING_API_KEY` - R pricing model API key
+//! - `R_PRICING_API_URL` - R pricing model API URL (optional)
+//!
+//! See `.env.example` for a template.
 
 use prmx_runtime::{AccountId, Signature, WASM_BINARY};
 use sc_service::ChainType;
@@ -8,6 +17,7 @@ use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
+use std::env;
 
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
 pub type ChainSpec = sc_service::GenericChainSpec;
@@ -187,20 +197,36 @@ fn testnet_genesis(
                 }),
             ],
         },
-        // PRMX Oracle - Oracle Providers
-        // Register Alice as an oracle provider for offchain worker signed transactions
+        // PRMX Oracle - Oracle Configuration
+        // Register oracle providers and configure AccuWeather API
         "prmxOracle": {
+            // Oracle providers (accounts authorized for signed transactions from OCW)
             "oracleProviders": vec![
                 endowed_accounts[0].clone(), // Alice
             ],
+            // AccuWeather API key from environment variable
+            "accuweatherApiKey": env::var("ACCUWEATHER_API_KEY")
+                .map(|k| k.into_bytes())
+                .unwrap_or_else(|_| {
+                    log::warn!("⚠️ ACCUWEATHER_API_KEY not set. Oracle rainfall fetching will not work.");
+                    Vec::new()
+                }),
         },
         // PRMX Quote - R Pricing API Configuration
         // Configure the R actuarial pricing model API for quote calculations
+        // API keys are loaded from environment variables for security
         "prmxQuote": {
-            // R pricing API key (test key for development)
-            "pricingApiKey": b"test_api_key".to_vec(),
-            // R pricing API URL
-            "pricingApiUrl": b"http://34.51.195.144:19090/pricing".to_vec(),
+            // R pricing API key from environment (falls back to placeholder if not set)
+            "pricingApiKey": env::var("R_PRICING_API_KEY")
+                .map(|k| k.into_bytes())
+                .unwrap_or_else(|_| {
+                    log::warn!("⚠️ R_PRICING_API_KEY not set. Quote pricing will not work.");
+                    b"NOT_CONFIGURED".to_vec()
+                }),
+            // R pricing API URL from environment (falls back to default)
+            "pricingApiUrl": env::var("R_PRICING_API_URL")
+                .map(|u| u.into_bytes())
+                .unwrap_or_else(|_| b"http://34.51.195.144:19090/pricing".to_vec()),
             // Quote providers (accounts authorized to submit quote results from OCW)
             "quoteProviders": vec![
                 endowed_accounts[0].clone(), // Alice

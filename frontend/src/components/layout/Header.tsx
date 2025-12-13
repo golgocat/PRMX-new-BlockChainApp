@@ -1,6 +1,7 @@
 'use client';
 
-import { Wifi, WifiOff, Sun, Moon, ExternalLink } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Wifi, WifiOff, Sun, Moon, ExternalLink, Clock } from 'lucide-react';
 import { useWalletStore } from '@/stores/walletStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { AccountSelector } from '@/components/features/AccountSelector';
@@ -19,6 +20,31 @@ function getPolkadotJsBlockUrl(blockNumber: number): string {
 export function Header() {
   const { isChainConnected, currentBlock } = useWalletStore();
   const { theme, toggleTheme } = useThemeStore();
+  const [utcTime, setUtcTime] = useState<string>('');
+
+  // Update UTC time every second
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', {
+        timeZone: 'UTC',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+      });
+      const dateStr = now.toLocaleDateString('en-US', {
+        timeZone: 'UTC',
+        month: 'short',
+        day: 'numeric',
+      });
+      setUtcTime(`${dateStr} ${timeStr}`);
+    };
+    
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleBlockClick = () => {
     if (currentBlock > 0) {
@@ -31,6 +57,14 @@ export function Header() {
       <div className="flex items-center justify-end px-8 py-4">
         {/* Right Section */}
         <div className="flex items-center gap-4">
+          {/* UTC Time Display */}
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background-secondary/50 border border-border-primary">
+            <Clock className="w-4 h-4 text-prmx-cyan" />
+            <span className="text-sm font-mono text-text-secondary">
+              {utcTime} <span className="text-prmx-cyan">UTC</span>
+            </span>
+          </div>
+
           {/* Chain Status Indicator */}
           <div className={cn(
             'flex items-center gap-2 px-3 py-1.5 rounded-lg border',

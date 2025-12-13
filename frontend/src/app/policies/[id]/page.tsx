@@ -185,7 +185,7 @@ export default function PolicyDetailPage() {
         <Card>
           <CardContent className="py-16 text-center">
             <Shield className="w-16 h-16 mx-auto mb-4 text-text-tertiary" />
-            <h3 className="text-lg font-semibold mb-2">Policy #{policyId} not found</h3>
+            <h3 className="text-lg font-semibold mb-2">Policy not found</h3>
             <p className="text-text-secondary mb-6">
               This policy may have been removed or never existed.
             </p>
@@ -210,7 +210,7 @@ export default function PolicyDetailPage() {
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">Policy #{policy.id}</h1>
+              <h1 className="text-3xl font-bold">Policy {policy.label}</h1>
               <StatusBadge status={policy.status} />
             </div>
             <p className="text-text-secondary mt-1">

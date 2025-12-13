@@ -121,7 +121,7 @@ export default function PoliciesPage() {
     setSettlingPolicy(policyId);
     try {
       await api.settlePolicy(keypair, policyId, eventOccurred);
-      toast.success(`Policy #${policyId} settled successfully!`);
+      toast.success(`Policy settled successfully!`);
       handleRefresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to settle policy');
@@ -291,8 +291,8 @@ export default function PoliciesPage() {
                             <Shield className="w-4 h-4 text-white" />
                           </div>
                           <div>
-                            <p className="font-medium">{getMarketName(policy.marketId)}</p>
-                            <p className="text-xs text-text-tertiary">#{policy.id}</p>
+                            <p className="font-medium">{policy.label}</p>
+                            <p className="text-xs text-text-tertiary">{getMarketName(policy.marketId)}</p>
                           </div>
                         </div>
                       </TableCell>

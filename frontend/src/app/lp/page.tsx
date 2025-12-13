@@ -620,7 +620,7 @@ export default function LpTradingPage() {
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold">Policy #{order.policyId}</span>
+                                <span className="font-semibold">{policy?.label || `Policy #${order.policyId}`}</span>
                                 <Badge variant="error" className="text-xs">Sell</Badge>
                                 {isOwner && <Badge variant="cyan" className="text-xs">Your Order</Badge>}
                               </div>
@@ -785,7 +785,7 @@ export default function LpTradingPage() {
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <div className="flex items-center gap-2">
-                          <span className="font-medium group-hover:text-prmx-cyan transition-colors">Policy #{holding.policyId}</span>
+                          <span className="font-medium group-hover:text-prmx-cyan transition-colors">{policy?.label || `Policy #${holding.policyId}`}</span>
                             {/* DeFi Allocation Indicator */}
                             {defiInfo?.isAllocatedToDefi && (
                               <Badge variant="success" className="text-xs px-1.5 py-0.5">
@@ -933,7 +933,7 @@ export default function LpTradingPage() {
                                 </span>
                               </div>
                               <p className="text-xs text-text-secondary">
-                                Policy #{trade.policyId} • {trade.marketName}
+                                {trade.marketName}
                               </p>
                             </div>
                           </div>
@@ -1010,7 +1010,7 @@ export default function LpTradingPage() {
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold">Policy #{outcome.policyId}</span>
+                                <span className="font-semibold">{outcome.marketName}</span>
                                 <Badge 
                                   variant={
                                     outcome.outcome === 'matured' ? 'success' : 
@@ -1163,8 +1163,8 @@ export default function LpTradingPage() {
                     <MapPin className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">{market.name}</h4>
-                    <p className="text-xs text-text-secondary">Policy #{selectedPolicy.id}</p>
+                    <h4 className="font-semibold">{selectedPolicy.label}</h4>
+                    <p className="text-xs text-text-secondary">{market.name}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1308,8 +1308,8 @@ export default function LpTradingPage() {
                     <MapPin className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">{market.name}</h4>
-                    <p className="text-xs text-text-secondary">Policy #{selectedOrder.policyId}</p>
+                    <h4 className="font-semibold">{policy?.label || `Policy #${selectedOrder.policyId}`}</h4>
+                    <p className="text-xs text-text-secondary">{market.name}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
@@ -1489,7 +1489,7 @@ export default function LpTradingPage() {
                 <Shield className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold">Policy #{selectedHoldingPolicyId}</h3>
+                <h3 className="text-xl font-bold">{policy?.label || `Policy #${selectedHoldingPolicyId}`}</h3>
                 {market && (
                   <p className="text-text-secondary flex items-center gap-1 mt-1">
                     <MapPin className="w-4 h-4" />

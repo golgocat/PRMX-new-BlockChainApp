@@ -27,6 +27,7 @@ export interface WindowRules {
 // Policy Types
 export interface Policy {
   id: number;
+  label: string; // Human-readable label like "manila-1", "tokyo-2"
   marketId: number;
   holder: string;
   coverageStart: number; // unix timestamp

@@ -167,12 +167,13 @@ fn testnet_genesis(
                 (USDT_ASSET_ID, dao_account, 60_000_000 * USDT_MULTIPLIER),  // DAO (combined treasury + capital)
             ],
         },
-        // PRMX Markets - Manila Market Configuration
+        // PRMX Markets - Market Configurations
         // Per design.md section 5.4, markets have center coordinates used by oracle
         "prmxMarkets": {
             "markets": vec![
                 serde_json::json!({
-                    // Manila, Philippines - Rainfall Insurance Market
+                    // Manila, Philippines - Rainfall Insurance Market (market_id = 0)
+                    // Has R actuarial model support
                     "name": "Manila".as_bytes(),
                     // Center coordinates: 14.5995° N, 120.9842° E
                     // Scaled by 1e6 for precision
@@ -193,6 +194,50 @@ fn testnet_genesis(
                     // Max duration: 7 days = 604,800 seconds
                     "maxDurationSecs": 604_800u32,
                     // Min lead time: 0 for testing (normally 21 days = 1,814,400 seconds)
+                    "minLeadTimeSecs": 0u32,
+                }),
+                serde_json::json!({
+                    // Amsterdam, Netherlands - Rainfall Insurance Market (market_id = 1)
+                    // No R actuarial model yet - uses fixed 1% probability benchmark
+                    "name": "Amsterdam".as_bytes(),
+                    // Center coordinates: 52.3676° N, 4.9041° E
+                    // Scaled by 1e6 for precision
+                    "centerLatitude": 52_367_600i32,
+                    "centerLongitude": 4_904_100i32,
+                    // Strike value: 50mm rainfall in 24h triggers payout
+                    // Oracle stores rainfall scaled by 10, so 50mm = 500
+                    "strikeValue": 500u32,
+                    // Payout per share: 100 USDT (in smallest units)
+                    "payoutPerShare": PAYOUT_PER_SHARE,
+                    // Base asset: USDT
+                    "baseAsset": USDT_ASSET_ID,
+                    // DAO margin: 20% = 2000 basis points
+                    "daoMarginBp": 2000u32,
+                    // Coverage window rules (relaxed for testing)
+                    "minDurationSecs": 60u32,
+                    "maxDurationSecs": 604_800u32,
+                    "minLeadTimeSecs": 0u32,
+                }),
+                serde_json::json!({
+                    // Tokyo, Japan - Rainfall Insurance Market (market_id = 2)
+                    // No R actuarial model yet - uses fixed 1% probability benchmark
+                    "name": "Tokyo".as_bytes(),
+                    // Center coordinates: 35.6762° N, 139.6503° E
+                    // Scaled by 1e6 for precision
+                    "centerLatitude": 35_676_200i32,
+                    "centerLongitude": 139_650_300i32,
+                    // Strike value: 50mm rainfall in 24h triggers payout
+                    // Oracle stores rainfall scaled by 10, so 50mm = 500
+                    "strikeValue": 500u32,
+                    // Payout per share: 100 USDT (in smallest units)
+                    "payoutPerShare": PAYOUT_PER_SHARE,
+                    // Base asset: USDT
+                    "baseAsset": USDT_ASSET_ID,
+                    // DAO margin: 20% = 2000 basis points
+                    "daoMarginBp": 2000u32,
+                    // Coverage window rules (relaxed for testing)
+                    "minDurationSecs": 60u32,
+                    "maxDurationSecs": 604_800u32,
                     "minLeadTimeSecs": 0u32,
                 }),
             ],

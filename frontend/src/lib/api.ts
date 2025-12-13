@@ -501,8 +501,12 @@ export async function getPolicies(): Promise<Policy[]> {
     const PAYOUT_PER_SHARE = BigInt(100_000_000);
     const totalCapital = shares * PAYOUT_PER_SHARE;
     
+    // Parse policy label (stored as hex-encoded bytes)
+    const policyLabel = hexToString(data.policyLabel) || `policy-${policyId}`;
+    
     return {
       id: policyId,
+      label: policyLabel,
       marketId: data.marketId,
       holder: data.holder,
       coverageStart: data.coverageStart,

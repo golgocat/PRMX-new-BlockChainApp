@@ -538,6 +538,9 @@ pub trait MarketsAccess {
 
     /// Get strike value for a market
     fn strike_value(market_id: u64) -> Result<u32, ()>;
+
+    /// Get market name as bytes (e.g., b"Manila", b"Tokyo")
+    fn market_name(market_id: u64) -> Result<alloc::vec::Vec<u8>, ()>;
 }
 
 impl<T: Config> MarketsAccess for Pallet<T> {
@@ -570,5 +573,11 @@ impl<T: Config> MarketsAccess for Pallet<T> {
 
     fn strike_value(market_id: u64) -> Result<u32, ()> {
         Pallet::<T>::get_strike_value(market_id).ok_or(())
+    }
+
+    fn market_name(market_id: u64) -> Result<alloc::vec::Vec<u8>, ()> {
+        Pallet::<T>::get_market(market_id)
+            .map(|m| m.name.to_vec())
+            .ok_or(())
     }
 }

@@ -83,6 +83,12 @@ pub const TEST_R_PRICING_API_KEY: &[u8] = b"test_api_key";
 #[cfg(feature = "dev-mode")]
 pub const TEST_R_PRICING_API_URL: &[u8] = b"http://34.51.195.144:19090/pricing";
 
+/// Fixed probability for markets without actuarial model support.
+/// 1% probability = 10,000 ppm (parts per million).
+/// This is a temporary benchmark for markets like Amsterdam and Tokyo
+/// until proper actuarial models are developed.
+pub const FIXED_PROBABILITY_PPM: u32 = 10_000;
+
 /// Trait for accessing quote data from other pallets
 pub trait QuoteAccess<AccountId, Balance> {
     /// Get quote request by ID
@@ -676,7 +682,23 @@ pub mod pallet {
                         req.market_id
                     );
 
-                    match Self::fetch_probability_from_r_api(&req, &api_key, &api_url) {
+                    // Check if market has actuarial model support
+                    let probability_result = if Self::has_actuarial_model(req.market_id) {
+                        // Call R API for markets with model support (Manila = market_id 0)
+                        Self::fetch_probability_from_r_api(&req, &api_key, &api_url)
+                    } else {
+                        // Use fixed 1% probability for markets without model
+                        // 1% = 10,000 ppm (parts per million)
+                        // This is a temporary benchmark for Amsterdam, Tokyo, etc.
+                        log::info!(
+                            target: "prmx-quote",
+                            "📊 Using fixed 1% probability for market {} (no actuarial model)",
+                            req.market_id
+                        );
+                        Ok(FIXED_PROBABILITY_PPM)
+                    };
+
+                    match probability_result {
                         Ok(probability_ppm) => {
                             log::info!(
                                 target: "prmx-quote",
@@ -722,6 +744,14 @@ pub mod pallet {
                 .unwrap_or(0);
             // Convert to seconds
             now_ms / 1000
+        }
+
+        /// Check if a market has actuarial model support.
+        /// Currently only Manila (market_id = 0) has R model support.
+        /// Other markets (Amsterdam = 1, Tokyo = 2) use fixed probability.
+        fn has_actuarial_model(market_id: u64) -> bool {
+            // Only Manila (market_id = 0) has R actuarial model
+            market_id == 0
         }
 
         /// Internal function to submit quote result

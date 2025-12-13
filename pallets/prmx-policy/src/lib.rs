@@ -20,6 +20,7 @@ use alloc::vec::Vec;
 use frame_support::traits::fungibles::{Inspect, Mutate};
 use frame_support::traits::tokens::Preservation;
 use pallet_prmx_holdings::HoldingsApi;
+use pallet_prmx_markets::MarketsAccess;
 use pallet_prmx_quote::QuoteAccess;
 use sp_runtime::DispatchError;
 
@@ -183,6 +184,8 @@ pub mod pallet {
     #[scale_info(skip_type_params(T))]
     pub struct PolicyInfo<T: Config> {
         pub policy_id: PolicyId,
+        /// Human-readable label like "manila-1", "tokyo-2", etc.
+        pub policy_label: BoundedVec<u8, ConstU32<32>>,
         pub market_id: MarketId,
         pub holder: T::AccountId,
         pub coverage_start: u64,    // unix seconds
@@ -258,6 +261,9 @@ pub mod pallet {
         /// Capital management API for DeFi yield strategy integration (Hydration Pool 102).
         /// Use NoOpCapitalApi if yield management is not enabled.
         type CapitalApi: CapitalApi<Self::AccountId, Balance = Self::Balance>;
+
+        /// Access to markets pallet for market name lookup (used for policy labels)
+        type MarketsApi: pallet_prmx_markets::MarketsAccess<Balance = Self::Balance>;
     }
 
     // =========================================================================
@@ -314,6 +320,19 @@ pub mod pallet {
         PolicyId,
         SettlementResult<T>,
         OptionQuery,
+    >;
+
+    /// Per-market policy counter for generating sequential labels.
+    /// Each market has its own counter starting from 0.
+    /// Used to generate labels like "manila-1", "tokyo-2", etc.
+    #[pallet::storage]
+    #[pallet::getter(fn next_policy_number)]
+    pub type NextPolicyNumberPerMarket<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        MarketId,
+        u64,
+        ValueQuery,
     >;
 
     // =========================================================================
@@ -450,8 +469,13 @@ pub mod pallet {
             // Create policy
             let policy_id = NextPolicyId::<T>::get();
             let now = Self::current_timestamp();
+
+            // Generate policy label (e.g., "manila-1", "tokyo-2")
+            let policy_label = Self::generate_policy_label(req.market_id);
+
             let policy = PolicyInfo::<T> {
                 policy_id,
+                policy_label,
                 market_id: req.market_id,
                 holder: who.clone(),
                 coverage_start: req.coverage_start,
@@ -672,6 +696,39 @@ pub mod pallet {
                 now_secs
             );
             now_secs
+        }
+
+        /// Generate a human-readable policy label like "manila-1", "tokyo-2".
+        /// Increments the per-market counter and creates a label from the market name.
+        fn generate_policy_label(market_id: MarketId) -> BoundedVec<u8, ConstU32<32>> {
+            // Get market name from MarketsApi
+            let market_name_bytes = T::MarketsApi::market_name(market_id)
+                .unwrap_or_else(|_| b"unknown".to_vec());
+            
+            // Convert to lowercase string
+            let market_name = core::str::from_utf8(&market_name_bytes)
+                .unwrap_or("unknown");
+            
+            // Get and increment per-market counter
+            let policy_number = NextPolicyNumberPerMarket::<T>::get(market_id) + 1;
+            NextPolicyNumberPerMarket::<T>::insert(market_id, policy_number);
+
+            // Generate label: "manila-1", "tokyo-2", etc.
+            let label_string = alloc::format!(
+                "{}-{}",
+                market_name.to_ascii_lowercase(),
+                policy_number
+            );
+
+            // Convert to bounded vec (truncate if too long)
+            label_string
+                .into_bytes()
+                .try_into()
+                .unwrap_or_else(|_| {
+                    // Fallback: just use "policy-{id}" format
+                    let fallback = alloc::format!("policy-{}", policy_number);
+                    fallback.into_bytes().try_into().unwrap_or_default()
+                })
         }
 
         /// Get all policies for a market

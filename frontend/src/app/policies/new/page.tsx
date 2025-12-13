@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { DatePicker } from '@/components/ui/DatePicker';
-import { addDays, startOfDay, getUnixTime } from 'date-fns';
+import { addDays, startOfDay } from 'date-fns';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { useMarkets, useQuoteRequests } from '@/hooks/useChainData';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
@@ -85,10 +85,17 @@ export default function NewPolicyPage() {
   const minStartDate = addDays(startOfDay(new Date()), minLeadTimeDays);
   
   // Calculate coverage dates (Unix timestamps for API)
+  // Coverage is from 00:00:00 UTC to 23:59:59 UTC of the selected day
   const coverageStart = coverageStartDate 
-    ? getUnixTime(startOfDay(coverageStartDate)) 
+    ? Date.UTC(
+        coverageStartDate.getFullYear(),
+        coverageStartDate.getMonth(),
+        coverageStartDate.getDate(),
+        0, 0, 0
+      ) / 1000  // Convert ms to seconds
     : 0;
-  const coverageEnd = coverageStart + (coverageDurationDays * 86400);
+  // End time is 23:59:59 UTC of the same day (or 86400 seconds - 1 from start)
+  const coverageEnd = coverageStart + (coverageDurationDays * 86400) - 1;
   const sharesNum = parseInt(shares) || 1;
   const maxPayout = sharesNum * 100; // $100 per share
 

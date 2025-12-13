@@ -424,6 +424,8 @@ impl pallet_prmx_policy::Config for Runtime {
     type MaxPoliciesPerMarket = MaxPoliciesPerMarket;
     /// Capital management via XCM-based DeFi strategy (Hydration Pool 102)
     type CapitalApi = PrmxXcmCapital;
+    /// Access to markets pallet for policy label generation
+    type MarketsApi = PrmxMarkets;
 }
 
 // =============================================================================

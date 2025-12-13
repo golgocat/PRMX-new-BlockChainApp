@@ -36,6 +36,7 @@ export interface Policy {
   premiumPaid: bigint;
   maxPayout: bigint;
   capitalPool: CapitalPool;
+  createdAt: number; // unix timestamp - when policy was created
 }
 
 export interface CapitalPool {

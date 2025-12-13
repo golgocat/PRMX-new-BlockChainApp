@@ -29,7 +29,7 @@ import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
-import { formatUSDT, formatDate, formatAddress, formatCoordinates, formatTimeRemaining } from '@/lib/utils';
+import { formatUSDT, formatDate, formatDateTimeUTC, formatAddress, formatCoordinates, formatTimeRemaining } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { Policy, Market, PolicyDefiInfo } from '@/types';
 import type { SettlementResult } from '@/lib/api';
@@ -275,16 +275,16 @@ export default function PolicyDetailPage() {
               <div className="p-4 rounded-xl border border-border-secondary">
                 <div className="flex items-center gap-2 mb-2">
                   <Calendar className="w-4 h-4 text-text-secondary" />
-                  <span className="text-sm text-text-secondary">Coverage Start</span>
+                  <span className="text-sm text-text-secondary">Coverage Start (UTC)</span>
                 </div>
-                <p className="font-semibold text-lg">{formatDate(policy.coverageStart)}</p>
+                <p className="font-semibold text-lg">{formatDateTimeUTC(policy.coverageStart)}</p>
               </div>
               <div className="p-4 rounded-xl border border-border-secondary">
                 <div className="flex items-center gap-2 mb-2">
                   <Calendar className="w-4 h-4 text-text-secondary" />
-                  <span className="text-sm text-text-secondary">Coverage End</span>
+                  <span className="text-sm text-text-secondary">Coverage End (UTC)</span>
                 </div>
-                <p className="font-semibold text-lg">{formatDate(policy.coverageEnd)}</p>
+                <p className="font-semibold text-lg">{formatDateTimeUTC(policy.coverageEnd)}</p>
               </div>
             </div>
 
@@ -307,6 +307,15 @@ export default function PolicyDetailPage() {
                 <span className="text-sm text-text-secondary">Policy Holder</span>
               </div>
               <p className="font-mono text-sm">{policy.holder}</p>
+            </div>
+
+            {/* Created At */}
+            <div className="p-4 rounded-xl border border-border-secondary">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="w-4 h-4 text-text-secondary" />
+                <span className="text-sm text-text-secondary">Policy Created (UTC)</span>
+              </div>
+              <p className="font-semibold">{formatDateTimeUTC(policy.createdAt)}</p>
             </div>
           </CardContent>
         </Card>
@@ -620,7 +629,7 @@ export default function PolicyDetailPage() {
                     <div className="pt-2 border-t border-border-secondary">
                       <div className="flex items-center gap-2 text-xs text-text-tertiary">
                         <Clock className="w-3 h-3" />
-                        Settled on {formatDate(settlementResult.settledAt)}
+                        Settled on {formatDateTimeUTC(settlementResult.settledAt)}
                       </div>
                     </div>
                   </>

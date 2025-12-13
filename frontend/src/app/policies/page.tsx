@@ -22,7 +22,7 @@ import { Input } from '@/components/ui/Input';
 import { StatCard } from '@/components/ui/StatCard';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
-import { formatUSDT, formatTimeRemaining, formatDate, formatCoordinates, formatAddress } from '@/lib/utils';
+import { formatUSDT, formatTimeRemaining, formatDateTimeUTCCompact, formatCoordinates, formatAddress } from '@/lib/utils';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMyPolicies, usePolicies, useMarkets } from '@/hooks/useChainData';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
@@ -308,7 +308,7 @@ export default function PoliciesPage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="text-sm">{formatDate(policy.coverageStart)} - {formatDate(policy.coverageEnd)}</p>
+                          <p className="text-sm">{formatDateTimeUTCCompact(policy.coverageStart)} - {formatDateTimeUTCCompact(policy.coverageEnd)}</p>
                           {!isExpired && policy.status === 'Active' && (
                             <p className="text-xs text-text-secondary flex items-center gap-1 mt-1">
                               <Clock className="w-3 h-3" />

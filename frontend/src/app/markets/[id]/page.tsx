@@ -27,7 +27,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, Tabl
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { usePolicies } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
-import { formatUSDT, formatCoordinates, formatDate, formatBasisPoints, secondsToDays, formatAddress } from '@/lib/utils';
+import { formatUSDT, formatCoordinates, formatDateTimeUTCCompact, formatBasisPoints, secondsToDays, formatAddress } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { Market, Policy } from '@/types';
 
@@ -423,7 +423,7 @@ export default function MarketDetailPage() {
                       </TableCell>
                       <TableCell>
                         <div>
-                          <p className="text-sm">{formatDate(policy.coverageStart)} - {formatDate(policy.coverageEnd)}</p>
+                          <p className="text-sm">{formatDateTimeUTCCompact(policy.coverageStart)} - {formatDateTimeUTCCompact(policy.coverageEnd)}</p>
                           {policy.status === 'Active' && (
                             <p className={`text-xs ${isExpired ? 'text-warning' : 'text-text-tertiary'}`}>
                               {isExpired ? 'Expired - awaiting settlement' : `Ends in ${Math.ceil((policy.coverageEnd - now) / 86400)} days`}

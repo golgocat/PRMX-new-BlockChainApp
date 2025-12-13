@@ -193,6 +193,7 @@ pub mod pallet {
         pub status: PolicyStatus,
         pub premium_paid: T::Balance,
         pub max_payout: T::Balance,
+        pub created_at: u64,        // unix seconds - when policy was created
     }
 
     // =========================================================================
@@ -448,6 +449,7 @@ pub mod pallet {
 
             // Create policy
             let policy_id = NextPolicyId::<T>::get();
+            let now = Self::current_timestamp();
             let policy = PolicyInfo::<T> {
                 policy_id,
                 market_id: req.market_id,
@@ -460,6 +462,7 @@ pub mod pallet {
                 status: PolicyStatus::Active,
                 premium_paid: premium,
                 max_payout,
+                created_at: now,
             };
 
             // Get pool account for this policy

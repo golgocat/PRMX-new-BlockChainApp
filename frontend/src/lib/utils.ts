@@ -44,6 +44,48 @@ export function formatDateTime(timestamp: number): string {
   });
 }
 
+/**
+ * Format timestamp to UTC date and time (hour:minute)
+ * Returns format like "Dec 13, 2025 14:30 UTC"
+ */
+export function formatDateTimeUTC(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'UTC',
+  };
+  return date.toLocaleString('en-US', options) + ' UTC';
+}
+
+/**
+ * Format timestamp to short UTC time (hour:minute only)
+ * Returns format like "14:30 UTC"
+ */
+export function formatTimeUTC(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const hours = date.getUTCHours().toString().padStart(2, '0');
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes} UTC`;
+}
+
+/**
+ * Format timestamp to compact UTC format for tables
+ * Returns format like "Dec 13, 14:30 UTC"
+ */
+export function formatDateTimeUTCCompact(timestamp: number): string {
+  const date = new Date(timestamp * 1000);
+  const month = date.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' });
+  const day = date.getUTCDate();
+  const hours = date.getUTCHours().toString().padStart(2, '0');
+  const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+  return `${month} ${day}, ${hours}:${minutes} UTC`;
+}
+
 export function formatTimeRemaining(endTimestamp: number): string {
   const now = Math.floor(Date.now() / 1000);
   const remaining = endTimestamp - now;

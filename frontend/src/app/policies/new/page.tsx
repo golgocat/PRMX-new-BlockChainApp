@@ -26,7 +26,7 @@ import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletSt
 import { useMarkets, useQuoteRequests } from '@/hooks/useChainData';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import * as api from '@/lib/api';
-import { formatUSDT, formatCoordinates, formatDate, secondsToDays } from '@/lib/utils';
+import { formatUSDT, formatCoordinates, formatDateTimeUTC, secondsToDays } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { Market, QuoteRequest } from '@/types';
 
@@ -414,12 +414,12 @@ export default function NewPolicyPage() {
               </h4>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-text-secondary">Coverage Start</span>
-                  <p className="font-medium">{formatDate(coverageStart)}</p>
+                  <span className="text-text-secondary">Coverage Start (UTC)</span>
+                  <p className="font-medium">{formatDateTimeUTC(coverageStart)}</p>
                 </div>
                 <div>
-                  <span className="text-text-secondary">Coverage End</span>
-                  <p className="font-medium">{formatDate(coverageEnd)}</p>
+                  <span className="text-text-secondary">Coverage End (UTC)</span>
+                  <p className="font-medium">{formatDateTimeUTC(coverageEnd)}</p>
                 </div>
                 <div>
                   <span className="text-text-secondary">Total Shares</span>
@@ -482,8 +482,8 @@ export default function NewPolicyPage() {
                         <span>{currentQuote.shares}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-text-secondary">Period</span>
-                        <span>{formatDate(currentQuote.coverageStart)} - {formatDate(currentQuote.coverageEnd)}</span>
+                        <span className="text-text-secondary">Period (UTC)</span>
+                        <span>{formatDateTimeUTC(currentQuote.coverageStart)} - {formatDateTimeUTC(currentQuote.coverageEnd)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-secondary">Max Payout</span>

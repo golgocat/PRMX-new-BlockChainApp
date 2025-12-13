@@ -35,7 +35,7 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/Tabs';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
-import { formatUSDT, formatAddress, formatDate } from '@/lib/utils';
+import { formatUSDT, formatAddress, formatDateTimeUTC } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory, useLpPositionOutcomes, addTradeToHistory } from '@/hooks/useChainData';
@@ -1336,12 +1336,12 @@ export default function LpTradingPage() {
                   <span className="font-medium">Coverage Period</span>
                 </div>
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-text-secondary">Start</span>
-                  <span>{formatDate(policy.coverageStart)}</span>
+                  <span className="text-text-secondary">Start (UTC)</span>
+                  <span>{formatDateTimeUTC(policy.coverageStart)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-text-secondary">End</span>
-                  <span>{formatDate(policy.coverageEnd)}</span>
+                  <span className="text-text-secondary">End (UTC)</span>
+                  <span>{formatDateTimeUTC(policy.coverageEnd)}</span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-text-secondary">Time Remaining</span>

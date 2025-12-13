@@ -516,6 +516,8 @@ export async function getPolicies(): Promise<Policy[]> {
         totalShares: Number(shares),
         lpHolders: data.capitalPool?.lpHolders || [],
       },
+      // createdAt may not exist for older policies, default to coverageStart
+      createdAt: data.createdAt || data.coverageStart,
     };
   });
 }

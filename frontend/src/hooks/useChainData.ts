@@ -1,9 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWalletStore } from '@/stores/walletStore';
 import * as api from '@/lib/api';
 import type { Market, Policy, QuoteRequest, LpAskOrder, LpHolding, LpTradeRecord, LpPositionOutcome } from '@/types';
+
+// Default polling interval for real-time updates (10 seconds)
+const DEFAULT_POLL_INTERVAL = 10000;
 
 /**
  * Hook to fetch and refresh markets data
@@ -70,18 +73,23 @@ export function useMarket(marketId: number | null) {
 }
 
 /**
- * Hook to fetch all policies
+ * Hook to fetch all policies with automatic polling for real-time updates
+ * @param pollInterval - Polling interval in ms (default 10s, set to 0 to disable)
  */
-export function usePolicies() {
+export function usePolicies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
   const { isChainConnected } = useWalletStore();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isFirstLoad = useRef(true);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected) return;
     
-    setLoading(true);
+    // Only show loading on first load, not on polls
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -91,29 +99,46 @@ export function usePolicies() {
       setError(err instanceof Error ? err.message : 'Failed to fetch policies');
     } finally {
       setLoading(false);
+      isFirstLoad.current = false;
     }
   }, [isChainConnected]);
 
+  // Initial load
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  return { policies, loading, error, refresh };
+  // Auto-polling for real-time updates
+  useEffect(() => {
+    if (!isChainConnected || pollInterval <= 0) return;
+    
+    const interval = setInterval(() => {
+      refresh(true); // Silent refresh (no loading state)
+    }, pollInterval);
+    
+    return () => clearInterval(interval);
+  }, [isChainConnected, pollInterval, refresh]);
+
+  return { policies, loading, error, refresh: () => refresh(false) };
 }
 
 /**
- * Hook to fetch policies for current user
+ * Hook to fetch policies for current user with automatic polling
+ * @param pollInterval - Polling interval in ms (default 10s, set to 0 to disable)
  */
-export function useMyPolicies() {
+export function useMyPolicies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
   const { isChainConnected, selectedAccount } = useWalletStore();
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isFirstLoad = useRef(true);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || !selectedAccount) return;
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -123,14 +148,27 @@ export function useMyPolicies() {
       setError(err instanceof Error ? err.message : 'Failed to fetch policies');
     } finally {
       setLoading(false);
+      isFirstLoad.current = false;
     }
   }, [isChainConnected, selectedAccount]);
 
+  // Initial load
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  return { policies, loading, error, refresh };
+  // Auto-polling for real-time updates
+  useEffect(() => {
+    if (!isChainConnected || !selectedAccount || pollInterval <= 0) return;
+    
+    const interval = setInterval(() => {
+      refresh(true);
+    }, pollInterval);
+    
+    return () => clearInterval(interval);
+  }, [isChainConnected, selectedAccount, pollInterval, refresh]);
+
+  return { policies, loading, error, refresh: () => refresh(false) };
 }
 
 /**
@@ -268,9 +306,10 @@ export function useRainfallData(marketId: number | null) {
 }
 
 /**
- * Hook to get dashboard stats
+ * Hook to get dashboard stats with automatic polling
+ * @param pollInterval - Polling interval in ms (default 10s, set to 0 to disable)
  */
-export function useDashboardStats() {
+export function useDashboardStats(pollInterval: number = DEFAULT_POLL_INTERVAL) {
   const { isChainConnected, selectedAccount } = useWalletStore();
   const [stats, setStats] = useState({
     totalMarkets: 0,
@@ -282,11 +321,14 @@ export function useDashboardStats() {
     myLpHoldings: 0,
   });
   const [loading, setLoading] = useState(true);
+  const isFirstLoad = useRef(true);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected) return;
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     
     try {
       const [markets, policies, orders] = await Promise.all([
@@ -321,14 +363,27 @@ export function useDashboardStats() {
       console.error('Failed to fetch dashboard stats:', err);
     } finally {
       setLoading(false);
+      isFirstLoad.current = false;
     }
   }, [isChainConnected, selectedAccount]);
 
+  // Initial load
   useEffect(() => {
     refresh();
   }, [refresh]);
 
-  return { stats, loading, refresh };
+  // Auto-polling
+  useEffect(() => {
+    if (!isChainConnected || pollInterval <= 0) return;
+    
+    const interval = setInterval(() => {
+      refresh(true);
+    }, pollInterval);
+    
+    return () => clearInterval(interval);
+  }, [isChainConnected, pollInterval, refresh]);
+
+  return { stats, loading, refresh: () => refresh(false) };
 }
 
 /**

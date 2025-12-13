@@ -68,6 +68,13 @@ export default function PolicyDetailPage() {
     }
     
     loadPolicy();
+    
+    // Auto-refresh every 10 seconds for real-time settlement updates
+    const interval = setInterval(() => {
+      loadPolicy();
+    }, 10000);
+    
+    return () => clearInterval(interval);
   }, [policyId]);
 
   const loadPolicy = async () => {

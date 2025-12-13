@@ -369,7 +369,8 @@ export default function PoliciesPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          {canSettle && (
+                          {/* Manual settlement buttons - only visible to DAO */}
+                          {isDao && canSettle && (
                             <div className="flex gap-1">
                               <Button
                                 variant="ghost"

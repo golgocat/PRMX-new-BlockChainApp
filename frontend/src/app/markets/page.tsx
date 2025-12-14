@@ -274,9 +274,7 @@ export default function MarketsPage() {
                       </div>
                       <div>
                         <p className="text-xs text-text-tertiary">Coverage Duration</p>
-                        <p className="font-semibold">
-                          {secondsToDays(market.windowRules.minDurationSecs)}-{secondsToDays(market.windowRules.maxDurationSecs)} days
-                        </p>
+                        <p className="font-semibold text-prmx-cyan">24 hours</p>
                       </div>
                     </div>
 

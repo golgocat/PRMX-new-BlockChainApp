@@ -261,14 +261,10 @@ export default function MarketDetailPage() {
                 <Calendar className="w-4 h-4 text-prmx-purple" />
                 Coverage Window Rules
               </h3>
-              <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-text-secondary">Min Duration</span>
-                  <p className="font-medium">{secondsToDays(market.windowRules.minDurationSecs)} days</p>
-                </div>
-                <div>
-                  <span className="text-text-secondary">Max Duration</span>
-                  <p className="font-medium">{secondsToDays(market.windowRules.maxDurationSecs)} days</p>
+                  <span className="text-text-secondary">Coverage Duration</span>
+                  <p className="font-medium text-prmx-cyan">24 hours</p>
                 </div>
                 <div>
                   <span className="text-text-secondary">Min Lead Time</span>

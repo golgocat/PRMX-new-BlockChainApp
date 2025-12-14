@@ -344,9 +344,7 @@ export default function NewPolicyPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-secondary">Duration</span>
-                        <span>
-                          {secondsToDays(market.windowRules.minDurationSecs)}-{secondsToDays(market.windowRules.maxDurationSecs)} days
-                        </span>
+                        <span className="text-prmx-cyan font-medium">24 hours</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-secondary">Lead time</span>
@@ -403,13 +401,11 @@ export default function NewPolicyPage() {
                 }
               />
               <Input
-                label="Coverage Duration (days)"
-                type="number"
-                min={1}
-                max={1}
-                value="1"
+                label="Coverage Duration"
+                type="text"
+                value="24 hours"
                 readOnly
-                hint="Fixed at 1 day for testing"
+                hint="All markets default to 24 hours coverage"
               />
             </div>
 

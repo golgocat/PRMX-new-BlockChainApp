@@ -1216,6 +1216,75 @@ export async function requestRainfallFetch(
 }
 
 /**
+ * Request rainfall fetch for ALL markets at once (DAO only)
+ * This is useful when the node has been offline and missed regular polling
+ */
+export async function requestRainfallFetchAll(
+  signer: KeyringPair
+): Promise<string> {
+  const api = await getApi();
+  
+  console.log(`[API] requestRainfallFetchAll called: refreshing all markets`);
+  
+  // The extrinsic requires GovernanceOrigin (EnsureRoot), so we need to use sudo
+  const innerCall = api.tx.prmxOracle.requestRainfallFetchAll();
+  const sudoCall = api.tx.sudo.sudo(innerCall);
+  
+  return new Promise((resolve, reject) => {
+    let unsub: () => void;
+    
+    sudoCall
+      .signAndSend(signer, ({ status, dispatchError, events }) => {
+        console.log(`[API] Transaction status:`, status.type);
+        
+        if (dispatchError) {
+          console.error(`[API] Dispatch error:`, dispatchError.toString());
+          if (dispatchError.isModule) {
+            const decoded = api.registry.findMetaError(dispatchError.asModule);
+            reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+          } else {
+            reject(new Error(dispatchError.toString()));
+          }
+          unsub?.();
+          return;
+        }
+        
+        // Check for failure events
+        if (events) {
+          const failedEvent = events.find(({ event }) => 
+            (event.section === 'system' && event.method === 'ExtrinsicFailed') ||
+            (event.section === 'sudo' && event.method === 'SudoFailed')
+          );
+          if (failedEvent) {
+            console.error(`[API] Extrinsic failed event:`, failedEvent.event.data.toString());
+            reject(new Error('Transaction failed on-chain (check if you are the sudo account)'));
+            unsub?.();
+            return;
+          }
+          
+          // Log events
+          events.forEach(({ event }) => {
+            console.log(`[API] Event: ${event.section}.${event.method}`);
+          });
+        }
+        
+        if (status.isInBlock) {
+          console.log(`[API] All markets fetch request included in block:`, status.asInBlock.toHex());
+          resolve(status.asInBlock.toHex());
+          unsub?.();
+        }
+      })
+      .then(unsubFn => {
+        unsub = unsubFn;
+      })
+      .catch(err => {
+        console.error(`[API] signAndSend error:`, err);
+        reject(err);
+      });
+  });
+}
+
+/**
  * Complete a manual rainfall fetch by submitting the data (DAO only)
  * This is called after the offchain worker has fetched data from AccuWeather
  * @param rainfallMm - 24h rolling sum in tenths of mm (e.g., 150 = 15.0mm)

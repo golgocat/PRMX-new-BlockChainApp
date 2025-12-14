@@ -70,6 +70,7 @@ export default function OraclePage() {
   const [selectedMarketId, setSelectedMarketId] = useState<string>('');
   const [testRainfallValue, setTestRainfallValue] = useState<string>('');
   const [isSettingRainfall, setIsSettingRainfall] = useState(false);
+  const [isRefreshingAllMarkets, setIsRefreshingAllMarkets] = useState(false);
   
   
   // Track which markets have expanded bucket details
@@ -198,6 +199,28 @@ export default function OraclePage() {
     }
   };
 
+  const handleRefreshAllMarkets = async () => {
+    const keypair = useWalletStore.getState().getKeypair();
+    if (!keypair) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+
+    setIsRefreshingAllMarkets(true);
+    try {
+      await api.requestRainfallFetchAll(keypair);
+      toast.success(`Queued rainfall fetch for all ${markets.length} markets`);
+      
+      // Wait a moment for blockchain state to propagate, then refresh
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await fetchRainfallData();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to refresh all markets');
+    } finally {
+      setIsRefreshingAllMarkets(false);
+    }
+  };
+
   const getMarketById = (marketId: number) => {
     return markets.find(m => m.id === marketId);
   };
@@ -313,6 +336,31 @@ export default function OraclePage() {
                   and updates on-chain storage via signed transactions. No manual intervention required.
                 </p>
               </div>
+            </div>
+
+            {/* Refresh All Markets Button */}
+            <div className="p-4 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30">
+              <h4 className="font-medium text-prmx-cyan mb-3 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Manual Refresh All Markets
+              </h4>
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={handleRefreshAllMarkets}
+                  loading={isRefreshingAllMarkets}
+                  icon={<RefreshCw className="w-4 h-4" />}
+                  className="bg-prmx-cyan hover:bg-prmx-cyan/90 text-black"
+                >
+                  Refresh All Markets Now
+                </Button>
+                <span className="text-sm text-text-secondary">
+                  {markets.length} markets will be queued for refresh
+                </span>
+              </div>
+              <p className="text-xs text-text-tertiary mt-3">
+                💡 Use this when the node has been offline and missed regular AccuWeather polling.
+                This queues fetch requests for all markets, which the offchain worker will process.
+              </p>
             </div>
 
             {/* Test Data Section */}

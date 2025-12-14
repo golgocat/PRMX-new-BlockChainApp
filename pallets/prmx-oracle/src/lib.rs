@@ -428,6 +428,11 @@ pub mod pallet {
             market_id: MarketId,
             records_updated: u32,
         },
+        /// All markets rainfall fetch requested (batch refresh)
+        AllMarketsFetchRequested {
+            market_count: u32,
+            requested_at: u64,
+        },
         /// Policy automatically settled after coverage expiration
         PolicyExpirationSettled {
             policy_id: super::PolicyId,
@@ -1003,6 +1008,55 @@ pub mod pallet {
                 market_id,
                 rainfall_mm as f64 / 10.0
             );
+
+            Ok(())
+        }
+
+        /// Request rainfall fetch for ALL markets at once.
+        /// Useful when the node has been offline and missed regular polling.
+        /// This queues fetch requests for all registered markets.
+        #[pallet::call_index(9)]
+        #[pallet::weight(Weight::from_parts(50_000, 0))]
+        pub fn request_rainfall_fetch_all(
+            origin: OriginFor<T>,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+
+            // Get total number of markets
+            let next_market_id = pallet_prmx_markets::NextMarketId::<T>::get();
+            
+            // Get current block for pending request storage
+            let current_block = frame_system::Pallet::<T>::block_number();
+            let now: u64 = Self::current_timestamp();
+            
+            let mut queued_count = 0u32;
+            for market_id in 0..next_market_id {
+                // Only queue if market exists and doesn't already have pending request
+                if pallet_prmx_markets::Markets::<T>::contains_key(market_id) {
+                    if !PendingFetchRequests::<T>::contains_key(market_id) {
+                        PendingFetchRequests::<T>::insert(market_id, current_block);
+                        queued_count += 1;
+                        
+                        log::info!(
+                            target: "prmx-oracle",
+                            "📥 Queued rainfall fetch for market {} (batch request)",
+                            market_id
+                        );
+                    }
+                }
+            }
+
+            log::info!(
+                target: "prmx-oracle",
+                "📥 Batch rainfall fetch requested: {} markets queued at block {:?}",
+                queued_count,
+                current_block
+            );
+
+            Self::deposit_event(Event::AllMarketsFetchRequested {
+                market_count: queued_count,
+                requested_at: now,
+            });
 
             Ok(())
         }

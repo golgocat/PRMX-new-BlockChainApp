@@ -82,6 +82,14 @@ export default function OraclePage() {
   
   // State for tabs and trigger logs
   const [activeTab, setActiveTab] = useState<'rainfall' | 'triggers'>('rainfall');
+  
+  // Helper to get UTC offset string (e.g., "UTC+9" for Tokyo)
+  const getUtcOffsetString = () => {
+    const offsetMinutes = new Date().getTimezoneOffset();
+    const offsetHours = -offsetMinutes / 60; // Negate because getTimezoneOffset returns opposite sign
+    const sign = offsetHours >= 0 ? '+' : '';
+    return `UTC${sign}${offsetHours}`;
+  };
   const [triggerLogs, setTriggerLogs] = useState<api.ThresholdTriggerLog[]>([]);
   const [loadingTriggerLogs, setLoadingTriggerLogs] = useState(false);
 
@@ -314,7 +322,7 @@ export default function OraclePage() {
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="w-4 h-4 text-warning" />
                     <span className="text-text-secondary">Update Frequency:</span>
-                    <span className="text-text-primary">Every block (~6 seconds)</span>
+                    <span className="text-text-primary">Every hour (~600 blocks)</span>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -653,6 +661,9 @@ export default function OraclePage() {
                                       day: 'numeric' 
                                     })}
                                   </span>
+                                  <span className="text-prmx-cyan text-xs font-medium">
+                                    ({getUtcOffsetString()})
+                                  </span>
                                   {idx === 0 && (
                                     <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
                                   )}
@@ -687,14 +698,14 @@ export default function OraclePage() {
                       <div className="pt-2 border-t border-border-secondary space-y-1">
                         <div className="flex items-center justify-center gap-2 text-xs text-text-tertiary">
                           <Clock className="w-3 h-3" />
-                          Last updated: {new Date(data.lastUpdated).toLocaleString()}
+                          Last updated: {new Date(data.lastUpdated).toLocaleString()} <span className="text-prmx-cyan">({getUtcOffsetString()})</span>
                         </div>
                         {(() => {
                           const lastReset = getLastResetTime(market.id);
                           return lastReset ? (
                             <div className="flex items-center justify-center gap-2 text-xs text-warning">
                               <RefreshCw className="w-3 h-3" />
-                              Sum reset after trigger: {lastReset.toLocaleString()}
+                              Sum reset after trigger: {lastReset.toLocaleString()} <span className="text-prmx-cyan">({getUtcOffsetString()})</span>
                             </div>
                           ) : (
                             <div className="flex items-center justify-center gap-2 text-xs text-text-tertiary/60">
@@ -857,11 +868,11 @@ export default function OraclePage() {
                   <p className="font-mono font-semibold text-prmx-purple">#{selectedBucket.blockNumber.toLocaleString()}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-text-secondary">Timestamp</span>
+                  <span className="text-sm text-text-secondary">Timestamp <span className="text-prmx-cyan">(UTC)</span></span>
                   <p className="font-mono text-sm">{selectedBucket.timestamp.toISOString()}</p>
                 </div>
                 <div>
-                  <span className="text-sm text-text-secondary">Local Time</span>
+                  <span className="text-sm text-text-secondary">Local Time <span className="text-prmx-cyan">({getUtcOffsetString()})</span></span>
                   <p className="font-mono text-sm">{selectedBucket.timestamp.toLocaleString()}</p>
                 </div>
               </div>

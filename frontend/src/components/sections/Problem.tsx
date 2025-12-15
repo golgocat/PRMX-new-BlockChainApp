@@ -116,15 +116,16 @@ export function Problem() {
                   </p>
                 </div>
 
-                {/* Visual element - question marks */}
-                <div className="flex items-center gap-3 md:pr-8">
-                  {[...Array(3)].map((_, i) => (
+                {/* Visual element - unclear terms */}
+                <div className="flex flex-col gap-2 md:pr-8">
+                  {['Hidden fees', 'Denied claims', 'Fine print'].map((text, i) => (
                     <div 
                       key={i}
-                      className="w-12 h-12 md:w-16 md:h-16 rounded-2xl bg-zinc-800/50 border border-zinc-700/50 flex items-center justify-center"
-                      style={{ opacity: 1 - i * 0.3 }}
+                      className="px-4 py-2 rounded-lg bg-zinc-800/50 border border-zinc-700/30 flex items-center gap-2"
+                      style={{ opacity: 1 - i * 0.15 }}
                     >
-                      <span className="text-2xl md:text-3xl text-zinc-600">?</span>
+                      <span className="w-4 h-0.5 bg-rose-500/60 rounded-full" />
+                      <span className="text-sm text-zinc-500 line-through decoration-rose-500/40">{text}</span>
                     </div>
                   ))}
                 </div>

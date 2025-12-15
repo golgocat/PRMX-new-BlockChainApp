@@ -1,9 +1,28 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight, Droplets, Shield, Zap } from 'lucide-react'
+import { ArrowRight, Droplets, Code, Zap } from 'lucide-react'
 import { FadeIn } from '@/components/ui/FadeIn'
 import { RainEffect } from '@/components/ui/RainEffect'
+import * as api from '@/lib/api'
 
 export function Hero() {
+  const [marketCount, setMarketCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    async function fetchMarketCount() {
+      try {
+        const markets = await api.getMarkets()
+        setMarketCount(markets.length)
+      } catch (error) {
+        console.error('Failed to fetch market count:', error)
+        // Keep null to show fallback
+      }
+    }
+    fetchMarketCount()
+  }, [])
+
   return (
     <section className="relative min-h-screen flex items-center overflow-hidden bg-[#030303]">
       {/* Background Video with dark overlay */}
@@ -58,7 +77,7 @@ export function Hero() {
                 </span>
                 <span className="text-xs text-zinc-500">•</span>
                 <span className="text-sm text-zinc-400 font-ui">
-                  12 markets worldwide
+                  {marketCount !== null ? `${marketCount} market${marketCount !== 1 ? 's' : ''} live` : 'Loading...'}
                 </span>
               </div>
             </FadeIn>
@@ -99,11 +118,11 @@ export function Hero() {
               <div className="flex flex-wrap items-center gap-8 mt-16 pt-8 border-t border-zinc-800">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-brand-violet/20">
-                    <Shield size={20} className="text-brand-violet" />
+                    <Code size={20} className="text-brand-violet" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white font-display">$10M+</p>
-                    <p className="text-sm text-zinc-500 font-ui">Coverage deployed</p>
+                    <p className="text-2xl font-bold text-white font-display">Open Source</p>
+                    <p className="text-sm text-zinc-500 font-ui">Verifiability</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -133,16 +152,6 @@ export function Hero() {
 
       {/* Bottom gradient fade */}
       <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-[#0a0a0a] to-transparent pointer-events-none" />
-
-      {/* Scroll indicator */}
-      <FadeIn delay={600}>
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2">
-          <span className="text-xs text-zinc-500 font-ui uppercase tracking-wider">Scroll</span>
-          <div className="w-5 h-8 rounded-full border border-zinc-700 flex items-start justify-center p-1">
-            <div className="w-1 h-2 rounded-full bg-zinc-500 animate-bounce" />
-          </div>
-        </div>
-      </FadeIn>
     </section>
   )
 }

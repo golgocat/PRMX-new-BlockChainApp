@@ -7,7 +7,7 @@ import { FadeIn } from '@/components/ui/FadeIn'
 const benefits = [
   { icon: Shield, text: 'No paperwork or claims process' },
   { icon: Zap, text: 'Instant payout when triggered' },
-  { icon: Wallet, text: 'USDT only' },
+  { icon: Wallet, text: 'Pay & receive in USDT' },
 ]
 
 const locations = [

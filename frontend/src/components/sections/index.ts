@@ -1,0 +1,10 @@
+export { Navbar } from './Navbar'
+export { Hero } from './Hero'
+export { Problem } from './Problem'
+export { Solutions } from './Solutions'
+export { QuoteCalculator } from './QuoteCalculator'
+export { HowItWorks } from './HowItWorks'
+export { FAQ } from './FAQ'
+export { FinalCTA } from './FinalCTA'
+export { Footer } from './Footer'
+

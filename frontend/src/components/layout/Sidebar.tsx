@@ -24,7 +24,7 @@ type NavItem = {
 };
 
 const mainNavItems: NavItem[] = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/markets', label: 'Markets', icon: Globe2, roles: ['dao', 'customer'] },
   { href: '/policies', label: 'My Policies', labelByRole: { dao: 'All Policies' }, icon: Shield, roles: ['dao', 'customer'] },
   { href: '/lp', label: 'LP Trading', icon: Wallet, roles: ['dao', 'lp'] },
@@ -61,7 +61,7 @@ export function Sidebar() {
           </div>
           
           {filteredMainNav.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             const Icon = item.icon;
             // Use role-specific label if available, otherwise default label
             const label = item.labelByRole?.[userRole] || item.label;

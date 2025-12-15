@@ -166,6 +166,11 @@
     --text-tertiary: 107 114 128;
     --border-primary: 55 65 81;
     --border-secondary: 31 41 55;
+    /* Landing page brand colors */
+    --brand-violet: #8A4AF3;
+    --brand-teal: #00C48C;
+    --brand-amber: #FFA000;
+    --brand-magenta: #FF4081;
   }
 
   /* Light mode */
@@ -353,4 +358,100 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+}
+
+/* ========================================
+   Landing Page Styles
+   ======================================== */
+
+@layer components {
+  /* Landing page buttons */
+  .landing-btn-primary {
+    @apply px-8 py-4 text-white rounded-full font-semibold transition-all 
+           flex items-center justify-center gap-2 hover:shadow-lg 
+           hover:shadow-purple-500/20 bg-brand-violet;
+  }
+
+  .landing-btn-secondary {
+    @apply px-8 py-4 bg-white text-zinc-900 border border-zinc-200 
+           rounded-full font-semibold hover:bg-zinc-50 transition-all shadow-sm;
+  }
+
+  .section-padding {
+    @apply py-24 md:py-32 px-6;
+  }
+}
+
+/* Custom range slider styling for landing page */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  @apply h-2 bg-zinc-100 rounded-lg;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  @apply w-5 h-5 rounded-full bg-brand-violet -mt-1.5 shadow-md;
+}
+
+input[type="range"]::-moz-range-track {
+  @apply h-2 bg-zinc-100 rounded-lg;
+}
+
+input[type="range"]::-moz-range-thumb {
+  @apply w-5 h-5 rounded-full bg-brand-violet border-0;
+}
+
+/* Rain animation for landing page */
+@keyframes rain {
+  0% {
+    transform: translateY(-100vh);
+  }
+  100% {
+    transform: translateY(100vh);
+  }
+}
+
+@keyframes splash {
+  0% {
+    transform: scale(0);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(2);
+    opacity: 0.3;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.animate-rain {
+  animation: rain linear infinite;
+}
+
+.animate-splash {
+  animation: splash ease-out infinite;
+}
+
+.animate-ripple {
+  animation: ripple ease-out infinite;
 }

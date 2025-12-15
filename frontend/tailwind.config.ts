@@ -21,6 +21,13 @@ const config: Config = {
           magenta: '#E040FB',
           'magenta-light': '#EA80FC',
         },
+        // Landing page brand colors
+        brand: {
+          violet: '#8A4AF3',
+          teal: '#00C48C',
+          amber: '#FFA000',
+          magenta: '#FF4081',
+        },
         // UI Colors - using RGB format for opacity support
         background: {
           primary: 'rgb(var(--bg-primary) / <alpha-value>)',
@@ -80,6 +87,9 @@ const config: Config = {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         mono: ['JetBrains Mono', 'monospace'],
+        // Landing page fonts
+        display: ['var(--font-plus-jakarta)', 'sans-serif'],
+        ui: ['var(--font-inter)', 'sans-serif'],
       },
       borderRadius: {
         '2xl': '1rem',

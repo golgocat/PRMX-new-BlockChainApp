@@ -110,7 +110,7 @@ export function Sidebar() {
         {/* Footer - Show different CTAs based on role */}
         <div className="border-t border-border-secondary p-4">
           {userRole === 'customer' && (
-            <div className="glass-card p-4 bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10">
+            <div className="glass-card p-4 bg-gradient-to-br from-sky-500/10 to-blue-500/10 dark:from-prmx-cyan/10 dark:to-prmx-purple/10">
               <h4 className="font-semibold text-sm mb-1">Need Coverage?</h4>
               <p className="text-xs text-text-secondary mb-3">
                 Protect your assets with parametric rainfall insurance
@@ -124,7 +124,7 @@ export function Sidebar() {
             </div>
           )}
           {userRole === 'lp' && (
-            <div className="glass-card p-4 bg-gradient-to-br from-prmx-purple/10 to-prmx-magenta/10">
+            <div className="glass-card p-4 bg-gradient-to-br from-cyan-500/10 to-sky-500/10 dark:from-prmx-purple/10 dark:to-prmx-magenta/10">
               <h4 className="font-semibold text-sm mb-1">LP Opportunities</h4>
               <p className="text-xs text-text-secondary mb-3">
                 Trade LP tokens and earn yields
@@ -138,7 +138,7 @@ export function Sidebar() {
             </div>
           )}
           {userRole === 'dao' && (
-            <div className="glass-card p-4 bg-gradient-to-br from-prmx-blue/10 to-prmx-cyan/10">
+            <div className="glass-card p-4 bg-gradient-to-br from-sky-500/10 to-cyan-500/10 dark:from-prmx-blue/10 dark:to-prmx-cyan/10">
               <h4 className="font-semibold text-sm mb-1">DAO Admin</h4>
               <p className="text-xs text-text-secondary mb-3">
                 Manage markets and settle policies

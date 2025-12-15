@@ -1,6 +1,7 @@
 'use client';
 
 import { cn } from '@/lib/utils';
+import { useThemeStore } from '@/stores/themeStore';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
@@ -9,6 +10,7 @@ interface LogoProps {
 }
 
 export function Logo({ size = 'md', showText = true, className }: LogoProps) {
+  const { theme } = useThemeStore();
   const sizeClasses = {
     sm: 'w-8 h-8',
     md: 'w-10 h-10',
@@ -80,10 +82,10 @@ export function Logo({ size = 'md', showText = true, className }: LogoProps) {
             opacity="0.9"
           />
           
-          {/* Inner hexagon cutout (white/transparent) */}
+          {/* Inner hexagon cutout (theme-aware) */}
           <path
             d="M35 42 L50 33 L65 42 L65 58 L50 67 L35 58 Z"
-            fill="#0A0E17"
+            fill={theme === 'light' ? '#f1f8ff' : '#0A0E17'}
           />
         </svg>
       </div>

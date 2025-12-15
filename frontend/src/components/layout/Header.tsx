@@ -59,9 +59,9 @@ export function Header() {
         <div className="flex items-center gap-4">
           {/* UTC Time Display */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-background-secondary/50 border border-border-primary">
-            <Clock className="w-4 h-4 text-prmx-cyan" />
+            <Clock className="w-4 h-4 text-prmx-cyan dark:text-prmx-cyan text-sky-500" />
             <span className="text-sm font-mono text-text-secondary">
-              {utcTime} <span className="text-prmx-cyan">UTC</span>
+              {utcTime} <span className="text-sky-500 dark:text-prmx-cyan">UTC</span>
             </span>
           </div>
 
@@ -99,9 +99,9 @@ export function Header() {
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {theme === 'dark' ? (
-              <Sun className="w-5 h-5 text-prmx-gold" />
+              <Sun className="w-5 h-5 text-amber-400" />
             ) : (
-              <Moon className="w-5 h-5 text-prmx-purple" />
+              <Moon className="w-5 h-5 text-sky-600" />
             )}
           </button>
 

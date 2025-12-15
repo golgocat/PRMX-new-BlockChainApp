@@ -46,6 +46,7 @@ export default function MarketsPage() {
     name: '',
     centerLatitude: '',
     centerLongitude: '',
+    timezoneOffsetHours: '0', // UTC offset in hours (e.g., 8 for Manila, 9 for Tokyo)
     strikeValue: '50',
     daoMarginBp: '2000',
     minDurationDays: '0',  // 0 for testing (allows immediate coverage)
@@ -87,6 +88,7 @@ export default function MarketsPage() {
         name: newMarket.name,
         centerLatitude: Math.round(parseFloat(newMarket.centerLatitude) * 1_000_000),
         centerLongitude: Math.round(parseFloat(newMarket.centerLongitude) * 1_000_000),
+        timezoneOffsetHours: parseInt(newMarket.timezoneOffsetHours),
         strikeValue: parseInt(newMarket.strikeValue),
         daoMarginBp: parseInt(newMarket.daoMarginBp),
         minDurationSecs: parseInt(newMarket.minDurationDays) * 86400,
@@ -100,6 +102,7 @@ export default function MarketsPage() {
         name: '',
         centerLatitude: '',
         centerLongitude: '',
+        timezoneOffsetHours: '0',
         strikeValue: '50',
         daoMarginBp: '2000',
         minDurationDays: '0',
@@ -331,6 +334,17 @@ export default function MarketsPage() {
               hint="Decimal degrees"
             />
           </div>
+
+          <Input
+            label="Timezone (UTC offset) *"
+            type="number"
+            min="-12"
+            max="14"
+            placeholder="e.g., 8 for UTC+8"
+            value={newMarket.timezoneOffsetHours}
+            onChange={(e) => setNewMarket({ ...newMarket, timezoneOffsetHours: e.target.value })}
+            hint="Hours from UTC (e.g., 8 for Manila, 9 for Tokyo, -5 for New York)"
+          />
 
           <Input
             label="Strike Value (mm)"

@@ -15,6 +15,23 @@ extern crate alloc;
 
 pub use pallet::*;
 
+// =============================================================================
+//                          NewMarketNotifier Trait
+// =============================================================================
+
+/// Trait for notifying the oracle pallet when a new market is created.
+/// This allows the oracle to immediately queue a fetch request for the new market.
+pub trait NewMarketNotifier {
+    /// Called when a new market is created. Queues the market for immediate
+    /// AccuWeather location resolution and rainfall fetch.
+    fn notify_new_market(market_id: u64);
+}
+
+/// No-op implementation for when oracle notification is not needed
+impl NewMarketNotifier for () {
+    fn notify_new_market(_market_id: u64) {}
+}
+
 #[frame_support::pallet]
 pub mod pallet {
     use super::*;
@@ -103,6 +120,8 @@ pub mod pallet {
         pub center_latitude: i32,
         /// Center longitude (scaled by 1e6), e.g., 120.9842° -> 120_984_200
         pub center_longitude: i32,
+        /// Timezone offset from UTC in hours (e.g., 8 for Manila UTC+8, 9 for Tokyo UTC+9, -5 for New York UTC-5)
+        pub timezone_offset_hours: i8,
         pub event_type: EventType,
         /// Rainfall threshold in mm (scaled by 10 for oracle, so 50mm = 500)
         pub strike_value: Millimeters,
@@ -128,6 +147,10 @@ pub mod pallet {
 
         /// AssetId type
         type AssetId: Parameter + Member + Copy + Default + MaxEncodedLen + From<u32>;
+
+        /// Notifier for when new markets are created.
+        /// Allows the oracle pallet to immediately queue fetch requests.
+        type NewMarketNotifier: crate::NewMarketNotifier;
     }
 
     // =========================================================================
@@ -174,6 +197,8 @@ pub mod pallet {
         pub name: Vec<u8>,
         pub center_latitude: i32,  // scaled by 1e6
         pub center_longitude: i32, // scaled by 1e6
+        /// Timezone offset from UTC in hours (e.g., 8 for Manila, 9 for Tokyo, -5 for New York)
+        pub timezone_offset_hours: i8,
         pub strike_value: u32,     // rainfall threshold in mm (scaled by 10)
         /// Payout per share in smallest units (u128)
         pub payout_per_share: u128,
@@ -211,6 +236,7 @@ pub mod pallet {
                     name,
                     center_latitude: market_config.center_latitude,
                     center_longitude: market_config.center_longitude,
+                    timezone_offset_hours: market_config.timezone_offset_hours,
                     event_type: EventType::Rainfall24h,
                     strike_value: market_config.strike_value,
                     payout_per_share: market_config.payout_per_share.into(),
@@ -295,6 +321,7 @@ pub mod pallet {
             name: Vec<u8>,
             center_latitude: i32,
             center_longitude: i32,
+            timezone_offset_hours: i8,
             strike_value: Millimeters,
             base_asset: T::AssetId,
             payout_per_share: T::Balance,
@@ -314,6 +341,7 @@ pub mod pallet {
                 name: bounded_name.clone(),
                 center_latitude,
                 center_longitude,
+                timezone_offset_hours,
                 event_type: EventType::Rainfall24h,
                 strike_value,
                 payout_per_share,
@@ -330,6 +358,9 @@ pub mod pallet {
                 market_id,
                 name: bounded_name,
             });
+
+            // Notify the oracle pallet to queue immediate AccuWeather binding and fetch
+            T::NewMarketNotifier::notify_new_market(market_id);
 
             Ok(())
         }

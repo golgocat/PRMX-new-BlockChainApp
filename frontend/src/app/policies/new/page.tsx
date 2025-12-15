@@ -37,6 +37,12 @@ const steps = [
   { id: 4, title: 'Apply Coverage' },
 ];
 
+// Format timezone offset as string (e.g., "UTC+9")
+const formatTimezoneOffset = (offsetHours: number): string => {
+  const sign = offsetHours >= 0 ? '+' : '';
+  return `UTC${sign}${offsetHours}`;
+};
+
 export default function NewPolicyPage() {
   const router = useRouter();
   const { isConnected, selectedAccount } = useWalletStore();
@@ -85,16 +91,19 @@ export default function NewPolicyPage() {
   const minStartDate = addDays(startOfDay(new Date()), minLeadTimeDays);
   
   // Calculate coverage dates (Unix timestamps for API)
-  // Coverage is from 00:00:00 UTC to 23:59:59 UTC of the selected day
+  // Coverage is from 00:00:00 to 23:59:59 in the MARKET'S local timezone
+  // For Tokyo (UTC+9): 00:00 Tokyo = 15:00 UTC previous day
+  // Timezone offset now comes from on-chain market data
+  const marketTimezoneOffset = selectedMarket?.timezoneOffsetHours ?? 0;
   const coverageStart = coverageStartDate 
-    ? Date.UTC(
+    ? (Date.UTC(
         coverageStartDate.getFullYear(),
         coverageStartDate.getMonth(),
         coverageStartDate.getDate(),
         0, 0, 0
-      ) / 1000  // Convert ms to seconds
+      ) / 1000) - (marketTimezoneOffset * 3600)  // Subtract timezone offset to get UTC
     : 0;
-  // End time is 23:59:59 UTC of the same day (or 86400 seconds - 1 from start)
+  // End time is 23:59:59 in market's local time (24 hours - 1 second from start)
   const coverageEnd = coverageStart + (coverageDurationDays * 86400) - 1;
   const sharesNum = parseInt(shares) || 1;
   const maxPayout = sharesNum * 100; // $100 per share
@@ -415,15 +424,34 @@ export default function NewPolicyPage() {
                 <Info className="w-4 h-4 text-prmx-cyan" />
                 Coverage Summary
               </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-text-secondary">Coverage Start (UTC)</span>
-                  <p className="font-medium">{formatDateTimeUTC(coverageStart)}</p>
+              <div className="space-y-3 text-sm">
+                {/* Local Time Display */}
+                <div className="p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/20">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-prmx-cyan" />
+                    <span className="font-medium text-prmx-cyan">
+                      {selectedMarket?.name} Local Time ({formatTimezoneOffset(marketTimezoneOffset)})
+                    </span>
+                  </div>
+                  <p className="font-mono text-lg">
+                    {coverageStartDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} 
+                    {' '}00:00 — 23:59
+                  </p>
+                </div>
+                
+                {/* UTC Equivalent */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <span className="text-text-secondary">Start (UTC)</span>
+                    <p className="font-medium font-mono text-xs">{formatDateTimeUTC(coverageStart)}</p>
                 </div>
                 <div>
-                  <span className="text-text-secondary">Coverage End (UTC)</span>
-                  <p className="font-medium">{formatDateTimeUTC(coverageEnd)}</p>
+                    <span className="text-text-secondary">End (UTC)</span>
+                    <p className="font-medium font-mono text-xs">{formatDateTimeUTC(coverageEnd)}</p>
+                  </div>
                 </div>
+                
+                <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border-secondary">
                 <div>
                   <span className="text-text-secondary">Total Shares</span>
                   <p className="font-medium">{sharesNum}</p>
@@ -431,6 +459,7 @@ export default function NewPolicyPage() {
                 <div>
                   <span className="text-text-secondary">Max Payout</span>
                   <p className="font-medium text-success">${maxPayout} USDT</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -485,8 +514,8 @@ export default function NewPolicyPage() {
                         <span>{currentQuote.shares}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-text-secondary">Period (UTC)</span>
-                        <span>{formatDateTimeUTC(currentQuote.coverageStart)} - {formatDateTimeUTC(currentQuote.coverageEnd)}</span>
+                        <span className="text-text-secondary">Period ({formatTimezoneOffset(marketTimezoneOffset)})</span>
+                        <span>00:00 — 23:59</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-secondary">Max Payout</span>

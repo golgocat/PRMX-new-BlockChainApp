@@ -317,6 +317,7 @@ impl pallet_prmx_markets::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
     type Balance = Balance;
     type AssetId = AssetId;
+    type NewMarketNotifier = PrmxOracle;
 }
 
 // =============================================================================

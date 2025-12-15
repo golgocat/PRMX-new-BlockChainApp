@@ -232,6 +232,7 @@ export async function getMarkets(): Promise<Market[]> {
       name: hexToString(data.name),
       centerLatitude: data.centerLatitude,
       centerLongitude: data.centerLongitude,
+      timezoneOffsetHours: data.timezoneOffsetHours ?? 0,
       strikeValue,
       payoutPerShare: BigInt(data.payoutPerShare || '100000000'),
       status: normalizeStatus(data.status, 'Open'),
@@ -264,6 +265,7 @@ export async function getMarket(marketId: number): Promise<Market | null> {
     name: hexToString(data.name),
     centerLatitude: data.centerLatitude,
     centerLongitude: data.centerLongitude,
+    timezoneOffsetHours: data.timezoneOffsetHours ?? 0,
     strikeValue,
     payoutPerShare: BigInt(data.payoutPerShare || '100000000'),
     status: normalizeStatus(data.status, 'Open'),
@@ -287,6 +289,7 @@ export async function createMarket(
     name: string;
     centerLatitude: number;
     centerLongitude: number;
+    timezoneOffsetHours: number;
     strikeValue: number;
     daoMarginBp: number;
     minDurationSecs: number;
@@ -302,7 +305,10 @@ export async function createMarket(
       params.name,
       params.centerLatitude,
       params.centerLongitude,
+      params.timezoneOffsetHours,
       strikeValueScaled,
+      USDT_ASSET_ID,
+      PAYOUT_PER_SHARE,
       { daoMarginBp: params.daoMarginBp },
       {
         minDurationSecs: params.minDurationSecs,

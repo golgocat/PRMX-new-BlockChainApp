@@ -61,7 +61,7 @@ pub mod crypto {
 }
 
 use alloc::vec::Vec;
-use pallet_prmx_markets::MarketId;
+use pallet_prmx_markets::{MarketId, NewMarketNotifier};
 
 // =============================================================================
 //                             Type Aliases
@@ -1009,6 +1009,16 @@ pub mod pallet {
                 rainfall_mm as f64 / 10.0
             );
 
+            // Clear any pending fetch request for this market since we've now updated it
+            if PendingFetchRequests::<T>::contains_key(market_id) {
+                PendingFetchRequests::<T>::remove(market_id);
+                log::info!(
+                    target: "prmx-oracle",
+                    "🧹 Cleared pending fetch request for market {}",
+                    market_id
+                );
+            }
+
             Ok(())
         }
 
@@ -1709,20 +1719,86 @@ pub mod pallet {
                     market_id
                 );
 
-                // Get location info
-                let location_info = match MarketLocationConfig::<T>::get(market_id) {
-                    Some(info) => info,
-                    None => {
-                        log::warn!(
+                // First, try to get location key from offchain cache
+                let location_key: Vec<u8> = match Self::get_location_key_from_offchain_index(market_id) {
+                    Some(key) => {
+                        log::info!(
                             target: "prmx-oracle",
-                            "Market {} has no location binding, skipping",
+                            "📖 Found cached location key for market {}",
                             market_id
                         );
-                        continue;
+                        key
+                    }
+                    None => {
+                        // No cached key - need to resolve from AccuWeather
+                        // Get market coordinates from MarketsApi
+                        let (lat, lon) = match T::MarketsApi::center_coordinates(market_id) {
+                            Ok(coords) => coords,
+                            Err(_) => {
+                                log::warn!(
+                                    target: "prmx-oracle",
+                                    "Market {} not found in markets pallet, skipping",
+                                    market_id
+                                );
+                                continue;
+                            }
+                        };
+
+                        let lat_f = lat as f64 / 1_000_000.0;
+                        let lon_f = lon as f64 / 1_000_000.0;
+
+                        log::info!(
+                            target: "prmx-oracle",
+                            "🔍 Resolving AccuWeather location key for new market {} (lat: {}, lon: {})",
+                            market_id,
+                            lat_f,
+                            lon_f
+                        );
+
+                        match Self::fetch_accuweather_location_key(&api_key, lat_f, lon_f) {
+                            Ok(key) => {
+                                let key_str = core::str::from_utf8(&key).unwrap_or("invalid");
+                                log::info!(
+                                    target: "prmx-oracle",
+                                    "✅ Resolved AccuWeather location key for new market {}: {}",
+                                    market_id,
+                                    key_str
+                                );
+
+                                // Store in offchain cache for future use
+                                let storage_key = Self::location_binding_key(market_id);
+                                sp_io::offchain::local_storage_set(
+                                    sp_core::offchain::StorageKind::PERSISTENT,
+                                    &storage_key,
+                                    &key,
+                                );
+
+                                // Also submit on-chain binding via signed transaction
+                                if let Err(e) = Self::submit_location_binding_tx(market_id, key.clone()) {
+                                    log::warn!(
+                                        target: "prmx-oracle",
+                                        "Failed to submit on-chain location binding for market {}: {:?}",
+                                        market_id,
+                                        e
+                                    );
+                                }
+
+                                key
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    target: "prmx-oracle",
+                                    "❌ Failed to resolve location key for new market {}: {}",
+                                    market_id,
+                                    e
+                                );
+                                continue;
+                            }
+                        }
                     }
                 };
 
-                let location_key = match core::str::from_utf8(&location_info.accuweather_location_key) {
+                let location_key_str = match core::str::from_utf8(&location_key) {
                     Ok(key) => key,
                     Err(_) => {
                         log::warn!(
@@ -1735,7 +1811,7 @@ pub mod pallet {
                 };
 
                 // Fetch rainfall data from AccuWeather
-                match Self::fetch_accuweather_rainfall(&api_key, location_key) {
+                match Self::fetch_accuweather_rainfall(&api_key, location_key_str) {
                     Ok(rainfall_data) => {
                         log::info!(
                             target: "prmx-oracle",
@@ -1746,19 +1822,34 @@ pub mod pallet {
 
                         if !rainfall_data.is_empty() {
                             // Store the fetched data in offchain index
-                            // DAO can then call complete_rainfall_fetch or the data will be displayed
                             Self::store_fetched_rainfall_data(market_id, rainfall_data.clone());
                             
-                            // Log the fetched rainfall value for the DAO to see
-                            // The rainfall_data contains (timestamp, rainfall_mm) pairs
+                            // Get the 24h rainfall sum and submit on-chain
                             // AccuWeather Past24Hours gives us the 24h sum in the first entry
                             if let Some((_, rainfall_mm)) = rainfall_data.first() {
                                 log::info!(
                                     target: "prmx-oracle",
-                                    "🌧️ AccuWeather 24h rainfall for market {}: {:.1} mm - DAO can call complete_rainfall_fetch to update on-chain",
+                                    "🌧️ AccuWeather 24h rainfall for market {}: {:.1} mm - submitting on-chain",
                                     market_id,
                                     *rainfall_mm as f64 / 10.0
                                 );
+                                
+                                // Submit rainfall on-chain via signed transaction
+                                if let Err(e) = Self::submit_rainfall_signed_tx(market_id, *rainfall_mm) {
+                                    log::warn!(
+                                        target: "prmx-oracle",
+                                        "Failed to submit on-chain rainfall for market {}: {:?}",
+                                        market_id,
+                                        e
+                                    );
+                                } else {
+                                    log::info!(
+                                        target: "prmx-oracle",
+                                        "✅ Submitted on-chain rainfall update for market {}: {:.1} mm",
+                                        market_id,
+                                        *rainfall_mm as f64 / 10.0
+                                    );
+                                }
                             }
                             
                             processed_any = true;
@@ -2073,6 +2164,61 @@ pub mod pallet {
             Err("All signed transactions failed")
         }
 
+        /// Submit a signed transaction to bind market location on-chain
+        /// This ensures the MarketLocationConfig storage is populated
+        fn submit_location_binding_tx(
+            market_id: MarketId,
+            location_key: Vec<u8>,
+        ) -> Result<(), &'static str> {
+            use frame_system::offchain::{Signer, SendSignedTransaction};
+
+            // Get signer from keystore
+            let signer = Signer::<T, T::AuthorityId>::all_accounts();
+            
+            if !signer.can_sign() {
+                log::warn!(
+                    target: "prmx-oracle",
+                    "⚠️ No oracle authority keys found in keystore. Cannot submit location binding tx."
+                );
+                return Err("No oracle authority keys in keystore");
+            }
+
+            // Create the call to set_market_location_key
+            let call = Call::<T>::set_market_location_key {
+                market_id,
+                accuweather_location_key: location_key.clone(),
+            };
+
+            // Send signed transaction
+            let results = signer.send_signed_transaction(|_account| call.clone());
+
+            for (acc, result) in &results {
+                match result {
+                    Ok(()) => {
+                        let key_str = core::str::from_utf8(&location_key).unwrap_or("invalid");
+                        log::info!(
+                            target: "prmx-oracle",
+                            "✅ Location binding tx sent for market {} with key {} from account {:?}",
+                            market_id,
+                            key_str,
+                            acc.id
+                        );
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "❌ Location binding tx from account {:?} failed: {:?}",
+                            acc.id,
+                            e
+                        );
+                    }
+                }
+            }
+
+            Err("All signed transactions failed for location binding")
+        }
+
         /// Generate offchain index key for location binding
         fn location_binding_key(market_id: MarketId) -> Vec<u8> {
             let mut key = b"prmx-oracle::location::".to_vec();
@@ -2379,5 +2525,27 @@ impl<T: Config> OracleAccess for Pallet<T> {
         pallet::RollingState::<T>::get(location_id as u64)
             .map(|s| s.rolling_sum_mm)
             .unwrap_or(0)
+    }
+}
+
+// =============================================================================
+//                    NewMarketNotifier Implementation
+// =============================================================================
+
+impl<T: Config> NewMarketNotifier for Pallet<T> {
+    /// Called by the markets pallet when a new market is created.
+    /// Queues a pending fetch request so the OCW will immediately resolve
+    /// the AccuWeather location and fetch rainfall data.
+    fn notify_new_market(market_id: MarketId) {
+        // Queue a pending fetch request for the new market
+        let current_block = frame_system::Pallet::<T>::block_number();
+        pallet::PendingFetchRequests::<T>::insert(market_id, current_block);
+        
+        log::info!(
+            target: "prmx-oracle",
+            "📥 Auto-queued fetch for newly created market {} at block {:?}",
+            market_id,
+            current_block
+        );
     }
 }

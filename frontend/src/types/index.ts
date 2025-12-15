@@ -4,6 +4,7 @@ export interface Market {
   name: string;
   centerLatitude: number;
   centerLongitude: number;
+  timezoneOffsetHours: number; // UTC offset in hours (e.g., 8 for Manila, 9 for Tokyo)
   strikeValue: number; // rainfall threshold in mm
   payoutPerShare: bigint;
   status: MarketStatus;

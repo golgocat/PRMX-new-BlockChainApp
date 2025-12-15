@@ -179,6 +179,8 @@ fn testnet_genesis(
                     // Scaled by 1e6 for precision
                     "centerLatitude": 14_599_500i32,
                     "centerLongitude": 120_984_200i32,
+                    // Timezone: UTC+8 (Philippines Standard Time)
+                    "timezoneOffsetHours": 8i8,
                     // Strike value: 50mm rainfall in 24h triggers payout
                     // Oracle stores rainfall scaled by 10, so 50mm = 500
                     "strikeValue": 500u32,
@@ -204,6 +206,8 @@ fn testnet_genesis(
                     // Scaled by 1e6 for precision
                     "centerLatitude": 52_367_600i32,
                     "centerLongitude": 4_904_100i32,
+                    // Timezone: UTC+1 (Central European Time, simplified - ignoring DST)
+                    "timezoneOffsetHours": 1i8,
                     // Strike value: 50mm rainfall in 24h triggers payout
                     // Oracle stores rainfall scaled by 10, so 50mm = 500
                     "strikeValue": 500u32,
@@ -226,6 +230,8 @@ fn testnet_genesis(
                     // Scaled by 1e6 for precision
                     "centerLatitude": 35_676_200i32,
                     "centerLongitude": 139_650_300i32,
+                    // Timezone: UTC+9 (Japan Standard Time)
+                    "timezoneOffsetHours": 9i8,
                     // Strike value: 50mm rainfall in 24h triggers payout
                     // Oracle stores rainfall scaled by 10, so 50mm = 500
                     "strikeValue": 500u32,

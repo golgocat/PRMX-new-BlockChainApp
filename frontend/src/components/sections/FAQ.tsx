@@ -7,33 +7,43 @@ import { FadeIn } from '@/components/ui/FadeIn'
 const questions = [
   {
     q: 'What triggers a payout?',
-    a: 'A payout is triggered when daily rainfall accumulation exceeds the predefined threshold for your location as reported by our weather oracle. The entire process is automated — no claims forms, no adjusters, no delays.',
+    a: 'A payout is automatically triggered when the 24-hour rolling rainfall sum exceeds the strike threshold defined for your market. The oracle fetches rainfall data from AccuWeather hourly, and smart contracts handle settlement automatically — no claims forms, no adjusters, no delays.',
     category: 'Payouts',
   },
   {
     q: 'What data source is used?',
-    a: 'We use AccuWeather and local satellite telemetry data, fetched and verified using our Off Chain Worker solution. This ensures objective, tamper-proof measurements that neither you nor we can manipulate.',
+    a: 'We use AccuWeather precipitation data, fetched every hour by our Substrate Off-chain Worker. The data is submitted on-chain and verified cryptographically. This ensures objective, tamper-proof measurements that neither you nor we can manipulate.',
     category: 'Data',
   },
   {
-    q: 'Is this traditional insurance?',
-    a: "No, this is parametric coverage. We don't indemnify specific losses; we pay based on the occurrence of the weather event itself. This means faster payouts and complete transparency.",
+    q: 'How does parametric coverage work?',
+    a: "Unlike traditional insurance, parametric coverage pays based on the occurrence of a weather event — not actual losses. If rainfall exceeds the threshold, you receive the full payout automatically. This means faster payouts, complete transparency, and no claim disputes.",
     category: 'Coverage',
   },
   {
-    q: 'What areas are supported?',
-    a: 'We currently support 12 markets across Southeast Asia, Latin America, and Africa. New regions are added regularly based on weather data availability and demand.',
-    category: 'Coverage',
+    q: 'What markets are available?',
+    a: 'Markets are created by the DAO and each represents a geographic location with specific parameters (strike threshold, coordinates, timezone). You can see all available markets in the app — new regions are added based on demand and weather data availability.',
+    category: 'Markets',
   },
   {
     q: 'How quickly do I receive my payout?',
-    a: 'Payouts are instant. Once the trigger event is confirmed by our weather oracle, smart contracts automatically send funds directly to your registered bank account, crypto wallet, or preferred payment method.',
+    a: 'Payouts are instant and automatic. When the oracle detects rainfall exceeding the threshold, the smart contract immediately settles the policy and transfers USDT directly to your wallet. No waiting, no approval process.',
     category: 'Payouts',
   },
   {
-    q: 'Can I cancel my policy?',
-    a: 'Yes, you can cancel anytime before a trigger event occurs. A pro-rated refund will be calculated based on the remaining coverage period and returned to your original payment method.',
-    category: 'Policy',
+    q: 'What currency is used?',
+    a: 'All premiums and payouts are in USDT (Tether) stablecoin. You pay your premium in USDT, and if a payout is triggered, you receive USDT directly to your connected wallet.',
+    category: 'Payments',
+  },
+  {
+    q: 'How is the premium calculated?',
+    a: 'Premiums are calculated on-chain based on historical rainfall probability for the market location, coverage amount, and a DAO margin. The quote system provides real-time pricing that reflects actual risk.',
+    category: 'Pricing',
+  },
+  {
+    q: 'What happens if rainfall doesn\'t exceed the threshold?',
+    a: 'If the coverage period ends without rainfall exceeding the strike threshold, the policy matures naturally. The capital pool (minus premium) is returned to liquidity providers. You keep your coverage benefit for the period — it simply wasn\'t triggered.',
+    category: 'Coverage',
   },
 ]
 
@@ -102,7 +112,7 @@ export function FAQ() {
                 <div
                   className={`overflow-hidden transition-all duration-300 ease-out ${
                     openIndex === i
-                      ? 'max-h-48 opacity-100'
+                      ? 'max-h-64 opacity-100'
                       : 'max-h-0 opacity-0'
                   }`}
                 >
@@ -116,13 +126,13 @@ export function FAQ() {
         </div>
 
         {/* Bottom CTA */}
-        <FadeIn delay={300}>
+        <FadeIn delay={400}>
           <div className="mt-16 text-center">
             <p className="text-zinc-500 font-ui mb-4">
               Still have questions?
             </p>
             <a 
-              href="mailto:hello@prmx.ph" 
+              href="mailto:hello@prmx.io" 
               className="inline-flex items-center gap-2 text-white hover:text-brand-violet transition-colors font-medium"
             >
               Contact our team
@@ -134,4 +144,3 @@ export function FAQ() {
     </section>
   )
 }
-

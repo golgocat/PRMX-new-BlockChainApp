@@ -15,7 +15,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -45,6 +45,7 @@ const formatTimezoneOffset = (offsetHours: number): string => {
 
 export default function NewPolicyPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isConnected, selectedAccount } = useWalletStore();
   const { usdtBalance } = useWalletStore();
   const { usdtFormatted } = useFormattedBalance();
@@ -52,6 +53,9 @@ export default function NewPolicyPage() {
   
   const { markets, loading: marketsLoading } = useMarkets();
   const { quotes, refresh: refreshQuotes } = useQuoteRequests();
+  
+  // Get marketId from URL params (from landing page quote calculator)
+  const preselectedMarketId = searchParams.get('marketId');
   
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
@@ -65,6 +69,17 @@ export default function NewPolicyPage() {
   const [shares, setShares] = useState('1');
   const [coverageStartDate, setCoverageStartDate] = useState<Date | undefined>(undefined);
   const coverageDurationDays = 1; // Fixed at 1 day for testing
+
+  // Pre-select market from URL params (from landing page quote calculator)
+  useEffect(() => {
+    if (!marketsLoading && markets.length > 0 && preselectedMarketId && !selectedMarket) {
+      const market = markets.find(m => m.id === parseInt(preselectedMarketId));
+      if (market) {
+        setSelectedMarket(market);
+        setCurrentStep(2); // Skip to Coverage Details step
+      }
+    }
+  }, [markets, marketsLoading, preselectedMarketId, selectedMarket]);
 
   // Poll for quote result
   useEffect(() => {

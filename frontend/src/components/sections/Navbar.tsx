@@ -52,6 +52,12 @@ export function Navbar() {
                 {link.label}
               </a>
             ))}
+            <Link
+              href="/provide-liquidity"
+              className="px-4 py-2 text-sm text-sky-400 hover:text-white hover:bg-sky-400/10 rounded-full transition-all font-ui font-medium"
+            >
+              For LPs
+            </Link>
           </div>
 
           {/* CTA Button */}
@@ -99,6 +105,13 @@ export function Navbar() {
             {link.label}
           </a>
         ))}
+        <Link
+          href="/provide-liquidity"
+          className="px-4 py-3 text-sky-400 hover:text-white hover:bg-sky-400/10 rounded-xl transition-all font-medium"
+          onClick={() => setMobileMenuOpen(false)}
+        >
+          For LPs
+        </Link>
         <div className="h-px bg-zinc-800 my-2" />
         <Link 
           href="/dashboard"

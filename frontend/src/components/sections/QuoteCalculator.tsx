@@ -1,8 +1,11 @@
 'use client'
 
-import { useState } from 'react'
-import { Droplets, ArrowRight, Shield, Zap, Wallet, MapPin } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Droplets, ArrowRight, Shield, Zap, Wallet, MapPin, RefreshCw } from 'lucide-react'
 import { FadeIn } from '@/components/ui/FadeIn'
+import * as api from '@/lib/api'
+import type { Market } from '@/types'
 
 const benefits = [
   { icon: Shield, text: 'No paperwork or claims process' },
@@ -10,22 +13,49 @@ const benefits = [
   { icon: Wallet, text: 'Pay & receive in USDT' },
 ]
 
-const locations = [
-  { id: 'sao-paulo', name: 'São Paulo', country: 'Brazil', threshold: 50 },
-  { id: 'mumbai', name: 'Mumbai', country: 'India', threshold: 75 },
-  { id: 'lagos', name: 'Lagos', country: 'Nigeria', threshold: 60 },
-  { id: 'jakarta', name: 'Jakarta', country: 'Indonesia', threshold: 65 },
-]
-
 export function QuoteCalculator() {
+  const router = useRouter()
   const [coverage, setCoverage] = useState(100000)
-  const [selectedLocation, setSelectedLocation] = useState(locations[0])
+  const [markets, setMarkets] = useState<Market[]>([])
+  const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  const premium = Math.floor(coverage * 0.045)
+  // Fetch markets from the API
+  useEffect(() => {
+    async function fetchMarkets() {
+      try {
+        const data = await api.getMarkets()
+        // Filter to only show Open markets
+        const openMarkets = data.filter(m => m.status === 'Open')
+        setMarkets(openMarkets)
+        if (openMarkets.length > 0) {
+          setSelectedMarket(openMarkets[0])
+        }
+      } catch (error) {
+        console.error('Failed to fetch markets:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchMarkets()
+  }, [])
+
+  // Calculate premium as 1% of coverage
+  const premium = Math.floor(coverage * 0.01)
   const coveragePercent = ((coverage - 10000) / (500000 - 10000)) * 100
 
+  const handleGetQuote = () => {
+    // Redirect to policies/new page with selected market
+    const params = new URLSearchParams()
+    if (selectedMarket) {
+      params.set('marketId', selectedMarket.id.toString())
+    }
+    params.set('coverage', coverage.toString())
+    router.push(`/policies/new?${params.toString()}`)
+  }
+
   return (
-    <section className="relative bg-[#0a0a0a] py-32 md:py-40 px-6 overflow-hidden">
+    <section id="coverage" className="relative bg-[#0a0a0a] py-32 md:py-40 px-6 overflow-hidden">
       {/* Background elements */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 right-1/4 w-[600px] h-[600px] rounded-full bg-brand-violet/10 blur-[150px]" />
@@ -120,54 +150,68 @@ export function QuoteCalculator() {
                   </div>
                 </div>
 
-                {/* Input 2: Location */}
+                {/* Input 2: Location - Markets from API */}
                 <div className="mb-8">
                   <div className="flex justify-between mb-4">
                     <label className="text-sm font-medium text-zinc-400">
-                      Select Location
+                      Select Market
                     </label>
                     <span className="text-white font-mono font-bold text-lg flex items-center gap-2">
                       <MapPin size={16} className="text-brand-teal" />
-                      {selectedLocation.name}
+                      {selectedMarket?.name || 'Select...'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {locations.map((location) => (
-                      <button
-                        key={location.id}
-                        onClick={() => setSelectedLocation(location)}
-                        className={`p-3 rounded-xl text-left transition-all ${
-                          selectedLocation.id === location.id
-                            ? 'bg-brand-teal/20 border border-brand-teal/30'
-                            : 'bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600'
-                        }`}
-                      >
-                        <p className={`text-sm font-medium ${
-                          selectedLocation.id === location.id ? 'text-brand-teal' : 'text-white'
-                        }`}>
-                          {location.name}
-                        </p>
-                        <p className="text-xs text-zinc-500">{location.country}</p>
-                      </button>
-                    ))}
-                  </div>
+                  
+                  {loading ? (
+                    <div className="flex items-center justify-center py-8">
+                      <RefreshCw className="w-6 h-6 animate-spin text-zinc-500" />
+                    </div>
+                  ) : markets.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50 text-center">
+                      <p className="text-zinc-500 text-sm">No markets available</p>
+                      <p className="text-zinc-600 text-xs mt-1">Connect to blockchain to see live markets</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                      {markets.map((market) => (
+                        <button
+                          key={market.id}
+                          onClick={() => setSelectedMarket(market)}
+                          className={`p-3 rounded-xl text-left transition-all ${
+                            selectedMarket?.id === market.id
+                              ? 'bg-brand-teal/20 border border-brand-teal/30'
+                              : 'bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600'
+                          }`}
+                        >
+                          <p className={`text-sm font-medium ${
+                            selectedMarket?.id === market.id ? 'text-brand-teal' : 'text-white'
+                          }`}>
+                            {market.name}
+                          </p>
+                          <p className="text-xs text-zinc-500">Strike: {market.strikeValue}mm</p>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Threshold Info */}
-                <div className="mb-10 p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Droplets size={18} className="text-brand-teal" />
-                      <span className="text-sm text-zinc-400">Rainfall Threshold</span>
+                {selectedMarket && (
+                  <div className="mb-10 p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Droplets size={18} className="text-brand-teal" />
+                        <span className="text-sm text-zinc-400">Rainfall Threshold</span>
+                      </div>
+                      <span className="text-white font-mono font-bold">
+                        {selectedMarket.strikeValue}mm / 24h
+                      </span>
                     </div>
-                    <span className="text-white font-mono font-bold">
-                      {selectedLocation.threshold}mm / 24h
-                    </span>
+                    <p className="text-xs text-zinc-500 mt-2">
+                      Payout triggers when 24-hour rainfall exceeds this threshold in {selectedMarket.name}
+                    </p>
                   </div>
-                  <p className="text-xs text-zinc-500 mt-2">
-                    Predefined based on historical weather patterns for {selectedLocation.name}
-                  </p>
-                </div>
+                )}
 
                 {/* Result */}
                 <div className="bg-zinc-800/50 rounded-2xl p-6 border border-zinc-700/50 mb-6">
@@ -179,6 +223,7 @@ export function QuoteCalculator() {
                       <p className="text-4xl font-bold text-white font-display">
                         ${premium.toLocaleString()}
                       </p>
+                      <p className="text-xs text-zinc-500 mt-1">1% of coverage</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
@@ -191,13 +236,17 @@ export function QuoteCalculator() {
                   </div>
                 </div>
 
-                <button className="group w-full py-4 rounded-xl bg-white text-zinc-900 font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all">
+                <button 
+                  onClick={handleGetQuote}
+                  disabled={!selectedMarket}
+                  className="group w-full py-4 rounded-xl bg-white text-zinc-900 font-semibold text-lg flex items-center justify-center gap-2 hover:shadow-[0_0_30px_rgba(255,255,255,0.2)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   Get Your Quote
                   <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                 </button>
                 
                 <p className="text-center text-xs text-zinc-600 mt-4">
-                  *Estimate only. Final quote based on precise location risk profile.
+                  *Estimate only. Final quote calculated on-chain based on market parameters.
                 </p>
               </div>
             </div>
@@ -207,4 +256,3 @@ export function QuoteCalculator() {
     </section>
   )
 }
-

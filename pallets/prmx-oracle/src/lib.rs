@@ -1487,6 +1487,10 @@ pub mod pallet {
     /// Offchain storage key for AccuWeather API key
     pub const ACCUWEATHER_API_KEY_STORAGE: &[u8] = b"prmx-oracle::accuweather-api-key";
 
+    /// Offchain storage key prefix for tracking in-flight pending fetch submissions
+    /// This prevents duplicate submissions while waiting for on-chain transaction to be processed
+    pub const PENDING_FETCH_INFLIGHT_PREFIX: &[u8] = b"prmx-oracle::pending-fetch-inflight::";
+
     /// AccuWeather API base URL
     pub const ACCUWEATHER_BASE_URL: &str = "https://dataservice.accuweather.com";
 
@@ -1713,6 +1717,17 @@ pub mod pallet {
             let mut processed_any = false;
 
             for market_id in pending_markets {
+                // Skip if we've already submitted a transaction for this market that's still in-flight
+                // This prevents duplicate submissions while waiting for on-chain processing
+                if Self::is_pending_fetch_inflight(market_id) {
+                    log::info!(
+                        target: "prmx-oracle",
+                        "⏳ Skipping market {} - submission already in-flight",
+                        market_id
+                    );
+                    continue;
+                }
+
                 log::info!(
                     target: "prmx-oracle",
                     "🌧️ Processing manual fetch request for market {}",
@@ -1843,9 +1858,15 @@ pub mod pallet {
                                         e
                                     );
                                 } else {
+                                    // Mark as in-flight to prevent duplicate submissions
+                                    // The in-flight marker will be cleared when:
+                                    // 1. The on-chain transaction is processed (clears PendingFetchRequests)
+                                    // 2. The marker expires after 3 minutes (staleness check)
+                                    Self::mark_pending_fetch_inflight(market_id);
+                                    
                                     log::info!(
                                         target: "prmx-oracle",
-                                        "✅ Submitted on-chain rainfall update for market {}: {:.1} mm",
+                                        "✅ Submitted on-chain rainfall update for market {}: {:.1} mm (marked in-flight)",
                                         market_id,
                                         *rainfall_mm as f64 / 10.0
                                     );
@@ -2233,6 +2254,71 @@ pub mod pallet {
             key.extend_from_slice(b"::");
             key.extend_from_slice(&timestamp.to_le_bytes());
             key
+        }
+
+        /// Generate offchain storage key for tracking in-flight pending fetch requests
+        fn pending_fetch_inflight_key(market_id: MarketId) -> Vec<u8> {
+            let mut key = PENDING_FETCH_INFLIGHT_PREFIX.to_vec();
+            key.extend_from_slice(&market_id.to_le_bytes());
+            key
+        }
+
+        /// Check if a pending fetch request submission is already in-flight for this market
+        /// Returns true if we've already submitted a transaction that hasn't been processed yet
+        fn is_pending_fetch_inflight(market_id: MarketId) -> bool {
+            let key = Self::pending_fetch_inflight_key(market_id);
+            let value = sp_io::offchain::local_storage_get(
+                sp_core::offchain::StorageKind::PERSISTENT,
+                &key,
+            );
+            
+            if let Some(timestamp_bytes) = value {
+                // Check if the in-flight marker is stale (older than 30 blocks worth of time)
+                // Each block is ~6 seconds, so 30 blocks = ~180 seconds = 3 minutes
+                // This prevents permanent blocking if a transaction fails
+                const MAX_INFLIGHT_AGE_MS: u64 = 180_000; // 3 minutes
+                
+                if timestamp_bytes.len() >= 8 {
+                    let mut bytes = [0u8; 8];
+                    bytes.copy_from_slice(&timestamp_bytes[..8]);
+                    let submitted_at = u64::from_le_bytes(bytes);
+                    let now = Self::current_timestamp();
+                    
+                    if now.saturating_sub(submitted_at) < MAX_INFLIGHT_AGE_MS {
+                        return true;
+                    }
+                    // Marker is stale, clear it
+                    sp_io::offchain::local_storage_set(
+                        sp_core::offchain::StorageKind::PERSISTENT,
+                        &key,
+                        &[],
+                    );
+                }
+            }
+            false
+        }
+
+        /// Mark a pending fetch request as in-flight (transaction submitted, waiting for processing)
+        fn mark_pending_fetch_inflight(market_id: MarketId) {
+            let key = Self::pending_fetch_inflight_key(market_id);
+            let timestamp = Self::current_timestamp();
+            sp_io::offchain::local_storage_set(
+                sp_core::offchain::StorageKind::PERSISTENT,
+                &key,
+                &timestamp.to_le_bytes(),
+            );
+        }
+
+        /// Clear the in-flight marker for a pending fetch request
+        /// Called when the on-chain transaction has been confirmed or we know it failed
+        #[allow(dead_code)]
+        fn clear_pending_fetch_inflight(market_id: MarketId) {
+            let key = Self::pending_fetch_inflight_key(market_id);
+            sp_io::offchain::local_storage_set(
+                sp_core::offchain::StorageKind::PERSISTENT,
+                &key,
+                &[],
+            );
         }
 
         /// Fetch AccuWeather Location Key via Geoposition Search

@@ -213,8 +213,23 @@ export default function NewPolicyPage() {
       toast.dismiss('quote-wait');
       
       if (!quoteReady) {
-        toast.error('Quote pricing timed out. The R pricing API may be unavailable. Please try again.');
-        throw new Error('Quote pricing timed out');
+        // R API timed out - offer fallback for testing/development
+        const useFallback = window.confirm(
+          'The R pricing API is currently unavailable.\n\n' +
+          'Would you like to use a fallback probability of 5% for testing?\n\n' +
+          'Click "OK" to continue with fallback, or "Cancel" to abort.'
+        );
+        
+        if (useFallback) {
+          // Submit fallback quote (5% = 50000 ppm)
+          const fallbackProbabilityPpm = 50000;
+          await api.submitQuote(keypair, requestId, fallbackProbabilityPpm);
+          await refreshQuotes();
+          toast.success('Quote ready (using 5% fallback due to R API timeout)');
+        } else {
+          toast.error('Quote request cancelled. Please try again when the R API is available.');
+          throw new Error('Quote pricing cancelled by user');
+        }
       }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to request quote');

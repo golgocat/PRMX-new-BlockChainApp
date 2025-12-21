@@ -151,6 +151,10 @@ pub mod pallet {
         /// Notifier for when new markets are created.
         /// Allows the oracle pallet to immediately queue fetch requests.
         type NewMarketNotifier: crate::NewMarketNotifier;
+
+        /// Origin that can perform DAO operations (create/update/close markets).
+        /// Typically set to Root or a DAO governance origin.
+        type DaoOrigin: EnsureOrigin<Self::RuntimeOrigin>;
     }
 
     // =========================================================================
@@ -313,7 +317,7 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         /// Create a new market with center coordinates.
-        /// Only DAO admin should be able to call this (TODO: add origin check).
+        /// Only DAO origin can call this.
         #[pallet::call_index(0)]
         #[pallet::weight(10_000)]
         pub fn dao_create_market(
@@ -328,8 +332,7 @@ pub mod pallet {
             risk: RiskParameters,
             window_rules: WindowRules,
         ) -> DispatchResult {
-            // TODO: Ensure DAO origin
-            let _who = ensure_signed(origin)?;
+            T::DaoOrigin::ensure_origin(origin)?;
 
             let bounded_name: BoundedVec<u8, ConstU32<64>> =
                 name.try_into().map_err(|_| Error::<T>::NameTooLong)?;
@@ -366,6 +369,7 @@ pub mod pallet {
         }
 
         /// Update window rules for a market.
+        /// Only DAO origin can call this.
         #[pallet::call_index(1)]
         #[pallet::weight(10_000)]
         pub fn dao_set_window_rules(
@@ -373,8 +377,7 @@ pub mod pallet {
             market_id: MarketId,
             window_rules: WindowRules,
         ) -> DispatchResult {
-            // TODO: Ensure DAO origin
-            let _who = ensure_signed(origin)?;
+            T::DaoOrigin::ensure_origin(origin)?;
 
             Markets::<T>::try_mutate(market_id, |maybe_market| -> DispatchResult {
                 let market = maybe_market.as_mut().ok_or(Error::<T>::MarketNotFound)?;
@@ -388,6 +391,7 @@ pub mod pallet {
         }
 
         /// Update risk parameters for a market.
+        /// Only DAO origin can call this.
         #[pallet::call_index(2)]
         #[pallet::weight(10_000)]
         pub fn dao_set_risk_parameters(
@@ -395,8 +399,7 @@ pub mod pallet {
             market_id: MarketId,
             risk: RiskParameters,
         ) -> DispatchResult {
-            // TODO: Ensure DAO origin
-            let _who = ensure_signed(origin)?;
+            T::DaoOrigin::ensure_origin(origin)?;
 
             Markets::<T>::try_mutate(market_id, |maybe_market| -> DispatchResult {
                 let market = maybe_market.as_mut().ok_or(Error::<T>::MarketNotFound)?;
@@ -410,11 +413,11 @@ pub mod pallet {
         }
 
         /// Close a market (prevent new policies).
+        /// Only DAO origin can call this.
         #[pallet::call_index(3)]
         #[pallet::weight(10_000)]
         pub fn dao_close_market(origin: OriginFor<T>, market_id: MarketId) -> DispatchResult {
-            // TODO: Ensure DAO origin
-            let _who = ensure_signed(origin)?;
+            T::DaoOrigin::ensure_origin(origin)?;
 
             Markets::<T>::try_mutate(market_id, |maybe_market| -> DispatchResult {
                 let market = maybe_market.as_mut().ok_or(Error::<T>::MarketNotFound)?;
@@ -428,11 +431,11 @@ pub mod pallet {
         }
 
         /// Settle a market (after all policies settled).
+        /// Only DAO origin can call this.
         #[pallet::call_index(4)]
         #[pallet::weight(10_000)]
         pub fn dao_settle_market(origin: OriginFor<T>, market_id: MarketId) -> DispatchResult {
-            // TODO: Ensure DAO origin
-            let _who = ensure_signed(origin)?;
+            T::DaoOrigin::ensure_origin(origin)?;
 
             Markets::<T>::try_mutate(market_id, |maybe_market| -> DispatchResult {
                 let market = maybe_market.as_mut().ok_or(Error::<T>::MarketNotFound)?;

@@ -318,6 +318,8 @@ impl pallet_prmx_markets::Config for Runtime {
     type Balance = Balance;
     type AssetId = AssetId;
     type NewMarketNotifier = PrmxOracle;
+    /// DAO operations require Root (Sudo) origin
+    type DaoOrigin = EnsureRoot<AccountId>;
 }
 
 // =============================================================================

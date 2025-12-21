@@ -250,6 +250,7 @@ export default function PoliciesPage() {
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Policy</TableHeaderCell>
+                <TableHeaderCell>Version</TableHeaderCell>
                 <TableHeaderCell>Holder</TableHeaderCell>
                 <TableHeaderCell>Coverage Period</TableHeaderCell>
                 <TableHeaderCell>Shares</TableHeaderCell>
@@ -261,7 +262,7 @@ export default function PoliciesPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center py-8">
+                  <TableCell colSpan={8} className="text-center py-8">
                     <RefreshCw className="w-6 h-6 animate-spin mx-auto text-text-tertiary" />
                   </TableCell>
                 </TableRow>
@@ -295,6 +296,14 @@ export default function PoliciesPage() {
                             <p className="text-xs text-text-tertiary">{getMarketName(policy.marketId)}</p>
                           </div>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={policy.policyVersion === 'V2' ? 'cyan' : 'default'}
+                          className="text-xs"
+                        >
+                          {policy.policyVersion || 'V1'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <div>

@@ -39,7 +39,19 @@ export interface Policy {
   maxPayout: bigint;
   capitalPool: CapitalPool;
   createdAt: number; // unix timestamp - when policy was created
+  // V2 fields
+  policyVersion: PolicyVersion;
+  eventType: EventType;
+  earlyTrigger: boolean;
+  oracleStatusV2?: V2OracleStatus;
+  strikeMm?: number;
 }
+
+// V2 Policy Types
+export type PolicyVersion = 'V1' | 'V2';
+export type EventType = 'Rainfall24hRolling' | 'CumulativeRainfallWindow';
+export type V2OracleStatus = 'PendingMonitoring' | 'Monitoring' | 'TriggeredReported' | 'MaturedReported' | 'Settled';
+export type V2Outcome = 'Triggered' | 'MaturedNoEvent';
 
 export interface CapitalPool {
   totalCapital: bigint;
@@ -59,6 +71,11 @@ export interface QuoteRequest {
   shares: number;
   requestedAt: number;
   result: QuoteResult | null;
+  // V2 fields
+  policyVersion: PolicyVersion;
+  eventType: EventType;
+  earlyTrigger: boolean;
+  durationDays: number;
 }
 
 export interface QuoteResult {
@@ -201,4 +218,36 @@ export interface PolicyDefiInfo {
   investmentStatus: InvestmentStatus;
   position: LpPosition | null;
   isAllocatedToDefi: boolean;
+}
+
+// V2 Oracle Monitor Types (from MongoDB)
+export type V2MonitorState = 'monitoring' | 'triggered' | 'matured' | 'reported';
+
+export interface V2Monitor {
+  _id: string;              // Composite UID: "0:42" (market_id:policy_id)
+  market_id: number;
+  policy_id: number;
+  coverage_start: number;   // Unix timestamp
+  coverage_end: number;     // Unix timestamp
+  strike_mm: number;        // Strike threshold in mm (scaled by 10)
+  lat: number;
+  lon: number;
+  state: V2MonitorState;
+  cumulative_mm: number;    // Current cumulative rainfall (scaled by 10)
+  trigger_time?: number;    // Unix timestamp when triggered
+  last_fetch_at: number;    // Unix timestamp of last AccuWeather fetch
+  location_key: string;     // AccuWeather location key
+  report_tx_hash?: string;  // On-chain report transaction hash
+  evidence_hash?: string;   // Evidence JSON hash
+  created_at: string;       // ISO date string
+  updated_at: string;       // ISO date string
+}
+
+export interface V2MonitorStats {
+  total: number;
+  monitoring: number;
+  triggered: number;
+  matured: number;
+  reported: number;
+  active: number;
 }

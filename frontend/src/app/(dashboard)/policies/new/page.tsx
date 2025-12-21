@@ -68,7 +68,14 @@ export default function NewPolicyPage() {
   // Form state
   const [shares, setShares] = useState('1');
   const [coverageStartDate, setCoverageStartDate] = useState<Date | undefined>(undefined);
-  const coverageDurationDays = 1; // Fixed at 1 day for testing
+  const [policyVersion, setPolicyVersion] = useState<'V1' | 'V2'>('V1');
+  const [v2DurationDays, setV2DurationDays] = useState(2); // 2-7 days for V2
+  
+  // Duration depends on version: V1 = 1 day, V2 = user-selected (2-7 days)
+  const coverageDurationDays = policyVersion === 'V2' ? v2DurationDays : 1;
+  
+  // Check if selected market supports V2 (only Manila, marketId = 0)
+  const isV2Available = selectedMarket?.id === 0;
 
   // Pre-select market from URL params (from landing page quote calculator)
   useEffect(() => {
@@ -130,6 +137,9 @@ export default function NewPolicyPage() {
     const defaultStartDate = addDays(startOfDay(new Date()), leadTimeDays);
     setShares('1');
     setCoverageStartDate(defaultStartDate);
+    // Reset to V1 by default; V2 only available for Manila (market.id === 0)
+    setPolicyVersion('V1');
+    setV2DurationDays(2);
     setCurrentStep(2);
   };
 
@@ -144,15 +154,30 @@ export default function NewPolicyPage() {
 
     setIsSubmitting(true);
     try {
-      // Step 1: Request the quote
-      const requestId = await api.requestQuote(keypair, {
-        marketId: selectedMarket.id,
-        coverageStart,
-        coverageEnd,
-        latitude: selectedMarket.centerLatitude,
-        longitude: selectedMarket.centerLongitude,
-        shares: sharesNum,
-      });
+      let requestId: number;
+      
+      if (policyVersion === 'V2' && isV2Available) {
+        // V2 quote request for Manila with cumulative rainfall
+        requestId = await api.requestQuoteV2(keypair, {
+          marketId: selectedMarket.id,
+          coverageStart,
+          coverageEnd,
+          latitude: selectedMarket.centerLatitude,
+          longitude: selectedMarket.centerLongitude,
+          shares: sharesNum,
+          durationDays: v2DurationDays,
+        });
+      } else {
+        // V1 quote request (24-hour rolling)
+        requestId = await api.requestQuote(keypair, {
+          marketId: selectedMarket.id,
+          coverageStart,
+          coverageEnd,
+          latitude: selectedMarket.centerLatitude,
+          longitude: selectedMarket.centerLongitude,
+          shares: sharesNum,
+        });
+      }
       
       if (requestId < 0) {
         throw new Error('Failed to get quote ID from chain event');
@@ -355,7 +380,18 @@ export default function NewPolicyPage() {
                         <MapPin className="w-5 h-5 text-white" />
                       </div>
                       <div>
-                        <h4 className="font-semibold">{market.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold">{market.name}</h4>
+                          {/* V1/V2 badges - Manila (id=0) supports V2 */}
+                          {market.id === 0 ? (
+                            <div className="flex gap-1">
+                              <Badge variant="default" className="text-xs px-1.5 py-0.5">V1</Badge>
+                              <Badge variant="purple" className="text-xs px-1.5 py-0.5">V2</Badge>
+                            </div>
+                          ) : (
+                            <Badge variant="default" className="text-xs px-1.5 py-0.5">V1</Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-text-secondary">
                           {formatCoordinates(market.centerLatitude, market.centerLongitude)}
                         </p>
@@ -368,7 +404,11 @@ export default function NewPolicyPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-secondary">Duration</span>
-                        <span className="text-prmx-cyan font-medium">24 hours</span>
+                        {market.id === 0 ? (
+                          <span className="text-prmx-purple font-medium">24h or 2-7d</span>
+                        ) : (
+                          <span className="text-prmx-cyan font-medium">24 hours</span>
+                        )}
                       </div>
                       <div className="flex justify-between">
                         <span className="text-text-secondary">Lead time</span>
@@ -403,6 +443,49 @@ export default function NewPolicyPage() {
               </div>
             </div>
 
+            {/* V1/V2 Version Selector (only for Manila) */}
+            {isV2Available && (
+              <div className="p-4 rounded-xl bg-prmx-purple/5 border border-prmx-purple/20">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Info className="w-4 h-4 text-prmx-purple" />
+                  Policy Version
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPolicyVersion('V1')}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      policyVersion === 'V1'
+                        ? 'border-prmx-cyan bg-prmx-cyan/5'
+                        : 'border-border-secondary hover:border-prmx-cyan/50'
+                    }`}
+                  >
+                    <div className="font-semibold mb-1">V1 - Standard</div>
+                    <p className="text-sm text-text-secondary">
+                      24-hour rolling rainfall trigger. Fixed 1-day coverage window.
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPolicyVersion('V2')}
+                    className={`p-4 rounded-xl border-2 text-left transition-all ${
+                      policyVersion === 'V2'
+                        ? 'border-prmx-purple bg-prmx-purple/5'
+                        : 'border-border-secondary hover:border-prmx-purple/50'
+                    }`}
+                  >
+                    <div className="font-semibold mb-1 flex items-center gap-2">
+                      V2 - Cumulative
+                      <Badge variant="purple">NEW</Badge>
+                    </div>
+                    <p className="text-sm text-text-secondary">
+                      Cumulative rainfall trigger. 2-7 day window with early trigger.
+                    </p>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Coverage Parameters */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
@@ -424,34 +507,80 @@ export default function NewPolicyPage() {
                   : 'Select when coverage begins'
                 }
               />
-              <Input
-                label="Coverage Duration"
-                type="text"
-                value="24 hours"
-                readOnly
-                hint="All markets default to 24 hours coverage"
-              />
+              {policyVersion === 'V2' && isV2Available ? (
+                <div>
+                  <label className="block text-sm font-medium text-text-secondary mb-2">
+                    Coverage Duration
+                  </label>
+                  <select
+                    className="select-field w-full"
+                    value={v2DurationDays}
+                    onChange={(e) => setV2DurationDays(Number(e.target.value))}
+                  >
+                    {[2, 3, 4, 5, 6, 7].map((days) => (
+                      <option key={days} value={days}>
+                        {days} days
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-text-tertiary mt-1.5">
+                    V2 policies support 2-7 day coverage windows
+                  </p>
+                </div>
+              ) : (
+                <Input
+                  label="Coverage Duration"
+                  type="text"
+                  value="24 hours"
+                  readOnly
+                  hint="V1 policies use 24 hours coverage"
+                />
+              )}
             </div>
 
             {/* Summary */}
-            <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
+            <div className={`p-4 rounded-xl border ${
+              policyVersion === 'V2' 
+                ? 'bg-prmx-purple/5 border-prmx-purple/20' 
+                : 'bg-prmx-cyan/5 border-prmx-cyan/20'
+            }`}>
               <h4 className="font-semibold mb-3 flex items-center gap-2">
-                <Info className="w-4 h-4 text-prmx-cyan" />
+                <Info className={`w-4 h-4 ${policyVersion === 'V2' ? 'text-prmx-purple' : 'text-prmx-cyan'}`} />
                 Coverage Summary
+                {policyVersion === 'V2' && (
+                  <Badge variant="purple">V2 Cumulative</Badge>
+                )}
               </h4>
               <div className="space-y-3 text-sm">
                 {/* Local Time Display */}
-                <div className="p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/20">
+                <div className={`p-3 rounded-lg border ${
+                  policyVersion === 'V2' 
+                    ? 'bg-prmx-purple/10 border-prmx-purple/20' 
+                    : 'bg-prmx-cyan/10 border-prmx-cyan/20'
+                }`}>
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-prmx-cyan" />
-                    <span className="font-medium text-prmx-cyan">
+                    <Clock className={`w-4 h-4 ${policyVersion === 'V2' ? 'text-prmx-purple' : 'text-prmx-cyan'}`} />
+                    <span className={`font-medium ${policyVersion === 'V2' ? 'text-prmx-purple' : 'text-prmx-cyan'}`}>
                       {selectedMarket?.name} Local Time ({formatTimezoneOffset(marketTimezoneOffset)})
                     </span>
                   </div>
-                  <p className="font-mono text-lg">
-                    {coverageStartDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} 
-                    {' '}00:00 — 23:59
-                  </p>
+                  {policyVersion === 'V2' && isV2Available ? (
+                    <div>
+                      <p className="font-mono text-lg">
+                        {coverageStartDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        {' — '}
+                        {coverageStartDate && addDays(coverageStartDate, v2DurationDays - 1).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-prmx-purple mt-1">
+                        {v2DurationDays} days • Cumulative rainfall • Early trigger enabled
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="font-mono text-lg">
+                      {coverageStartDate?.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} 
+                      {' '}00:00 — 23:59
+                    </p>
+                  )}
                 </div>
                 
                 {/* UTC Equivalent */}

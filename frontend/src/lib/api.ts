@@ -7,7 +7,7 @@
 
 import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
 import { KeyringPair } from '@polkadot/keyring/types';
-import type { Market, Policy, QuoteRequest, QuoteResult, LpHolding, LpAskOrder, RainfallData } from '@/types';
+import type { Market, Policy, QuoteRequest, QuoteResult, LpHolding, LpAskOrder, RainfallData, V2Monitor, V2MonitorStats } from '@/types';
 
 // Constants
 export const WS_ENDPOINT = process.env.NEXT_PUBLIC_WS_ENDPOINT || 'ws://localhost:9944';
@@ -235,7 +235,7 @@ export async function getMarkets(): Promise<Market[]> {
       timezoneOffsetHours: data.timezoneOffsetHours ?? 0,
       strikeValue,
       payoutPerShare: BigInt(data.payoutPerShare || '100000000'),
-      status: normalizeStatus(data.status, 'Open'),
+      status: normalizeStatus(data.status, 'Open') as 'Open' | 'Closed' | 'Settled',
       riskParameters: {
         daoMarginBp: data.risk?.daoMarginBp || 2000,
       },
@@ -268,7 +268,7 @@ export async function getMarket(marketId: number): Promise<Market | null> {
     timezoneOffsetHours: data.timezoneOffsetHours ?? 0,
     strikeValue,
     payoutPerShare: BigInt(data.payoutPerShare || '100000000'),
-    status: normalizeStatus(data.status, 'Open'),
+    status: normalizeStatus(data.status, 'Open') as 'Open' | 'Closed' | 'Settled',
     riskParameters: {
       daoMarginBp: data.risk?.daoMarginBp || 2000,
     },
@@ -381,6 +381,11 @@ export async function getQuoteRequests(): Promise<QuoteRequest[]> {
       shares: Number(data.shares || '1'),
       requestedAt: data.requestedAt,
       result,
+      // V2 fields (default to V1 for backwards compatibility)
+      policyVersion: (data.policyVersion?.toString() || 'V1') as 'V1' | 'V2',
+      eventType: (data.eventType?.toString() || 'Rainfall24hRolling') as 'Rainfall24hRolling' | 'CumulativeRainfallWindow',
+      earlyTrigger: data.earlyTrigger ?? false,
+      durationDays: data.durationDays ?? 0,
     };
   }));
   
@@ -460,6 +465,76 @@ export async function requestQuote(
 }
 
 /**
+ * Request a V2 policy quote (cumulative rainfall, early trigger)
+ * V2 policies are only available for Manila market with 2-7 day duration.
+ */
+export async function requestQuoteV2(
+  signer: KeyringPair,
+  params: {
+    marketId: number;        // Must be 0 (Manila) for V2
+    coverageStart: number;
+    coverageEnd: number;
+    latitude: number;
+    longitude: number;
+    shares: number;
+    durationDays: number;    // 2-7 days
+  }
+): Promise<number> {
+  const api = await getApi();
+  
+  // Validate V2 requirements
+  if (params.marketId !== 0) {
+    throw new Error('V2 policies are only available for Manila market (marketId = 0)');
+  }
+  if (params.durationDays < 2 || params.durationDays > 7) {
+    throw new Error('V2 policy duration must be 2-7 days');
+  }
+  
+  const expectedQuoteId = await getNextQuoteId();
+  
+  return new Promise((resolve, reject) => {
+    api.tx.prmxQuote.requestPolicyQuoteV2(
+      params.marketId,
+      params.coverageStart,
+      params.coverageEnd,
+      params.latitude,
+      params.longitude,
+      params.shares,
+      params.durationDays
+    ).signAndSend(signer, ({ status, events, dispatchError }) => {
+      if (dispatchError) {
+        if (dispatchError.isModule) {
+          const decoded = api.registry.findMetaError(dispatchError.asModule);
+          reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+        } else {
+          reject(new Error(dispatchError.toString()));
+        }
+        return;
+      }
+      if (status.isFinalized) {
+        console.log('V2 Quote Events:', events.map(({ event }) => `${event.section}.${event.method}`));
+        
+        const quoteEvent = events.find(({ event }) => 
+          event.method === 'QuoteRequested'
+        );
+        if (quoteEvent) {
+          const data = quoteEvent.event.data;
+          const quoteId = (data as any).quoteId?.toNumber?.() 
+            ?? (data as any).quote_id?.toNumber?.() 
+            ?? (data[0] as any)?.toNumber?.()
+            ?? expectedQuoteId;
+          console.log('V2 Quote ID:', quoteId);
+          resolve(quoteId);
+        } else {
+          console.warn('QuoteRequested event not found, using expected ID:', expectedQuoteId);
+          resolve(expectedQuoteId);
+        }
+      }
+    });
+  });
+}
+
+/**
  * Submit quote result (simulates off-chain worker)
  * In production, the off-chain worker would calculate this from rainfall data.
  * For testing, we submit a mock probability.
@@ -521,7 +596,7 @@ export async function getPolicies(): Promise<Policy[]> {
       coverageStart: data.coverageStart,
       coverageEnd: data.coverageEnd,
       shares,
-      status: normalizeStatus(data.status, 'Active'),
+      status: normalizeStatus(data.status, 'Active') as 'Active' | 'Expired' | 'Settled' | 'Cancelled',
       premiumPaid: BigInt(data.premiumPaid || '0'),
       maxPayout: BigInt(data.maxPayout || '0') || totalCapital,
       capitalPool: {
@@ -531,6 +606,12 @@ export async function getPolicies(): Promise<Policy[]> {
       },
       // createdAt may not exist for older policies, default to coverageStart
       createdAt: data.createdAt || data.coverageStart,
+      // V2 fields (default to V1 for backwards compatibility)
+      policyVersion: (data.policyVersion?.toString() || 'V1') as 'V1' | 'V2',
+      eventType: (data.eventType?.toString() || 'Rainfall24hRolling') as 'Rainfall24hRolling' | 'CumulativeRainfallWindow',
+      earlyTrigger: data.earlyTrigger ?? false,
+      oracleStatusV2: data.oracleStatusV2?.toString() as 'PendingMonitoring' | 'Monitoring' | 'TriggeredReported' | 'MaturedReported' | 'Settled' | undefined,
+      strikeMm: data.strikeMm,
     };
   });
 }
@@ -1374,7 +1455,7 @@ export async function getPendingFetchRequest(marketId: number): Promise<number |
   const api = await getApi();
   const result = await api.query.prmxOracle.pendingFetchRequests(marketId);
   
-  if (result.isSome) {
+  if (!(result as any).isEmpty) {
     return (result as any).unwrap().toNumber();
   }
   return null;
@@ -1581,4 +1662,107 @@ export async function getAllLpPositions(): Promise<LpPosition[]> {
   }
   
   return positions;
+}
+
+// ============================================================================
+// V2 Oracle Service REST API
+// ============================================================================
+
+const V2_ORACLE_API_URL = process.env.NEXT_PUBLIC_ORACLE_V2_API_URL || 'http://localhost:3001';
+
+/**
+ * Get all V2 monitors from the oracle service
+ */
+export async function getV2Monitors(): Promise<V2Monitor[]> {
+  try {
+    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors`);
+    const json = await response.json();
+    
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to fetch V2 monitors');
+    }
+    
+    return json.data || [];
+  } catch (err) {
+    console.error('Failed to fetch V2 monitors:', err);
+    return [];
+  }
+}
+
+/**
+ * Get a single V2 monitor by composite ID (market_id:policy_id)
+ */
+export async function getV2Monitor(id: string): Promise<V2Monitor | null> {
+  try {
+    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors/${id}`);
+    const json = await response.json();
+    
+    if (!json.success) {
+      return null;
+    }
+    
+    return json.data || null;
+  } catch (err) {
+    console.error('Failed to fetch V2 monitor:', err);
+    return null;
+  }
+}
+
+/**
+ * Get V2 monitor by policy ID
+ */
+export async function getV2MonitorByPolicy(policyId: number): Promise<V2Monitor | null> {
+  try {
+    const response = await fetch(`${V2_ORACLE_API_URL}/v2/policies/${policyId}/monitor`);
+    const json = await response.json();
+    
+    if (!json.success) {
+      return null;
+    }
+    
+    return json.data || null;
+  } catch (err) {
+    console.error('Failed to fetch V2 monitor by policy:', err);
+    return null;
+  }
+}
+
+/**
+ * Get V2 oracle service stats
+ */
+export async function getV2MonitorStats(): Promise<V2MonitorStats> {
+  try {
+    const response = await fetch(`${V2_ORACLE_API_URL}/v2/stats`);
+    const json = await response.json();
+    
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to fetch V2 stats');
+    }
+    
+    return json.data;
+  } catch (err) {
+    console.error('Failed to fetch V2 stats:', err);
+    return {
+      total: 0,
+      monitoring: 0,
+      triggered: 0,
+      matured: 0,
+      reported: 0,
+      active: 0,
+    };
+  }
+}
+
+/**
+ * Check if V2 oracle service is healthy
+ */
+export async function checkV2OracleHealth(): Promise<boolean> {
+  try {
+    const response = await fetch(`${V2_ORACLE_API_URL}/health`);
+    const json = await response.json();
+    return json.status === 'ok';
+  } catch (err) {
+    console.error('V2 Oracle service health check failed:', err);
+    return false;
+  }
 }

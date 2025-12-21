@@ -27,6 +27,7 @@ frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk.git", t
 
 # Local dependencies
 pallet-prmx-markets = { path = "../prmx-markets", default-features = false }
+prmx-primitives = { path = "../../primitives", default-features = false }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
@@ -48,6 +49,7 @@ std = [
     "sp-application-crypto/std",
     "frame-benchmarking?/std",
     "pallet-prmx-markets/std",
+    "prmx-primitives/std",
 ]
 # Development mode - enables test API keys (DO NOT USE IN PRODUCTION)
 dev-mode = []

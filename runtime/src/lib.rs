@@ -429,6 +429,8 @@ impl pallet_prmx_policy::Config for Runtime {
     type CapitalApi = PrmxXcmCapital;
     /// Access to markets pallet for policy label generation
     type MarketsApi = PrmxMarkets;
+    /// V2 oracle origin - only root/sudo can settle V2 policies
+    type V2OracleOrigin = EnsureRoot<AccountId>;
 }
 
 // =============================================================================

@@ -19,6 +19,7 @@ pub use pallet::*;
 use alloc::vec::Vec;
 use frame_support::traits::fungibles::{Inspect, Mutate};
 use frame_support::traits::tokens::Preservation;
+use frame_support::traits::Get;
 use pallet_prmx_holdings::HoldingsApi;
 use pallet_prmx_markets::MarketsAccess;
 use pallet_prmx_quote::QuoteAccess;
@@ -197,6 +198,12 @@ pub mod pallet {
         pub premium_paid: T::Balance,
         pub max_payout: T::Balance,
         pub created_at: u64,        // unix seconds - when policy was created
+        // V2 fields
+        pub policy_version: prmx_primitives::PolicyVersion,
+        pub event_type: prmx_primitives::EventType,
+        pub early_trigger: bool,
+        pub oracle_status_v2: Option<prmx_primitives::V2OracleStatus>,
+        pub strike_mm: Option<u32>,
     }
 
     // =========================================================================
@@ -264,6 +271,10 @@ pub mod pallet {
 
         /// Access to markets pallet for market name lookup (used for policy labels)
         type MarketsApi: pallet_prmx_markets::MarketsAccess<Balance = Self::Balance>;
+
+        /// Origin that can submit V2 oracle reports.
+        /// Only authorized accounts/origins can settle V2 policies.
+        type V2OracleOrigin: EnsureOrigin<Self::RuntimeOrigin>;
     }
 
     // =========================================================================
@@ -335,6 +346,17 @@ pub mod pallet {
         ValueQuery,
     >;
 
+    /// V2 final reports by policy ID (one report per policy, immutable once set).
+    #[pallet::storage]
+    #[pallet::getter(fn v2_final_report)]
+    pub type V2FinalReport<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        PolicyId,
+        prmx_primitives::V2Report<T::AccountId>,
+        OptionQuery,
+    >;
+
     // =========================================================================
     //                                  Events
     // =========================================================================
@@ -376,6 +398,23 @@ pub mod pallet {
             policy_id: PolicyId,
             residual_to_pool: T::Balance,
         },
+        /// V2 policy created - emitted for off-chain oracle to pick up.
+        V2PolicyCreated {
+            policy_id: PolicyId,
+            market_id: MarketId,
+            coverage_start: u64,
+            coverage_end: u64,
+            strike_mm: u32,
+            latitude: i32,
+            longitude: i32,
+        },
+        /// V2 policy settled by off-chain oracle report.
+        V2PolicySettled {
+            policy_id: PolicyId,
+            outcome: prmx_primitives::V2Outcome,
+            cumulative_mm: u32,
+            evidence_hash: [u8; 32],
+        },
     }
 
     // =========================================================================
@@ -406,6 +445,16 @@ pub mod pallet {
         ArithmeticOverflow,
         /// Transfer failed.
         TransferFailed,
+        /// Not a V2 policy.
+        NotV2Policy,
+        /// V2 report already submitted for this policy.
+        V2ReportAlreadySubmitted,
+        /// Invalid V2 observed_at timestamp.
+        InvalidObservedAt,
+        /// V2 threshold not met for triggered claim.
+        ThresholdNotMet,
+        /// V2 policy not active.
+        V2PolicyNotActive,
     }
 
     // =========================================================================
@@ -470,8 +519,15 @@ pub mod pallet {
             let policy_id = NextPolicyId::<T>::get();
             let now = Self::current_timestamp();
 
-            // Generate policy label (e.g., "manila-1", "tokyo-2")
-            let policy_label = Self::generate_policy_label(req.market_id);
+            // Generate policy label using global policy ID (e.g., "manila-1" for policy_id=0)
+            let policy_label = Self::generate_policy_label(req.market_id, policy_id);
+
+            // Get strike value from market for V2 policies
+            let strike_mm = if req.policy_version == prmx_primitives::PolicyVersion::V2 {
+                T::MarketsApi::strike_value(req.market_id).ok()
+            } else {
+                None
+            };
 
             let policy = PolicyInfo::<T> {
                 policy_id,
@@ -487,6 +543,16 @@ pub mod pallet {
                 premium_paid: premium,
                 max_payout,
                 created_at: now,
+                // V2 fields from quote
+                policy_version: req.policy_version,
+                event_type: req.event_type,
+                early_trigger: req.early_trigger,
+                oracle_status_v2: if req.policy_version == prmx_primitives::PolicyVersion::V2 {
+                    Some(prmx_primitives::V2OracleStatus::PendingMonitoring)
+                } else {
+                    None
+                },
+                strike_mm,
             };
 
             // Get pool account for this policy
@@ -550,6 +616,21 @@ pub mod pallet {
                 holder: who,
                 shares,
             });
+
+            // Emit V2PolicyCreated for off-chain oracle to pick up
+            if req.policy_version == prmx_primitives::PolicyVersion::V2 {
+                if let Some(strike) = strike_mm {
+                    Self::deposit_event(Event::V2PolicyCreated {
+                        policy_id,
+                        market_id: req.market_id,
+                        coverage_start: req.coverage_start,
+                        coverage_end: req.coverage_end,
+                        strike_mm: strike,
+                        latitude: req.latitude,
+                        longitude: req.longitude,
+                    });
+                }
+            }
 
             Self::deposit_event(Event::CapitalLocked {
                 policy_id,
@@ -665,6 +746,128 @@ pub mod pallet {
 
             Ok(())
         }
+
+        /// Settle a V2 policy based on off-chain oracle report.
+        /// 
+        /// Only authorized V2 oracle reporters can call this.
+        /// V2 policies are completely isolated from V1 settlement.
+        ///
+        /// - `policy_id`: The V2 policy to settle.
+        /// - `outcome`: Triggered or MaturedNoEvent.
+        /// - `observed_at`: Timestamp when the outcome was determined.
+        /// - `cumulative_mm`: Cumulative rainfall in tenths of mm.
+        /// - `evidence_hash`: SHA256 hash of off-chain evidence JSON.
+        #[pallet::call_index(3)]
+        #[pallet::weight(100_000)]
+        pub fn settle_v2_policy(
+            origin: OriginFor<T>,
+            policy_id: PolicyId,
+            outcome: prmx_primitives::V2Outcome,
+            observed_at: u64,
+            cumulative_mm: u32,
+            evidence_hash: [u8; 32],
+        ) -> DispatchResult {
+            // Only V2 oracle origin can call this
+            T::V2OracleOrigin::ensure_origin(origin.clone())?;
+
+            // Load policy
+            let mut policy = Policies::<T>::get(policy_id)
+                .ok_or(Error::<T>::PolicyNotFound)?;
+
+            // Verify this is a V2 policy
+            ensure!(
+                policy.policy_version == prmx_primitives::PolicyVersion::V2,
+                Error::<T>::NotV2Policy
+            );
+
+            // Verify policy is active
+            ensure!(
+                policy.status == PolicyStatus::Active,
+                Error::<T>::V2PolicyNotActive
+            );
+
+            // Verify no report already submitted
+            ensure!(
+                !V2FinalReport::<T>::contains_key(policy_id),
+                Error::<T>::V2ReportAlreadySubmitted
+            );
+
+            // Validate report based on outcome
+            match outcome {
+                prmx_primitives::V2Outcome::Triggered => {
+                    // observed_at must be within coverage window
+                    ensure!(
+                        observed_at >= policy.coverage_start && observed_at <= policy.coverage_end,
+                        Error::<T>::InvalidObservedAt
+                    );
+                    // cumulative_mm must meet or exceed strike
+                    if let Some(strike) = policy.strike_mm {
+                        ensure!(cumulative_mm >= strike, Error::<T>::ThresholdNotMet);
+                    }
+                }
+                prmx_primitives::V2Outcome::MaturedNoEvent => {
+                    // observed_at must be at or after coverage end
+                    ensure!(
+                        observed_at >= policy.coverage_end,
+                        Error::<T>::CoverageNotEnded
+                    );
+                }
+            }
+
+            // Get reporter account (for the report record)
+            let reporter = match ensure_signed(origin) {
+                Ok(acc) => acc,
+                Err(_) => T::DaoAccountId::get(), // Root origin uses DAO account
+            };
+
+            let now = Self::current_timestamp();
+
+            // Store the immutable V2 report
+            let report = prmx_primitives::V2Report {
+                outcome: outcome.clone(),
+                observed_at,
+                cumulative_mm,
+                evidence_hash,
+                reporter,
+                submitted_at: now,
+            };
+            V2FinalReport::<T>::insert(policy_id, report);
+
+            // Update policy oracle status
+            policy.oracle_status_v2 = Some(match outcome {
+                prmx_primitives::V2Outcome::Triggered => prmx_primitives::V2OracleStatus::TriggeredReported,
+                prmx_primitives::V2Outcome::MaturedNoEvent => prmx_primitives::V2OracleStatus::MaturedReported,
+            });
+
+            // Perform actual settlement using existing mechanics
+            let event_occurred = matches!(outcome, prmx_primitives::V2Outcome::Triggered);
+            let payout = Self::do_settle_policy(policy_id, event_occurred)?;
+
+            // Update oracle status to Settled
+            if let Some(mut p) = Policies::<T>::get(policy_id) {
+                p.oracle_status_v2 = Some(prmx_primitives::V2OracleStatus::Settled);
+                Policies::<T>::insert(policy_id, p);
+            }
+
+            // Emit V2-specific settlement event
+            Self::deposit_event(Event::V2PolicySettled {
+                policy_id,
+                outcome,
+                cumulative_mm,
+                evidence_hash,
+            });
+
+            log::info!(
+                target: "prmx-policy",
+                "✅ V2 policy {} settled: {:?}, cumulative_mm={}, payout={}",
+                policy_id,
+                outcome,
+                cumulative_mm,
+                payout.into()
+            );
+
+            Ok(())
+        }
     }
 
     // =========================================================================
@@ -699,8 +902,9 @@ pub mod pallet {
         }
 
         /// Generate a human-readable policy label like "manila-1", "tokyo-2".
-        /// Increments the per-market counter and creates a label from the market name.
-        fn generate_policy_label(market_id: MarketId) -> BoundedVec<u8, ConstU32<32>> {
+        /// Uses global policy_id + 1 for consistent numbering across UI.
+        /// e.g., policy_id=0 -> "manila-1", policy_id=3 -> "manila-4"
+        fn generate_policy_label(market_id: MarketId, policy_id: PolicyId) -> BoundedVec<u8, ConstU32<32>> {
             // Get market name from MarketsApi
             let market_name_bytes = T::MarketsApi::market_name(market_id)
                 .unwrap_or_else(|_| b"unknown".to_vec());
@@ -709,9 +913,8 @@ pub mod pallet {
             let market_name = core::str::from_utf8(&market_name_bytes)
                 .unwrap_or("unknown");
             
-            // Get and increment per-market counter
-            let policy_number = NextPolicyNumberPerMarket::<T>::get(market_id) + 1;
-            NextPolicyNumberPerMarket::<T>::insert(market_id, policy_number);
+            // Use global policy_id + 1 for the number (1-indexed for user display)
+            let policy_number = policy_id + 1;
 
             // Generate label: "manila-1", "tokyo-2", etc.
             let label_string = alloc::format!(
@@ -948,6 +1151,94 @@ impl<T: Config> pallet_prmx_oracle::PolicySettlement<T::AccountId> for Pallet<T>
         // Call internal settlement function with the determined event outcome
         let payout = pallet::Pallet::<T>::do_settle_policy(policy_id, event_occurred)?;
         Ok(payout.into())
+    }
+
+    fn settle_v2_policy(
+        policy_id: pallet_prmx_oracle::PolicyId,
+        outcome: prmx_primitives::V2Outcome,
+        observed_at: u64,
+        cumulative_mm: u32,
+        evidence_hash: [u8; 32],
+    ) -> Result<(), sp_runtime::DispatchError> {
+        // Load policy
+        let mut policy = pallet::Policies::<T>::get(policy_id)
+            .ok_or(pallet::Error::<T>::PolicyNotFound)?;
+
+        // Verify this is a V2 policy
+        if policy.policy_version != prmx_primitives::PolicyVersion::V2 {
+            return Err(pallet::Error::<T>::NotV2Policy.into());
+        }
+
+        // Verify policy is active
+        if policy.status != pallet::PolicyStatus::Active {
+            return Err(pallet::Error::<T>::V2PolicyNotActive.into());
+        }
+
+        // Verify no report already submitted
+        if pallet::V2FinalReport::<T>::contains_key(policy_id) {
+            return Err(pallet::Error::<T>::V2ReportAlreadySubmitted.into());
+        }
+
+        // Validate report based on outcome
+        match outcome {
+            prmx_primitives::V2Outcome::Triggered => {
+                // observed_at must be within coverage window
+                if observed_at < policy.coverage_start || observed_at > policy.coverage_end {
+                    return Err(pallet::Error::<T>::InvalidObservedAt.into());
+                }
+                // cumulative_mm must meet or exceed strike
+                if let Some(strike) = policy.strike_mm {
+                    if cumulative_mm < strike {
+                        return Err(pallet::Error::<T>::ThresholdNotMet.into());
+                    }
+                }
+            }
+            prmx_primitives::V2Outcome::MaturedNoEvent => {
+                // observed_at must be at or after coverage end
+                if observed_at < policy.coverage_end {
+                    return Err(pallet::Error::<T>::CoverageNotEnded.into());
+                }
+            }
+        }
+
+        let now = pallet::Pallet::<T>::current_timestamp();
+
+        // Store the immutable V2 report
+        let report = prmx_primitives::V2Report {
+            outcome: outcome.clone(),
+            observed_at,
+            cumulative_mm,
+            evidence_hash,
+            reporter: T::DaoAccountId::get(), // Use DAO account for trait calls
+            submitted_at: now,
+        };
+        pallet::V2FinalReport::<T>::insert(policy_id, report);
+
+        // Update policy oracle status
+        policy.oracle_status_v2 = Some(match outcome {
+            prmx_primitives::V2Outcome::Triggered => prmx_primitives::V2OracleStatus::TriggeredReported,
+            prmx_primitives::V2Outcome::MaturedNoEvent => prmx_primitives::V2OracleStatus::MaturedReported,
+        });
+
+        // Perform actual settlement using existing mechanics
+        let event_occurred = matches!(outcome, prmx_primitives::V2Outcome::Triggered);
+        pallet::Pallet::<T>::do_settle_policy(policy_id, event_occurred)?;
+
+        // Update oracle status to Settled
+        if let Some(mut p) = pallet::Policies::<T>::get(policy_id) {
+            p.oracle_status_v2 = Some(prmx_primitives::V2OracleStatus::Settled);
+            pallet::Policies::<T>::insert(policy_id, p);
+        }
+
+        // Emit V2-specific settlement event
+        pallet::Pallet::<T>::deposit_event(pallet::Event::V2PolicySettled {
+            policy_id,
+            outcome,
+            cumulative_mm,
+            evidence_hash,
+        });
+
+        Ok(())
     }
 }
 

@@ -4,6 +4,7 @@ resolver = "2"
 members = [
     "node",
     "runtime",
+    "primitives",
     "pallets/prmx-markets",
     "pallets/prmx-holdings",
     "pallets/prmx-quote",

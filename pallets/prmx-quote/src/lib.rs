@@ -116,6 +116,14 @@ pub struct QuoteRequestInfo<AccountId> {
     pub longitude: i32,
     pub shares: u128,
     pub requested_at: u64,
+    /// Policy version (V1 or V2) - determines settlement path
+    pub policy_version: prmx_primitives::PolicyVersion,
+    /// Event type for this quote
+    pub event_type: prmx_primitives::EventType,
+    /// Whether early trigger is enabled (V2 only)
+    pub early_trigger: bool,
+    /// Duration in days (used for V2 validation)
+    pub duration_days: u8,
 }
 
 /// Quote result info (generic version for trait)
@@ -155,6 +163,14 @@ pub mod pallet {
         pub longitude: i32,     // scaled by 1e6
         pub shares: u128,
         pub requested_at: u64,
+        /// Policy version (V1 or V2) - determines which settlement path is used
+        pub policy_version: prmx_primitives::PolicyVersion,
+        /// Event type for the policy
+        pub event_type: prmx_primitives::EventType,
+        /// Whether early trigger is enabled (V2 default: true)
+        pub early_trigger: bool,
+        /// Duration in days (for V2 validation: 2-7 days)
+        pub duration_days: u8,
     }
 
     /// Quote result from the offchain worker
@@ -389,6 +405,8 @@ pub mod pallet {
         ArithmeticOverflow,
         /// Not a quote provider.
         NotQuoteProvider,
+        /// V2 quote not allowed for this market/duration.
+        V2NotAllowed,
     }
 
     // =========================================================================
@@ -475,7 +493,7 @@ pub mod pallet {
                 now,
             ).map_err(|_| Error::<T>::InvalidCoverageWindow)?;
 
-            // Create quote request
+            // Create quote request (V1 defaults)
             let quote_id = NextQuoteId::<T>::get();
             let quote_request = QuoteRequest::<T> {
                 quote_id,
@@ -487,6 +505,11 @@ pub mod pallet {
                 longitude,
                 shares,
                 requested_at: now,
+                // V1 defaults
+                policy_version: prmx_primitives::PolicyVersion::V1,
+                event_type: prmx_primitives::EventType::Rainfall24hRolling,
+                early_trigger: false,
+                duration_days: 0, // Not used for V1
             };
 
             // Store quote request
@@ -623,6 +646,94 @@ pub mod pallet {
             QuoteProviders::<T>::remove(&account);
 
             Self::deposit_event(Event::QuoteProviderRemoved { account });
+
+            Ok(())
+        }
+
+        /// Request a V2 quote for policy coverage.
+        /// 
+        /// V2 policies use cumulative rainfall over the coverage window with early trigger.
+        /// Currently only Manila market is supported with 2-7 day durations.
+        ///
+        /// - `market_id`: The market (must be Manila for V2).
+        /// - `coverage_start`: Start of coverage window (unix timestamp).
+        /// - `coverage_end`: End of coverage window (unix timestamp).
+        /// - `latitude`: Latitude scaled by 1e6.
+        /// - `longitude`: Longitude scaled by 1e6.
+        /// - `shares`: Number of shares (1 share = 100 USDT coverage).
+        /// - `duration_days`: Coverage duration in days (2-7 for V2).
+        #[pallet::call_index(7)]
+        #[pallet::weight(10_000)]
+        pub fn request_policy_quote_v2(
+            origin: OriginFor<T>,
+            market_id: MarketId,
+            coverage_start: u64,
+            coverage_end: u64,
+            latitude: i32,
+            longitude: i32,
+            shares: u128,
+            duration_days: u8,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // Validate shares
+            ensure!(shares > 0, Error::<T>::InvalidShares);
+
+            // Check market is open
+            ensure!(
+                T::MarketsApi::is_market_open(market_id),
+                Error::<T>::MarketNotOpen
+            );
+
+            // V2-specific validation: market must be Manila and duration 2-7 days
+            T::MarketsApi::ensure_v2_allowed(market_id, duration_days)
+                .map_err(|_| Error::<T>::V2NotAllowed)?;
+
+            // Get current timestamp
+            let now = Self::current_timestamp();
+
+            // Validate coverage window
+            T::MarketsApi::validate_coverage_window(
+                market_id,
+                coverage_start,
+                coverage_end,
+                now,
+            ).map_err(|_| Error::<T>::InvalidCoverageWindow)?;
+
+            // Create V2 quote request
+            let quote_id = NextQuoteId::<T>::get();
+            let quote_request = QuoteRequest::<T> {
+                quote_id,
+                market_id,
+                requester: who.clone(),
+                coverage_start,
+                coverage_end,
+                latitude,
+                longitude,
+                shares,
+                requested_at: now,
+                // V2 specifics
+                policy_version: prmx_primitives::PolicyVersion::V2,
+                event_type: prmx_primitives::EventType::CumulativeRainfallWindow,
+                early_trigger: true, // V2 default
+                duration_days,
+            };
+
+            // Store quote request
+            QuoteRequests::<T>::insert(quote_id, quote_request);
+            QuoteStatuses::<T>::insert(quote_id, QuoteStatus::Pending);
+            NextQuoteId::<T>::put(quote_id + 1);
+
+            // Add to pending quotes for offchain worker
+            PendingQuotes::<T>::mutate(|pending| {
+                let _ = pending.try_push(quote_id);
+            });
+
+            Self::deposit_event(Event::QuoteRequested {
+                quote_id,
+                requester: who,
+                market_id,
+            });
 
             Ok(())
         }
@@ -1190,6 +1301,10 @@ pub mod pallet {
                 longitude: req.longitude,
                 shares: req.shares,
                 requested_at: req.requested_at,
+                policy_version: req.policy_version,
+                event_type: req.event_type,
+                early_trigger: req.early_trigger,
+                duration_days: req.duration_days,
             })
         }
 

@@ -240,7 +240,18 @@ export default function MarketsPage() {
                           <Globe2 className="w-6 h-6 text-white" />
                         </div>
                         <div>
-                          <h3 className="text-lg font-semibold">{market.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-lg font-semibold">{market.name}</h3>
+                            {/* V1/V2 Badge - Manila (id=0) supports V2 */}
+                            {market.id === 0 ? (
+                              <div className="flex gap-1">
+                                <Badge variant="default" className="text-xs px-1.5 py-0.5">V1</Badge>
+                                <Badge variant="purple" className="text-xs px-1.5 py-0.5">V2</Badge>
+                              </div>
+                            ) : (
+                              <Badge variant="default" className="text-xs px-1.5 py-0.5">V1</Badge>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1 text-sm text-text-secondary">
                             <MapPin className="w-3 h-3" />
                             {formatCoordinates(market.centerLatitude, market.centerLongitude)}

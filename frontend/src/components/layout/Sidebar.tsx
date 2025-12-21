@@ -8,6 +8,7 @@ import {
   Shield, 
   Wallet, 
   Cloud,
+  Activity,
   Settings,
   HelpCircle
 } from 'lucide-react';
@@ -28,7 +29,8 @@ const mainNavItems: NavItem[] = [
   { href: '/markets', label: 'Markets', icon: Globe2, roles: ['dao', 'customer'] },
   { href: '/policies', label: 'My Policies', labelByRole: { dao: 'All Policies' }, icon: Shield, roles: ['dao', 'customer'] },
   { href: '/lp', label: 'LP Trading', icon: Wallet, roles: ['dao', 'lp'] },
-  { href: '/oracle', label: 'Oracle Data', icon: Cloud },
+  { href: '/oracle', label: 'Oracle (V1)', icon: Cloud },
+  { href: '/oracle-v2', label: 'Oracle V2', icon: Activity },
 ];
 
 const secondaryNavItems: NavItem[] = [

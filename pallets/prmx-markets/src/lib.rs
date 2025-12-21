@@ -181,6 +181,22 @@ pub mod pallet {
     pub type NextMarketId<T> = StorageValue<_, MarketId, ValueQuery>;
 
     // =========================================================================
+    //                           V2 Configuration Storage
+    // =========================================================================
+
+    /// Markets that support V2 policies (cumulative rainfall, early trigger).
+    /// By default, only Manila (market_id = 0) is enabled.
+    #[pallet::storage]
+    #[pallet::getter(fn v2_enabled_markets)]
+    pub type V2EnabledMarkets<T> = StorageMap<_, Blake2_128Concat, MarketId, bool, ValueQuery>;
+
+    /// V2 duration rules per market: (min_days, max_days).
+    /// Default for Manila: (2, 7) days.
+    #[pallet::storage]
+    #[pallet::getter(fn v2_duration_rules)]
+    pub type V2DurationRules<T> = StorageMap<_, Blake2_128Concat, MarketId, (u8, u8), ValueQuery>;
+
+    // =========================================================================
     //                           Genesis Configuration
     // =========================================================================
 
@@ -308,6 +324,12 @@ pub mod pallet {
         MarketNotOpen,
         /// Name too long.
         NameTooLong,
+        /// V2 policies are only allowed for Manila market.
+        V2OnlyManilaAllowed,
+        /// V2 policy duration must be 2-7 days.
+        V2InvalidDuration,
+        /// Market does not support V2 policies.
+        MarketNotV2Enabled,
     }
 
     // =========================================================================
@@ -539,6 +561,58 @@ pub mod pallet {
         pub fn get_strike_value(market_id: MarketId) -> Option<Millimeters> {
             Markets::<T>::get(market_id).map(|m| m.strike_value)
         }
+
+        // =====================================================================
+        //                       V2 Validation Functions
+        // =====================================================================
+
+        /// Check if a market supports V2 policies.
+        /// Currently only Manila (market_id = 0) is enabled.
+        pub fn is_v2_enabled(market_id: MarketId) -> bool {
+            // Check storage first, then fall back to hardcoded Manila check
+            if V2EnabledMarkets::<T>::get(market_id) {
+                return true;
+            }
+            // Manila (market_id = 0) is always enabled for V2
+            market_id == prmx_primitives::MANILA_MARKET_ID
+        }
+
+        /// Validate that a V2 policy is allowed for the given market and duration.
+        /// 
+        /// V2 requirements:
+        /// - Market must be Manila (market_id = 0) or explicitly V2-enabled
+        /// - Duration must be 2-7 days
+        ///
+        /// Returns Ok(()) if valid, otherwise returns an appropriate error.
+        pub fn ensure_v2_allowed(market_id: MarketId, duration_days: u8) -> DispatchResult {
+            // Check market is V2-enabled (currently only Manila)
+            ensure!(Self::is_v2_enabled(market_id), Error::<T>::V2OnlyManilaAllowed);
+
+            // Check duration is within V2 range (2-7 days)
+            let (min_days, max_days) = V2DurationRules::<T>::get(market_id);
+            
+            // If no rules set, use defaults from primitives
+            let min = if min_days == 0 { prmx_primitives::V2_MIN_DURATION_DAYS } else { min_days };
+            let max = if max_days == 0 { prmx_primitives::V2_MAX_DURATION_DAYS } else { max_days };
+
+            ensure!(
+                duration_days >= min && duration_days <= max,
+                Error::<T>::V2InvalidDuration
+            );
+
+            Ok(())
+        }
+
+        /// Get V2 duration rules for a market (min_days, max_days).
+        /// Returns defaults if not explicitly set.
+        pub fn get_v2_duration_rules(market_id: MarketId) -> (u8, u8) {
+            let (min, max) = V2DurationRules::<T>::get(market_id);
+            if min == 0 && max == 0 {
+                (prmx_primitives::V2_MIN_DURATION_DAYS, prmx_primitives::V2_MAX_DURATION_DAYS)
+            } else {
+                (min, max)
+            }
+        }
     }
 }
 
@@ -575,6 +649,15 @@ pub trait MarketsAccess {
 
     /// Get market name as bytes (e.g., b"Manila", b"Tokyo")
     fn market_name(market_id: u64) -> Result<alloc::vec::Vec<u8>, ()>;
+
+    /// Check if market supports V2 policies
+    fn is_v2_enabled(market_id: u64) -> bool;
+
+    /// Validate V2 policy is allowed (market + duration check)
+    fn ensure_v2_allowed(market_id: u64, duration_days: u8) -> Result<(), sp_runtime::DispatchError>;
+
+    /// Get V2 duration rules for a market (min_days, max_days)
+    fn v2_duration_rules(market_id: u64) -> (u8, u8);
 }
 
 impl<T: Config> MarketsAccess for Pallet<T> {
@@ -613,5 +696,17 @@ impl<T: Config> MarketsAccess for Pallet<T> {
         Pallet::<T>::get_market(market_id)
             .map(|m| m.name.to_vec())
             .ok_or(())
+    }
+
+    fn is_v2_enabled(market_id: u64) -> bool {
+        Pallet::<T>::is_v2_enabled(market_id)
+    }
+
+    fn ensure_v2_allowed(market_id: u64, duration_days: u8) -> Result<(), sp_runtime::DispatchError> {
+        Pallet::<T>::ensure_v2_allowed(market_id, duration_days)
+    }
+
+    fn v2_duration_rules(market_id: u64) -> (u8, u8) {
+        Pallet::<T>::get_v2_duration_rules(market_id)
     }
 }

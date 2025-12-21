@@ -1,0 +1,35 @@
+{
+  "name": "prmx-oracle-v2",
+  "version": "1.0.0",
+  "description": "Off-chain V2 Oracle Service for PRMX cumulative rainfall monitoring",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@polkadot/api": "^14.0.0",
+    "@polkadot/keyring": "^13.0.0",
+    "axios": "^1.7.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "mongodb": "^6.8.0",
+    "crypto-js": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/crypto-js": "^4.2.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+

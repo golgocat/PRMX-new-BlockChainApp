@@ -151,7 +151,18 @@ export default function MarketDetailPage() {
                 <MapPin className="w-6 h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">{market.name}</h1>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-bold">{market.name}</h1>
+                  {/* V1/V2 badges - Manila (id=0) supports V2 */}
+                  {marketId === 0 ? (
+                    <div className="flex gap-1.5">
+                      <Badge variant="default">V1</Badge>
+                      <Badge variant="purple">V2</Badge>
+                    </div>
+                  ) : (
+                    <Badge variant="default">V1</Badge>
+                  )}
+                </div>
                 <p className="text-text-secondary">
                   {formatCoordinates(market.centerLatitude, market.centerLongitude)}
                 </p>
@@ -261,16 +272,52 @@ export default function MarketDetailPage() {
                 <Calendar className="w-4 h-4 text-prmx-purple" />
                 Coverage Window Rules
               </h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-text-secondary">Coverage Duration</span>
-                  <p className="font-medium text-prmx-cyan">24 hours</p>
+              
+              {/* V1 Rules */}
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Badge variant="default">V1</Badge>
+                  <span className="text-xs text-text-tertiary">24-hour rolling rainfall</span>
                 </div>
-                <div>
-                  <span className="text-text-secondary">Min Lead Time</span>
-                  <p className="font-medium">{secondsToDays(market.windowRules.minLeadTimeSecs)} days</p>
+                <div className="grid grid-cols-2 gap-4 text-sm pl-2 border-l-2 border-border-secondary">
+                  <div>
+                    <span className="text-text-secondary">Duration</span>
+                    <p className="font-medium text-prmx-cyan">24 hours</p>
+                  </div>
+                  <div>
+                    <span className="text-text-secondary">Min Lead Time</span>
+                    <p className="font-medium">{secondsToDays(market.windowRules.minLeadTimeSecs)} days</p>
+                  </div>
                 </div>
               </div>
+              
+              {/* V2 Rules - Only for Manila (marketId === 0) */}
+              {marketId === 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="purple">V2</Badge>
+                    <span className="text-xs text-text-tertiary">Cumulative rainfall + early trigger</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm pl-2 border-l-2 border-prmx-purple/50">
+                    <div>
+                      <span className="text-text-secondary">Duration</span>
+                      <p className="font-medium text-prmx-purple">2–7 days</p>
+                    </div>
+                    <div>
+                      <span className="text-text-secondary">Min Lead Time</span>
+                      <p className="font-medium">{secondsToDays(market.windowRules.minLeadTimeSecs)} days</p>
+                    </div>
+                    <div>
+                      <span className="text-text-secondary">Event Type</span>
+                      <p className="font-medium">Cumulative rainfall</p>
+                    </div>
+                    <div>
+                      <span className="text-text-secondary">Early Trigger</span>
+                      <p className="font-medium text-success">Enabled</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Insurance Parameters */}
@@ -280,9 +327,18 @@ export default function MarketDetailPage() {
                 Insurance Parameters
               </h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
+                <div className="col-span-2">
                   <span className="text-text-secondary">Strike Threshold</span>
-                  <p className="font-medium">{market.strikeValue} mm (24h rolling sum)</p>
+                  <p className="font-medium">
+                    {market.strikeValue} mm
+                    {marketId === 0 ? (
+                      <span className="text-text-tertiary text-xs ml-2">
+                        (V1: 24h rolling / V2: cumulative over window)
+                      </span>
+                    ) : (
+                      <span className="text-text-tertiary text-xs ml-2">(24h rolling sum)</span>
+                    )}
+                  </p>
                 </div>
                 <div>
                   <span className="text-text-secondary">Payout per Share</span>
@@ -390,6 +446,7 @@ export default function MarketDetailPage() {
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Policy ID</TableHeaderCell>
+                <TableHeaderCell>Version</TableHeaderCell>
                 <TableHeaderCell>Holder</TableHeaderCell>
                 <TableHeaderCell>Coverage Period</TableHeaderCell>
                 <TableHeaderCell>Shares</TableHeaderCell>
@@ -400,7 +457,7 @@ export default function MarketDetailPage() {
             <TableBody>
               {marketPolicies.length === 0 ? (
                 <TableEmpty 
-                  colSpan={6} 
+                  colSpan={7} 
                   message="No policies in this market yet"
                   icon={<Shield className="w-8 h-8" />}
                 />
@@ -411,8 +468,13 @@ export default function MarketDetailPage() {
                     <TableRow key={policy.id} className="cursor-pointer hover:bg-background-tertiary/50">
                       <TableCell>
                         <Link href={`/policies/${policy.id}`} className="font-medium hover:text-prmx-cyan">
-                          #{policy.id}
+                          #{policy.id + 1}
                         </Link>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={policy.policyVersion === 'V2' ? 'purple' : 'default'}>
+                          {policy.policyVersion || 'V1'}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <span className="font-mono text-sm">{formatAddress(policy.holder)}</span>

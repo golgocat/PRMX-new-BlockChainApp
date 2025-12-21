@@ -21,7 +21,9 @@ import {
   ArrowRight,
   Copy,
   Check,
-  Lock
+  Lock,
+  Activity,
+  Zap
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -31,7 +33,7 @@ import { useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
 import { formatUSDT, formatDate, formatDateTimeUTC, formatAddress, formatCoordinates, formatTimeRemaining } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import type { Policy, Market, PolicyDefiInfo } from '@/types';
+import type { Policy, Market, PolicyDefiInfo, V2Monitor } from '@/types';
 import type { SettlementResult } from '@/lib/api';
 
 export default function PolicyDetailPage() {
@@ -48,6 +50,7 @@ export default function PolicyDetailPage() {
   const [settlementResult, setSettlementResult] = useState<SettlementResult | null>(null);
   const [poolInfo, setPoolInfo] = useState<{ address: string; balance: bigint } | null>(null);
   const [defiInfo, setDefiInfo] = useState<PolicyDefiInfo | null>(null);
+  const [v2Monitor, setV2Monitor] = useState<V2Monitor | null>(null);
   const [loading, setLoading] = useState(true);
   const [settling, setSettling] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -105,6 +108,15 @@ export default function PolicyDetailPage() {
           setDefiInfo(defi);
         } catch (defiErr) {
           console.error('Failed to load DeFi info:', defiErr);
+        }
+        // Load V2 monitor info if this is a V2 policy
+        if (found.policyVersion === 'V2') {
+          try {
+            const monitor = await api.getV2MonitorByPolicy(policyId);
+            setV2Monitor(monitor);
+          } catch (v2Err) {
+            console.error('Failed to load V2 monitor:', v2Err);
+          }
         }
         // Load settlement result if policy is settled
         if (found.status === 'Settled') {
@@ -211,6 +223,12 @@ export default function PolicyDetailPage() {
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold">Policy {policy.label}</h1>
+              <Badge 
+                variant={policy.policyVersion === 'V2' ? 'cyan' : 'default'}
+                className="text-sm"
+              >
+                {policy.policyVersion || 'V1'}
+              </Badge>
               <StatusBadge status={policy.status} />
             </div>
             <p className="text-text-secondary mt-1">
@@ -250,9 +268,9 @@ export default function PolicyDetailPage() {
                     )}
                   </div>
                 </div>
-                <Link href={`/oracle?marketId=${policy.marketId}`}>
-                  <Button variant="secondary" size="sm" icon={<Droplets className="w-4 h-4" />}>
-                    View Rainfall
+                <Link href={policy.policyVersion === 'V2' ? '/oracle-v2' : `/oracle?marketId=${policy.marketId}`}>
+                  <Button variant="secondary" size="sm" icon={policy.policyVersion === 'V2' ? <Activity className="w-4 h-4" /> : <Droplets className="w-4 h-4" />}>
+                    {policy.policyVersion === 'V2' ? 'View V2 Oracle' : 'View Rainfall'}
                   </Button>
                 </Link>
               </div>
@@ -465,6 +483,137 @@ export default function PolicyDetailPage() {
                     The DAO guarantees coverage of potential losses.
                   </p>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* V2 Oracle Details (V2 policies only) */}
+          {policy.policyVersion === 'V2' && (
+            <Card className="border-prmx-purple/30">
+              <CardHeader className="pb-2">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-prmx-purple" />
+                  V2 Oracle Details
+                </h2>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Event Type */}
+                <div className="p-4 rounded-xl bg-prmx-purple/10 border border-prmx-purple/30">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-text-secondary">Event Type</span>
+                      <p className="font-medium text-prmx-purple-light">
+                        {policy.eventType === 'CumulativeRainfallWindow' 
+                          ? 'Cumulative Rainfall' 
+                          : '24h Rolling'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-text-secondary">Early Trigger</span>
+                      <p className="font-medium">
+                        {policy.earlyTrigger ? (
+                          <span className="text-success flex items-center gap-1">
+                            <Zap className="w-3 h-3" /> Enabled
+                          </span>
+                        ) : 'Disabled'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Oracle Status */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-secondary">Oracle Status</span>
+                    <Badge 
+                      variant={
+                        policy.oracleStatusV2 === 'Settled' ? 'success' :
+                        policy.oracleStatusV2 === 'TriggeredReported' ? 'warning' :
+                        'cyan'
+                      }
+                      className="text-xs"
+                    >
+                      {policy.oracleStatusV2 || 'PendingMonitoring'}
+                    </Badge>
+                  </div>
+                  {policy.strikeMm && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-text-secondary">Strike Threshold</span>
+                      <span className="font-medium">{policy.strikeMm / 10} mm</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Live Monitor Data (from oracle service) */}
+                {v2Monitor && (
+                  <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
+                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Activity className="w-4 h-4 text-prmx-cyan" />
+                      Live Monitoring
+                    </h4>
+                    
+                    {/* Cumulative Progress */}
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-text-secondary">Cumulative Rainfall</span>
+                        <span className="font-mono font-semibold">
+                          {(v2Monitor.cumulative_mm / 10).toFixed(1)} / {(v2Monitor.strike_mm / 10).toFixed(1)} mm
+                        </span>
+                      </div>
+                      <div className="h-2 bg-background-secondary rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full transition-all ${
+                            v2Monitor.cumulative_mm >= v2Monitor.strike_mm 
+                              ? 'bg-success' 
+                              : v2Monitor.cumulative_mm >= v2Monitor.strike_mm * 0.75 
+                                ? 'bg-warning' 
+                                : 'bg-prmx-cyan'
+                          }`}
+                          style={{ 
+                            width: `${Math.min(100, (v2Monitor.cumulative_mm / v2Monitor.strike_mm) * 100)}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* State and Last Fetch */}
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-text-tertiary">State</span>
+                        <p className="font-medium capitalize">{v2Monitor.state}</p>
+                      </div>
+                      <div>
+                        <span className="text-text-tertiary">Last Fetch</span>
+                        <p className="font-medium">
+                          {v2Monitor.last_fetch_at > 0 
+                            ? new Date(v2Monitor.last_fetch_at * 1000).toLocaleTimeString()
+                            : 'Never'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Report TX Hash if available */}
+                    {v2Monitor.report_tx_hash && (
+                      <div className="mt-3 pt-3 border-t border-border-secondary">
+                        <span className="text-xs text-text-tertiary">Report TX</span>
+                        <p className="font-mono text-xs truncate text-prmx-cyan">
+                          {v2Monitor.report_tx_hash}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Link to Oracle V2 page */}
+                <Link href="/oracle-v2">
+                  <Button 
+                    variant="secondary" 
+                    className="w-full" 
+                    icon={<Activity className="w-4 h-4" />}
+                  >
+                    View All V2 Monitors
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           )}

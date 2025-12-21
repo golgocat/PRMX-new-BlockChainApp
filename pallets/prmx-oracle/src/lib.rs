@@ -174,6 +174,16 @@ pub trait PolicySettlement<AccountId> {
     /// Settle an expired policy with the determined event outcome
     /// Returns Ok(payout_amount_u128) on success
     fn settle_expired_policy(policy_id: PolicyId, event_occurred: bool) -> Result<u128, sp_runtime::DispatchError>;
+
+    /// Settle a V2 policy based on off-chain oracle report.
+    /// This is called by the oracle pallet after validating the report.
+    fn settle_v2_policy(
+        policy_id: PolicyId,
+        outcome: prmx_primitives::V2Outcome,
+        observed_at: u64,
+        cumulative_mm: u32,
+        evidence_hash: [u8; 32],
+    ) -> Result<(), sp_runtime::DispatchError>;
 }
 
 #[frame_support::pallet]
@@ -383,6 +393,29 @@ pub mod pallet {
     pub type PendingApiKey<T: Config> = StorageValue<_, BoundedVec<u8, ConstU32<256>>, OptionQuery>;
 
     // =========================================================================
+    //                          V2 Oracle Storage
+    // =========================================================================
+
+    /// Authorized V2 oracle reporters (accounts that can submit V2 reports).
+    /// These are off-chain oracle service accounts.
+    #[pallet::storage]
+    #[pallet::getter(fn authorized_v2_reporters)]
+    pub type AuthorizedV2Reporters<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, bool, ValueQuery>;
+
+    /// V2 final reports by policy ID (one report per policy, immutable once set).
+    /// Stored here for oracle-level tracking; policy pallet also stores a copy.
+    #[pallet::storage]
+    #[pallet::getter(fn v2_final_report_by_policy)]
+    pub type V2FinalReportByPolicy<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        PolicyId,
+        prmx_primitives::V2Report<T::AccountId>,
+        OptionQuery,
+    >;
+
+    // =========================================================================
     //                                  Events
     // =========================================================================
 
@@ -439,6 +472,18 @@ pub mod pallet {
             event_occurred: bool,
             payout_amount: u128,
         },
+        // ===== V2 Oracle Events =====
+        /// V2 reporter added
+        V2ReporterAdded { account: T::AccountId },
+        /// V2 reporter removed
+        V2ReporterRemoved { account: T::AccountId },
+        /// V2 report accepted and forwarded to policy pallet
+        V2ReportAccepted {
+            policy_id: super::PolicyId,
+            outcome: prmx_primitives::V2Outcome,
+            cumulative_mm: u32,
+            evidence_hash: [u8; 32],
+        },
     }
 
     // =========================================================================
@@ -477,6 +522,14 @@ pub mod pallet {
         NoPendingFetchRequest,
         /// Invalid unsigned transaction submission
         InvalidUnsignedSubmission,
+        /// Not an authorized V2 reporter
+        NotAuthorizedV2Reporter,
+        /// V2 report already submitted for this policy
+        V2ReportAlreadySubmitted,
+        /// Not a V2 policy
+        NotV2Policy,
+        /// V2 policies only allowed for Manila market
+        V2OnlyManilaAllowed,
     }
 
     // =========================================================================
@@ -1067,6 +1120,121 @@ pub mod pallet {
                 market_count: queued_count,
                 requested_at: now,
             });
+
+            Ok(())
+        }
+
+        // =====================================================================
+        //                       V2 Oracle Extrinsics
+        // =====================================================================
+
+        /// Submit a V2 oracle report for a policy.
+        /// 
+        /// Only authorized V2 reporters can call this.
+        /// This forwards the report to the policy pallet for settlement.
+        ///
+        /// - `policy_id`: The V2 policy to report on.
+        /// - `outcome`: Triggered or MaturedNoEvent.
+        /// - `observed_at`: Timestamp when the outcome was determined.
+        /// - `cumulative_mm`: Cumulative rainfall in tenths of mm.
+        /// - `evidence_hash`: SHA256 hash of off-chain evidence JSON.
+        #[pallet::call_index(10)]
+        #[pallet::weight(Weight::from_parts(100_000, 0))]
+        pub fn submit_v2_report(
+            origin: OriginFor<T>,
+            policy_id: PolicyId,
+            outcome: prmx_primitives::V2Outcome,
+            observed_at: u64,
+            cumulative_mm: u32,
+            evidence_hash: [u8; 32],
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // Verify caller is authorized V2 reporter
+            ensure!(
+                AuthorizedV2Reporters::<T>::get(&who),
+                Error::<T>::NotAuthorizedV2Reporter
+            );
+
+            // Verify no report already submitted for this policy (idempotency)
+            ensure!(
+                !V2FinalReportByPolicy::<T>::contains_key(policy_id),
+                Error::<T>::V2ReportAlreadySubmitted
+            );
+
+            // Get current timestamp
+            let now = Self::current_timestamp();
+
+            // Store the report in oracle storage (immutable record)
+            let report = prmx_primitives::V2Report {
+                outcome: outcome.clone(),
+                observed_at,
+                cumulative_mm,
+                evidence_hash,
+                reporter: who.clone(),
+                submitted_at: now,
+            };
+            V2FinalReportByPolicy::<T>::insert(policy_id, report);
+
+            // Forward to policy pallet for actual settlement
+            // The policy pallet will validate the report and perform settlement
+            T::PolicySettlement::settle_v2_policy(
+                policy_id,
+                outcome.clone(),
+                observed_at,
+                cumulative_mm,
+                evidence_hash,
+            )?;
+
+            // Emit event
+            Self::deposit_event(Event::V2ReportAccepted {
+                policy_id,
+                outcome,
+                cumulative_mm,
+                evidence_hash,
+            });
+
+            log::info!(
+                target: "prmx-oracle",
+                "✅ V2 report accepted for policy {}: {:?}, cumulative_mm={}",
+                policy_id,
+                outcome,
+                cumulative_mm
+            );
+
+            Ok(())
+        }
+
+        /// Add an authorized V2 reporter.
+        /// Only governance/root can call this.
+        #[pallet::call_index(11)]
+        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        pub fn add_v2_reporter(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+
+            AuthorizedV2Reporters::<T>::insert(&account, true);
+
+            Self::deposit_event(Event::V2ReporterAdded { account });
+
+            Ok(())
+        }
+
+        /// Remove an authorized V2 reporter.
+        /// Only governance/root can call this.
+        #[pallet::call_index(12)]
+        #[pallet::weight(Weight::from_parts(10_000, 0))]
+        pub fn remove_v2_reporter(
+            origin: OriginFor<T>,
+            account: T::AccountId,
+        ) -> DispatchResult {
+            T::GovernanceOrigin::ensure_origin(origin)?;
+
+            AuthorizedV2Reporters::<T>::remove(&account);
+
+            Self::deposit_event(Event::V2ReporterRemoved { account });
 
             Ok(())
         }

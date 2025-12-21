@@ -64,3 +64,7 @@ try-runtime = [
     "frame-support/try-runtime",
     "frame-system/try-runtime",
 ]
+# EXPERIMENTAL: Enable live XCM strategy for real cross-chain capital management.
+# Only enable when HRMP channels to Asset Hub and Hydration are configured.
+# By default, the MockXcmStrategyInterface is used instead.
+live-xcm = []

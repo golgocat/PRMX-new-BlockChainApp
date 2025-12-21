@@ -22,6 +22,16 @@
 //! 3. **DAO Covers Losses**: DeFi loss is covered 100% by the DAO
 //! 4. **DAO Receives Profits**: DeFi profit always accrues to the DAO
 //! 5. **Full Unwind at Settlement**: All LP positions are fully unwound at settlement
+//!
+//! ## XCM Strategy Selection
+//!
+//! By default, `MockXcmStrategyInterface` is used which simulates DeFi operations locally.
+//!
+//! **EXPERIMENTAL**: To enable real XCM cross-chain operations, enable the `live-xcm` feature.
+//! This requires HRMP channels to Asset Hub and Hydration to be properly configured.
+//! ```toml
+//! pallet-prmx-xcm-capital = { ..., features = ["live-xcm"] }
+//! ```
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -29,11 +39,15 @@ extern crate alloc;
 
 pub use pallet::*;
 
-// XCM configuration for Hydration Pool 102 integration (placeholder for future implementation)
+// XCM configuration constants for Hydration Pool 102 integration.
+// These are always available for reference, even when live-xcm is disabled.
 pub mod xcm_config;
 
-// Live XCM strategy interface for real cross-chain operations
+// EXPERIMENTAL: Live XCM strategy interface for real cross-chain operations.
+// Only available when the `live-xcm` feature is enabled.
+#[cfg(feature = "live-xcm")]
 pub mod xcm_strategy;
+#[cfg(feature = "live-xcm")]
 pub use xcm_strategy::LiveXcmStrategyInterface;
 
 use frame_support::traits::fungibles::{Inspect, Mutate};

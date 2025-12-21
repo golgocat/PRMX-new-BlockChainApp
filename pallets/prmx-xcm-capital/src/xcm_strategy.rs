@@ -1,7 +1,16 @@
-//! Live XCM Strategy Interface Implementation
+//! # Live XCM Strategy Interface Implementation
+//!
+//! **EXPERIMENTAL - DO NOT USE IN PRODUCTION**
 //!
 //! This module implements the `XcmStrategyInterface` trait using real XCM
 //! for cross-chain capital management with Hydration Pool 102 via Asset Hub.
+//!
+//! ## Prerequisites
+//!
+//! Before enabling this module, ensure:
+//! - HRMP channels are open between PRMX <-> Asset Hub <-> Hydration
+//! - DAO account has sufficient funds for XCM fees
+//! - Hydration pallet indices are verified against the live runtime
 //!
 //! ## XCM Flow
 //!
@@ -17,6 +26,11 @@
 //! 1. Transact -> stableswap.remove_liquidity_one_asset
 //! 2. InitiateReserveWithdraw to Asset Hub
 //! 3. DepositReserveAsset to PRMX
+//!
+//! ## Current Status
+//!
+//! XCM messages are constructed but NOT actually sent (TODO). This module
+//! returns expected values and logs intent for testing purposes only.
 
 use crate::{Config, XcmStrategyInterface};
 use alloc::vec;

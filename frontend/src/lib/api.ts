@@ -301,20 +301,23 @@ export async function createMarket(
   const strikeValueScaled = params.strikeValue * 10;
   
   return new Promise((resolve, reject) => {
-    api.tx.prmxMarkets.daoCreateMarket(
-      params.name,
-      params.centerLatitude,
-      params.centerLongitude,
-      params.timezoneOffsetHours,
-      strikeValueScaled,
-      USDT_ASSET_ID,
-      PAYOUT_PER_SHARE,
-      { daoMarginBp: params.daoMarginBp },
-      {
-        minDurationSecs: params.minDurationSecs,
-        maxDurationSecs: params.maxDurationSecs,
-        minLeadTimeSecs: params.minLeadTimeSecs,
-      }
+    // Wrap in sudo since daoCreateMarket requires Root origin (DaoOrigin = EnsureRoot)
+    api.tx.sudo.sudo(
+      api.tx.prmxMarkets.daoCreateMarket(
+        params.name,
+        params.centerLatitude,
+        params.centerLongitude,
+        params.timezoneOffsetHours,
+        strikeValueScaled,
+        USDT_ASSET_ID,
+        PAYOUT_PER_SHARE,
+        { daoMarginBp: params.daoMarginBp },
+        {
+          minDurationSecs: params.minDurationSecs,
+          maxDurationSecs: params.maxDurationSecs,
+          minLeadTimeSecs: params.minLeadTimeSecs,
+        }
+      )
     ).signAndSend(signer, ({ status, dispatchError }) => {
       if (dispatchError) {
         if (dispatchError.isModule) {

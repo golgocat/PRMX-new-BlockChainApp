@@ -5,7 +5,7 @@ const risks = [
   {
     icon: CloudRain,
     title: 'Event Risk',
-    description: 'If rainfall exceeds the strike threshold, your LP tokens pay out to policyholders. You lose your invested capital.',
+    description: 'If rainfall exceeds the strike threshold (V1: 24h rolling, V2: cumulative over window), your LP tokens pay out to policyholders. You lose your invested capital.',
     severity: 'high',
     mitigation: 'Diversify across multiple markets and policies. Research historical rainfall patterns before investing.',
   },

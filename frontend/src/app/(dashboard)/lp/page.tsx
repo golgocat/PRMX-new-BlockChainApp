@@ -1399,8 +1399,17 @@ export default function LpTradingPage() {
                 <div className="mt-3 pt-3 border-t border-border-secondary text-xs text-text-secondary flex items-start gap-2">
                   <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
                   <span>
-                    As an LP, you earn {maxPayout}/share if the 24h rolling rainfall stays below {market.strikeValue}mm. 
-                    If the event occurs (rainfall exceeds threshold), your investment pays out to policy holders.
+                    {policy?.policyVersion === 'V2' ? (
+                      <>
+                        As an LP, you earn {maxPayout}/share if the cumulative rainfall stays below {market.strikeValue}mm over the coverage window. 
+                        V2 policies have early trigger enabled - if rainfall exceeds threshold at any point, your investment pays out immediately.
+                      </>
+                    ) : (
+                      <>
+                        As an LP, you earn {maxPayout}/share if the 24h rolling rainfall stays below {market.strikeValue}mm. 
+                        If the event occurs (rainfall exceeds threshold), your investment pays out to policy holders.
+                      </>
+                    )}
                   </span>
                 </div>
               </div>
@@ -1669,8 +1678,18 @@ export default function LpTradingPage() {
                 <AlertTriangle className="w-4 h-4 text-error mt-0.5 flex-shrink-0" />
                 <div className="text-xs text-text-secondary">
                   <span className="text-error font-medium">Event Risk: </span>
-                  If the 24h rolling rainfall exceeds {market?.strikeValue || 50}mm during the coverage period, 
-                  your LP tokens will pay out to the policy holder and you will lose your investment.
+                  {policy?.policyVersion === 'V2' ? (
+                    <>
+                      If the cumulative rainfall over the coverage window exceeds {market?.strikeValue || 50}mm, 
+                      your LP tokens will pay out to the policy holder and you will lose your investment.
+                      <span className="text-prmx-purple-light"> (V2: early trigger enabled)</span>
+                    </>
+                  ) : (
+                    <>
+                      If the 24h rolling rainfall exceeds {market?.strikeValue || 50}mm during the coverage period, 
+                      your LP tokens will pay out to the policy holder and you will lose your investment.
+                    </>
+                  )}
                   {policyDefiInfoMap.get(selectedHoldingPolicyId)?.isAllocatedToDefi && (
                     <span className="block mt-1">
                       <span className="text-prmx-purple-light font-medium">DeFi Risk: </span>

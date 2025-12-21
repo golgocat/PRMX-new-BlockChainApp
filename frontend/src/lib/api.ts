@@ -1135,8 +1135,10 @@ export async function setAccuweatherApiKey(
   const api = await getApi();
   
   return new Promise((resolve, reject) => {
-    api.tx.prmxOracle.setAccuweatherApiKey(apiKey)
-      .signAndSend(signer, ({ status, dispatchError }) => {
+    // Wrap in sudo since setAccuweatherApiKey requires GovernanceOrigin (EnsureRoot)
+    api.tx.sudo.sudo(
+      api.tx.prmxOracle.setAccuweatherApiKey(apiKey)
+    ).signAndSend(signer, ({ status, dispatchError }) => {
         if (dispatchError) {
           if (dispatchError.isModule) {
             const decoded = api.registry.findMetaError(dispatchError.asModule);

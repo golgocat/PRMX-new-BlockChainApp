@@ -4,16 +4,30 @@
 
 PRMX is a Substrate-based blockchain that provides **rainfall parametric insurance** with:
 
-- **v1: Fixed 24-hour coverage window** (1 day per policy for testing)
+- **V1: Fixed 24-hour coverage window** with on-chain oracle (24h rolling rainfall)
+- **V2: Configurable 2-7 day coverage** with off-chain oracle (cumulative rainfall, early trigger)
 - Pricing from an external R-based probability model (HTTP API)
 - Per-policy fully funded capital pools (max payout locked on-chain)
 - Risk-bearing LP tokens tradable via an LP-only orderbook
 - Non-tradable coverage (Policy Token side) represented by policies
 - Market-level geospatial targeting (center latitude / longitude per market)
-- AccuWeather-based rainfall oracle bound per market
+- AccuWeather-based rainfall oracle (V1: on-chain OCW, V2: off-chain Node.js service)
 - XCM-based capital management (Hydration Pool 102 integration prepared)
 - Gasless UX on core insurance flows
 - Governance via a native PRMX token
+
+---
+
+## Version Summary
+
+| Feature | V1 | V2 |
+|---------|----|----|
+| **Markets** | All markets | Manila only |
+| **Coverage Duration** | 24 hours fixed | 2-7 days configurable |
+| **Event Type** | 24h rolling rainfall | Cumulative over window |
+| **Early Trigger** | No | Yes |
+| **Oracle** | On-chain OCW | Off-chain Node.js + MongoDB |
+| **Settlement** | Automatic via `on_initialize` | Via `submit_v2_report` extrinsic |
 
 **Reference Polkadot SDK version:**
 
@@ -59,55 +73,67 @@ When ready to deploy as a Polkadot parachain via Tanssi:
   - Service, chain spec, CLI etc. from the reference repo
 - PRMX pallets are integrated into a custom runtime
 
-**Core pallets in this design:**
+**Core pallets and crates in this design:**
 
-| Pallet | Purpose |
-|--------|---------|
-| `pallet_prmx_markets` | Market definitions and parameters |
-| `pallet_prmx_policy` | Policies (Policy Token side) and per-policy capital pools |
+| Component | Purpose |
+|-----------|---------|
+| `prmx-primitives` | Shared types (PolicyVersion, V2Outcome, V2Report, etc.) |
+| `pallet_prmx_markets` | Market definitions and parameters (V2 rules for Manila) |
+| `pallet_prmx_policy` | Policies (V1/V2), per-policy capital pools, V2 settlement |
 | `pallet_prmx_holdings` | LP token holdings per policy |
 | `pallet_prmx_orderbook_lp` | LP-only orderbook |
-| `pallet_prmx_oracle` | AccuWeather-based rainfall data and 24h rolling sums |
-| `pallet_prmx_quote` | Pricing via external R model and offchain worker |
+| `pallet_prmx_oracle` | V1: 24h rolling sums, V2: report receiver for off-chain service |
+| `pallet_prmx_quote` | Pricing via external R model (V1 and V2 quote requests) |
 | `pallet_prmx_xcm_capital` | XCM-based capital management with Hydration Pool 102 |
+
+**Off-chain services:**
+
+| Service | Purpose |
+|---------|---------|
+| `oracle-v2/` | Node.js + MongoDB Atlas service for V2 cumulative rainfall monitoring |
 
 ---
 
 ## 2. High-Level Architecture and Flow
 
-### Key Flows
+### Key Flows (V1 and V2)
 
 1. **DAO creates a market** (e.g., Manila)
    - Sets name, center latitude/longitude, strike, window rules, DAO margin, payout per share
+   - Manila (market_id=0) supports both V1 and V2 policies
 
 2. **Oracle offchain worker resolves AccuWeather location** for that market
    - Geoposition search using center coordinates
    - Binds the AccuWeather Location Key to the market
 
 3. **User requests a quote** for a policy
-   - Chooses market (e.g., Manila), coverage window, and number of shares
+   - **V1**: `request_policy_quote` - 24h fixed coverage
+   - **V2**: `request_policy_quote_v2` - 2-7 day coverage, Manila only
    - Offchain worker calls R pricing API using the market's center coordinates
    - Stores quote result on-chain
 
 4. **User applies coverage** using the quote
-   - Policy is created (bound to market, with per-policy lat/lon for reference)
+   - Policy is created with `policy_version = V1` or `V2`
    - User premium plus DAO capital are locked in a per-policy pool
    - DAO receives LP tokens for this specific policy
    - A DAO LP ask is auto-listed on the orderbook
+   - **V2 only**: `V2PolicyCreated` event emitted for off-chain oracle
 
 5. **Liquidity providers buy LP tokens** on the LP-only orderbook
    - They absorb risk in exchange for premium-based yield
    - LP tokens are policy-specific (isolated risk exposure)
 
-6. **During and after coverage**
-   - Oracle offchain worker periodically ingests AccuWeather rainfall data by market
-   - Rainfall is aggregated into hourly buckets and 24h rolling sums
+6. **During coverage - Oracle monitoring**
+   - **V1**: On-chain offchain worker periodically ingests rainfall, maintains 24h rolling sums
+   - **V2**: Off-chain Node.js service monitors cumulative rainfall, early trigger enabled
 
 7. **Settlement**
-   - At or after coverage end, anyone can call a settlement extrinsic
-   - Oracle checks whether 24h rainfall exceeded the strike at any time during the coverage window
-   - If yes → Policy Token side wins, policy holder gets max payout
-   - If no → LP side wins, pooled capital is automatically distributed pro-rata to LP holders
+   - **V1**: At or after coverage end, oracle checks 24h rolling rainfall
+   - **V2**: Off-chain service submits `submit_v2_report` when:
+     - Cumulative ≥ strike (Triggered) → immediate settlement
+     - Coverage ends with cumulative < strike (MaturedNoEvent) → no payout
+   - If event → Policy Token side wins, policy holder gets max payout
+   - If no event → LP side wins, pooled capital distributed pro-rata to LP holders
    - LP tokens are burned after settlement
 
 8. **LP Token Cleanup**
@@ -279,19 +305,30 @@ pub struct WindowRules {
 }
 ```
 
-**v1 Configuration (Fixed 24-hour coverage):**
+**V1 Configuration (Fixed 24-hour coverage):**
 
-For v1, coverage duration is fixed to **1 day (24 hours)** to align with the R actuarial model and oracle event definitions. See `pricing-model.md` for details.
+For V1, coverage duration is fixed to **1 day (24 hours)** to align with the R actuarial model and oracle event definitions. See `pricing-model.md` for details.
 
-| Parameter | v1 Value | Notes |
+| Parameter | V1 Value | Notes |
 |-----------|----------|-------|
-| `min_duration_secs` | 86,400 (1 day) | Fixed for v1 |
-| `max_duration_secs` | 86,400 (1 day) | Fixed for v1 (same as min) |
+| `min_duration_secs` | 86,400 (1 day) | Fixed for V1 |
+| `max_duration_secs` | 86,400 (1 day) | Fixed for V1 (same as min) |
 | `min_lead_time_secs` | 0 (for testing) | Production: 1,814,400 (21 days) |
 
-**Frontend enforces 1-day duration** - users cannot select different durations in v1.
+**V2 Configuration (2-7 day coverage, Manila only):**
 
-**v2 will extend to 1-7 days** once the R model and oracle support variable-length windows.
+| Parameter | V2 Value | Notes |
+|-----------|----------|-------|
+| `min_duration_days` | 2 | Minimum V2 coverage |
+| `max_duration_days` | 7 | Maximum V2 coverage |
+| `min_lead_time_secs` | 0 (for testing) | Production: 1,814,400 (21 days) |
+| `market` | Manila only | market_id = 0 |
+| `early_trigger` | true | Always enabled for V2 |
+
+**Frontend behavior:**
+
+- V1: 24h fixed duration (default for all markets)
+- V2: Duration selector (2-7 days) appears only for Manila market when V2 is selected
 
 ### 5.3 Payout Per Share
 
@@ -392,10 +429,47 @@ pub struct PolicyInfo<T: Config> {
     pub status: PolicyStatus,
     pub premium_paid: T::Balance, // actual premium paid
     pub max_payout: T::Balance,   // maximum payout amount
+    
+    // V2 fields (from prmx-primitives)
+    pub policy_version: PolicyVersion,     // V1 or V2
+    pub event_type: EventType,             // Rainfall24hRolling or CumulativeRainfallWindow
+    pub early_trigger: bool,               // true for V2
+    pub oracle_status_v2: Option<V2OracleStatus>, // V2 only
 }
 ```
 
-### 6.2 SettlementResult
+### 6.2 V2 Types (from prmx-primitives)
+
+```rust
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Encode, Decode, TypeInfo)]
+pub enum PolicyVersion {
+    V1,  // 24h rolling rainfall, on-chain oracle
+    V2,  // Cumulative rainfall, off-chain oracle
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Encode, Decode, TypeInfo)]
+pub enum EventType {
+    Rainfall24hRolling,       // V1: 24h rolling sum
+    CumulativeRainfallWindow, // V2: cumulative over coverage window
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Encode, Decode, TypeInfo)]
+pub enum V2OracleStatus {
+    PendingMonitoring,
+    Monitoring,
+    TriggeredReported,
+    MaturedReported,
+    Settled,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Encode, Decode, TypeInfo)]
+pub enum V2Outcome {
+    Triggered,       // Cumulative >= strike
+    MaturedNoEvent,  // Coverage ended, cumulative < strike
+}
+```
+
+### 6.3 SettlementResult
 
 When a policy is settled, the outcome is stored for transparency and auditing:
 
@@ -970,9 +1044,11 @@ fn buy_lp(
 
 ## 12. Oracle Summary
 
-> **Detailed specification in `oracle_design.md`.**
+> **Detailed specification in `oracle-design.md`.**
 
-**Key points for this document:**
+### 12.1 V1 Oracle (On-Chain)
+
+**Key points:**
 
 - Each market has a `center_latitude` and `center_longitude`
 - Oracle offchain worker:
@@ -986,7 +1062,7 @@ fn buy_lp(
 - `LocationId` is an alias for `MarketId`
 - **Automatic settlement**: Oracle can trigger settlement when thresholds are breached during coverage
 
-**RainfallOracle Trait:**
+**RainfallOracle Trait (V1):**
 
 ```rust
 pub trait RainfallOracle {
@@ -1004,9 +1080,50 @@ pub trait RainfallOracle {
 }
 ```
 
-**PolicySettlement Trait (implemented by policy pallet):**
+### 12.2 V2 Oracle (Off-Chain Service)
 
-The oracle pallet uses this trait to coordinate automatic settlement:
+**Key points:**
+
+- V2 policies use a dedicated Node.js service (`oracle-v2/`) with MongoDB Atlas
+- The service listens for `V2PolicyCreated` events and creates monitor documents
+- Monitors track cumulative rainfall over the coverage window
+- **Early trigger**: Settlement occurs immediately when cumulative ≥ strike
+- Service submits `submit_v2_report` extrinsic with outcome, cumulative_mm, and evidence_hash
+
+**V2 Oracle Extrinsics:**
+
+```rust
+// Submit V2 report (authorized reporters only)
+fn submit_v2_report(
+    origin,
+    policy_id: PolicyId,
+    outcome: V2Outcome,
+    observed_at: u64,
+    cumulative_mm: u32,
+    evidence_hash: [u8; 32],
+) -> DispatchResult;
+
+// Manage authorized reporters (governance)
+fn add_v2_reporter(origin, account: AccountId) -> DispatchResult;
+fn remove_v2_reporter(origin, account: AccountId) -> DispatchResult;
+```
+
+**V2 Events:**
+
+```rust
+V2ReporterAdded { account: AccountId }
+V2ReporterRemoved { account: AccountId }
+V2ReportAccepted {
+    policy_id: PolicyId,
+    outcome: V2Outcome,
+    cumulative_mm: u32,
+    evidence_hash: [u8; 32],
+}
+```
+
+### 12.3 PolicySettlement Trait
+
+The oracle pallet uses this trait to coordinate settlement (both V1 and V2):
 
 ```rust
 pub trait PolicySettlement<AccountId> {
@@ -1014,10 +1131,16 @@ pub trait PolicySettlement<AccountId> {
     fn get_active_policies_in_window(market_id: MarketId, current_time: u64) -> Vec<PolicyId>;
     fn get_policy_info(policy_id: PolicyId) -> Option<(MarketId, u64, u64)>;
     fn trigger_immediate_settlement(policy_id: PolicyId) -> Result<(), DispatchError>;
+    
+    // V2 settlement
+    fn settle_v2_policy(
+        policy_id: PolicyId,
+        outcome: V2Outcome,
+        observed_at: u64,
+        cumulative_mm: u32,
+        evidence_hash: [u8; 32],
+    ) -> Result<u128, DispatchError>;
 }
-```
-
-The policy pallet uses `exceeded_threshold_in_window` at settlement time, and the oracle pallet can call `trigger_immediate_settlement` when a threshold breach is detected during an active coverage period.
 
 ---
 
@@ -1338,39 +1461,78 @@ prmx-chain/
   app-design.md
   oracle-design.md
   pricing-model.md
+  
+  primitives/                   # Shared types crate
+    Cargo.toml
+    src/lib.rs                  # PolicyVersion, V2Outcome, V2Report, etc.
+  
   pallets/
     prmx-markets/
-      src/lib.rs
+      src/lib.rs                # V2 rules for Manila
     prmx-policy/
-      src/lib.rs
+      src/lib.rs                # V1/V2 policies, V2PolicyCreated/Settled events
     prmx-holdings/
       src/lib.rs
     prmx-orderbook-lp/
       src/lib.rs
     prmx-oracle/
-      src/lib.rs
+      src/lib.rs                # V1 rolling sums + V2 report receiver
     prmx-quote/
-      src/lib.rs
+      src/lib.rs                # request_policy_quote + request_policy_quote_v2
     prmx-xcm-capital/           # XCM capital management
       src/
         lib.rs                  # Pallet with MockXcmStrategyInterface
         xcm_config.rs           # Hydration Pool 102 configuration (preserved)
         xcm_strategy.rs         # LiveXcmStrategyInterface (preserved)
+  
   runtime/
     src/lib.rs                  # Standalone dev chain (no cumulus pallets)
+  
   node/
     src/chain_spec.rs
     src/service.rs
+  
+  oracle-v2/                    # V2 off-chain oracle service
+    package.json
+    tsconfig.json
+    src/
+      index.ts                  # Entry point
+      config.ts                 # Environment configuration
+      chain/
+        listener.ts             # V2PolicyCreated/Settled event listener
+        reporter.ts             # submit_v2_report transaction submitter
+      db/
+        mongo.ts                # MongoDB Atlas connection + chain restart detection
+      accuweather/
+        fetcher.ts              # AccuWeather API client
+      evaluator/
+        cumulative.ts           # Cumulative rainfall calculator
+      scheduler/
+        monitor.ts              # Polling loop for active monitors
+      api/
+        server.ts               # Express.js REST API
+        routes.ts               # /v2/monitors, /v2/stats endpoints
+  
   scripts/
     run-node-dev.sh
-    functional-tests/           # JavaScript functional tests
+    set-oracle-api-key.mjs      # Inject AccuWeather API key
+    e2e-singapore-flow.mjs      # V1 functional test
+    e2e-v2-policy-flow.mjs      # V2 functional test
+    test-v2-settlement.mjs      # V2 settlement test (triggered + matured)
+  
   frontend/
     src/
-      app/           # Next.js pages
-      components/    # React components
-      hooks/         # Custom hooks
-      lib/           # API and utilities
-      types/         # TypeScript types
+      app/
+        (dashboard)/
+          oracle-v2/page.tsx    # V2 Oracle monitoring page
+          policies/new/page.tsx # Get Coverage (V1/V2 selector)
+          markets/[id]/page.tsx # Market detail (V1/V2 badges)
+      components/
+      hooks/
+      lib/
+        api.ts                  # V2 API functions (getV2Monitors, etc.)
+      types/
+        index.ts                # V2Monitor, V2MonitorStats interfaces
 ```
 
 ---

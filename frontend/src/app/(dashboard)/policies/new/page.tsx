@@ -185,17 +185,37 @@ export default function NewPolicyPage() {
       
       setQuoteRequestId(requestId);
       setCurrentStep(3);
-      toast.success('Quote requested! Calculating premium...');
+      toast.success('Quote requested! Waiting for pricing from R model...');
       
-      // Step 2: Simulate off-chain worker by submitting quote result
-      // In production, the off-chain worker would do this automatically
-      // For testing, we submit a mock probability (10% = 100,000 ppm)
-      const mockProbabilityPpm = 100000; // 10% probability
-      await api.submitQuote(keypair, requestId, mockProbabilityPpm);
+      // Step 2: Wait for off-chain worker to process the quote
+      // The OCW fetches probability from the R pricing API and submits it
+      // Poll for quote to become Ready (max ~30 seconds)
+      let quoteReady = false;
+      const maxAttempts = 15;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+        await refreshQuotes();
+        
+        // Check if our quote is now ready via API (result is non-null when ready)
+        const updatedQuotes = await api.getQuoteRequests();
+        const ourQuote = updatedQuotes.find((q: QuoteRequest) => q.id === requestId);
+        if (ourQuote?.result) {
+          quoteReady = true;
+          const probability = ourQuote.result.probabilityPercent || 0;
+          toast.success(`Quote ready! Probability: ${(probability / 100).toFixed(2)}%`);
+          break;
+        }
+        
+        if (attempt < maxAttempts - 1) {
+          toast.loading(`Waiting for R pricing model... (${attempt + 1}/${maxAttempts})`, { id: 'quote-wait' });
+        }
+      }
+      toast.dismiss('quote-wait');
       
-      // Refresh quotes to get the result
-      await refreshQuotes();
-      toast.success('Quote calculated successfully!');
+      if (!quoteReady) {
+        toast.error('Quote pricing timed out. The R pricing API may be unavailable. Please try again.');
+        throw new Error('Quote pricing timed out');
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to request quote');
     } finally {

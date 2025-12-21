@@ -521,20 +521,33 @@ export default function PolicyDetailPage() {
                   </div>
                 </div>
 
-                {/* Oracle Status */}
+                {/* Oracle Status - prioritize live monitor state when available */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-text-secondary">Oracle Status</span>
-                    <Badge 
-                      variant={
-                        policy.oracleStatusV2 === 'Settled' ? 'success' :
-                        policy.oracleStatusV2 === 'TriggeredReported' ? 'warning' :
-                        'cyan'
-                      }
-                      className="text-xs"
-                    >
-                      {policy.oracleStatusV2 || 'PendingMonitoring'}
-                    </Badge>
+                    {(() => {
+                      // Use live monitor state if available, otherwise fall back to on-chain status
+                      const liveState = v2Monitor?.state;
+                      const displayStatus = liveState 
+                        ? (liveState === 'triggered' ? 'Triggered' :
+                           liveState === 'matured' ? 'Matured' :
+                           liveState === 'reported' ? 'Reported' :
+                           liveState === 'monitoring' ? 'Monitoring' : liveState)
+                        : (policy.oracleStatusV2 || 'PendingMonitoring');
+                      
+                      const variant = 
+                        displayStatus === 'Settled' || displayStatus === 'Reported' ? 'success' :
+                        displayStatus === 'Triggered' || displayStatus === 'TriggeredReported' ? 'warning' :
+                        displayStatus === 'Matured' || displayStatus === 'MaturedReported' ? 'default' :
+                        displayStatus === 'Monitoring' ? 'cyan' :
+                        'default';
+                      
+                      return (
+                        <Badge variant={variant} className="text-xs">
+                          {displayStatus}
+                        </Badge>
+                      );
+                    })()}
                   </div>
                   {policy.strikeMm && (
                     <div className="flex items-center justify-between text-sm">

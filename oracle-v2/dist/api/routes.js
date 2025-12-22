@@ -4,6 +4,7 @@
 import { getMonitors, getBuckets } from '../db/mongo.js';
 import { runEvaluationCycle } from '../scheduler/monitor.js';
 import { evaluateMonitor } from '../evaluator/cumulative.js';
+import { fetchPrecipitation } from '../accuweather/fetcher.js';
 /**
  * Setup all API routes
  */
@@ -195,6 +196,38 @@ export function setupRoutes(app) {
             res.status(500).json({
                 success: false,
                 error: 'Failed to trigger monitor evaluation',
+            });
+        }
+    });
+    // Test endpoint to check AccuWeather API response
+    app.get('/v2/test/accuweather/:locationKey', async (req, res) => {
+        try {
+            const { locationKey } = req.params;
+            const now = Math.floor(Date.now() / 1000);
+            const startTime = now - 86400; // Last 24 hours
+            console.log(`🧪 Testing AccuWeather API for location ${locationKey}`);
+            console.log(`   Time window: ${new Date(startTime * 1000).toISOString()} to ${new Date(now * 1000).toISOString()}`);
+            const records = await fetchPrecipitation(locationKey, startTime, now);
+            res.json({
+                success: true,
+                locationKey,
+                timeWindow: {
+                    start: new Date(startTime * 1000).toISOString(),
+                    end: new Date(now * 1000).toISOString(),
+                },
+                recordsCount: records.length,
+                records: records.map(r => ({
+                    dateTime: r.dateTime,
+                    precipitationMm: r.precipitationMm,
+                    timestamp: new Date(r.dateTime).getTime() / 1000,
+                })),
+            });
+        }
+        catch (error) {
+            console.error('Error testing AccuWeather API:', error);
+            res.status(500).json({
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error',
             });
         }
     });

@@ -29,10 +29,19 @@ export async function evaluateMonitor(monitor) {
     const overlapStart = Math.max(monitor.coverage_start, monitor.last_fetch_at > 0 ? monitor.last_fetch_at - 7200 : monitor.coverage_start // 2h overlap
     );
     const fetchEnd = Math.min(now, monitor.coverage_end);
+    console.log(`📡 Fetching precipitation for policy ${monitor.policy_id}:`);
+    console.log(`   Location: ${monitor.location_key}`);
+    console.log(`   Window: ${new Date(overlapStart * 1000).toISOString()} to ${new Date(fetchEnd * 1000).toISOString()}`);
+    console.log(`   Coverage: ${new Date(monitor.coverage_start * 1000).toISOString()} to ${new Date(monitor.coverage_end * 1000).toISOString()}`);
     try {
         const records = await fetchPrecipitation(monitor.location_key, overlapStart, fetchEnd);
+        console.log(`   ✅ Received ${records.length} records from AccuWeather API`);
+        if (records.length === 0) {
+            console.log(`   ⚠️  No precipitation records found in time window. This might be normal if there was no rain.`);
+        }
         // Update buckets
         const buckets = getBuckets();
+        let bucketsCreated = 0;
         for (const record of records) {
             const hourUtc = normalizeToHour(record.dateTime);
             const bucketId = `${monitor._id}:${hourUtc.replace(/[-:TZ]/g, '').slice(0, 10)}`;
@@ -43,10 +52,14 @@ export async function evaluateMonitor(monitor) {
                     mm: Math.round(record.precipitationMm * 10), // Convert to tenths of mm
                 }
             }, { upsert: true });
+            bucketsCreated++;
+            console.log(`   📦 Created/updated bucket ${bucketId}: ${record.precipitationMm}mm at ${record.dateTime}`);
         }
+        console.log(`   📊 Created/updated ${bucketsCreated} buckets`);
         // Recompute cumulative rainfall
         const allBuckets = await buckets.find({ monitor_id: monitor._id }).toArray();
         const cumulativeMm = allBuckets.reduce((sum, b) => sum + b.mm, 0);
+        console.log(`   💧 Total cumulative: ${cumulativeMm / 10}mm (from ${allBuckets.length} buckets)`);
         // Update monitor
         const monitors = getMonitors();
         await monitors.updateOne({ _id: monitor._id }, {

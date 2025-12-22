@@ -59,8 +59,10 @@ export default function MarketDetailPage() {
     loadMarket();
   }, [marketId]);
 
-  const loadMarket = async () => {
-    setLoading(true);
+  const loadMarket = async (isInitialLoad = true) => {
+    if (isInitialLoad) {
+      setLoading(true);
+    }
     try {
       const marketData = await api.getMarket(marketId);
       setMarket(marketData);
@@ -76,7 +78,9 @@ export default function MarketDetailPage() {
       console.error('Failed to load market:', err);
       toast.error('Failed to load market details');
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   };
 
@@ -177,7 +181,7 @@ export default function MarketDetailPage() {
             variant="secondary" 
             onClick={async () => {
               setIsRefreshing(true);
-              await loadMarket();
+              await loadMarket(false);
               setIsRefreshing(false);
             }} 
             icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}

@@ -81,8 +81,10 @@ export default function PolicyDetailPage() {
     return () => clearInterval(interval);
   }, [policyId]);
 
-  const loadPolicy = async () => {
-    setLoading(true);
+  const loadPolicy = async (isInitialLoad = true) => {
+    if (isInitialLoad) {
+      setLoading(true);
+    }
     try {
       const policies = await api.getPolicies();
       const found = policies.find(p => p.id === policyId);
@@ -129,7 +131,9 @@ export default function PolicyDetailPage() {
       console.error('Failed to load policy:', err);
       toast.error('Failed to load policy details');
     } finally {
-      setLoading(false);
+      if (isInitialLoad) {
+        setLoading(false);
+      }
     }
   };
 
@@ -241,7 +245,7 @@ export default function PolicyDetailPage() {
           variant="secondary" 
           onClick={async () => {
             setIsRefreshing(true);
-            await loadPolicy();
+            await loadPolicy(false);
             setIsRefreshing(false);
           }} 
           icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}

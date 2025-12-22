@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -66,24 +66,8 @@ export default function PolicyDetailPage() {
     }
   };
 
-  useEffect(() => {
-    if (isNaN(policyId) || policyId < 0) {
-      router.push('/policies');
-      return;
-    }
-    
-    loadPolicy();
-    
-    // Auto-refresh every 10 seconds for real-time settlement updates
-    // Use isInitialLoad=false to prevent scroll jumps and loading state
-    const interval = setInterval(() => {
-      loadPolicy(false);
-    }, 10000);
-    
-    return () => clearInterval(interval);
-  }, [policyId]);
-
-  const loadPolicy = async (isInitialLoad = true) => {
+  // Define loadPolicy with useCallback BEFORE useEffect
+  const loadPolicy = useCallback(async (isInitialLoad = true) => {
     if (isInitialLoad) {
       setLoading(true);
     }
@@ -144,7 +128,25 @@ export default function PolicyDetailPage() {
         setLoading(false);
       }
     }
-  };
+  }, [policyId, markets]);
+
+  // Auto-refresh effect - now loadPolicy is defined above
+  useEffect(() => {
+    if (isNaN(policyId) || policyId < 0) {
+      router.push('/policies');
+      return;
+    }
+    
+    loadPolicy();
+    
+    // Auto-refresh every 10 seconds for real-time settlement updates
+    // Use isInitialLoad=false to prevent scroll jumps and loading state
+    const interval = setInterval(() => {
+      loadPolicy(false);
+    }, 10000);
+    
+    return () => clearInterval(interval);
+  }, [policyId, loadPolicy, router]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

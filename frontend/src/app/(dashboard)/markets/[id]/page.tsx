@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -50,16 +50,8 @@ export default function MarketDetailPage() {
   const activePolicies = marketPolicies.filter(p => p.status === 'Active');
   const settledPolicies = marketPolicies.filter(p => p.status === 'Settled');
 
-  useEffect(() => {
-    if (isNaN(marketId) || marketId < 0) {
-      router.push('/markets');
-      return;
-    }
-    
-    loadMarket();
-  }, [marketId]);
-
-  const loadMarket = async (isInitialLoad = true) => {
+  // Define loadMarket with useCallback BEFORE useEffect
+  const loadMarket = useCallback(async (isInitialLoad = true) => {
     if (isInitialLoad) {
       setLoading(true);
     }
@@ -82,7 +74,16 @@ export default function MarketDetailPage() {
         setLoading(false);
       }
     }
-  };
+  }, [marketId]);
+
+  useEffect(() => {
+    if (isNaN(marketId) || marketId < 0) {
+      router.push('/markets');
+      return;
+    }
+    
+    loadMarket();
+  }, [marketId, loadMarket, router]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);

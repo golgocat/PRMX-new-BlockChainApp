@@ -54,6 +54,18 @@ export const TEST_ACCOUNTS = {
 
 export type AccountKey = keyof typeof TEST_ACCOUNTS;
 
+/**
+ * Get account info by address (for display purposes)
+ */
+export function getAccountByAddress(address: string): { name: string; role: string } | null {
+  for (const account of Object.values(TEST_ACCOUNTS)) {
+    if (account.address === address) {
+      return { name: account.name, role: account.role };
+    }
+  }
+  return null;
+}
+
 // Singleton API instance
 let apiInstance: ApiPromise | null = null;
 let keyring: Keyring | null = null;
@@ -782,6 +794,47 @@ export async function getLpHoldings(holder: string): Promise<LpHolding[]> {
   }
   
   return holdings;
+}
+
+/**
+ * Get all LP holdings for a specific policy
+ * Returns all holders and their shares for the given policy
+ */
+export async function getLpHoldingsForPolicy(policyId: number): Promise<LpHolding[]> {
+  const api = await getApi();
+  const entries = await api.query.prmxHoldings.holdingsStorage.entries();
+  
+  const holdings: LpHolding[] = [];
+  
+  for (const [key, value] of entries) {
+    const [storedPolicyId, accountId] = key.args;
+    if ((storedPolicyId as any).toNumber() === policyId) {
+      const data = (value as any).toJSON();
+      const shares = BigInt(data.lpShares || data.shares || '0');
+      // Only include holders with > 0 shares
+      if (shares > BigInt(0)) {
+        holdings.push({
+          policyId,
+          holder: accountId.toString(),
+          shares,
+          lockedShares: BigInt(data.lockedShares || '0'),
+        });
+      }
+    }
+  }
+  
+  // Sort by shares (descending)
+  holdings.sort((a, b) => (b.shares > a.shares ? 1 : -1));
+  
+  return holdings;
+}
+
+/**
+ * Get total LP shares issued for a policy
+ */
+export async function getTotalLpShares(policyId: number): Promise<bigint> {
+  const holdings = await getLpHoldingsForPolicy(policyId);
+  return holdings.reduce((sum, h) => sum + h.shares, BigInt(0));
 }
 
 // ============================================================================

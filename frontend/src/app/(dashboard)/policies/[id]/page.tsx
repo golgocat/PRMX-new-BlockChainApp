@@ -33,7 +33,7 @@ import { useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
 import { formatUSDT, formatDate, formatDateTimeUTC, formatAddress, formatCoordinates, formatTimeRemaining, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import type { Policy, Market, PolicyDefiInfo, V2Monitor } from '@/types';
+import type { Policy, Market, PolicyDefiInfo, V2Monitor, LpHolding } from '@/types';
 import type { SettlementResult } from '@/lib/api';
 
 export default function PolicyDetailPage() {
@@ -51,6 +51,7 @@ export default function PolicyDetailPage() {
   const [poolInfo, setPoolInfo] = useState<{ address: string; balance: bigint } | null>(null);
   const [defiInfo, setDefiInfo] = useState<PolicyDefiInfo | null>(null);
   const [v2Monitor, setV2Monitor] = useState<V2Monitor | null>(null);
+  const [lpHoldings, setLpHoldings] = useState<LpHolding[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [settling, setSettling] = useState(false);
@@ -120,6 +121,13 @@ export default function PolicyDetailPage() {
           } catch (v2Err) {
             console.error('Failed to load V2 monitor:', v2Err);
           }
+        }
+        // Load LP holdings for this policy
+        try {
+          const holdings = await api.getLpHoldingsForPolicy(policyId);
+          setLpHoldings(holdings);
+        } catch (lpErr) {
+          console.error('Failed to load LP holdings:', lpErr);
         }
         // Load settlement result if policy is settled
         if (found.status === 'Settled') {
@@ -502,6 +510,122 @@ export default function PolicyDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* LP Token Holders */}
+          <Card className="border-prmx-cyan/30">
+            <CardHeader className="pb-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <Users className="w-5 h-5 text-prmx-cyan" />
+                LP Token Holders
+              </h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {lpHoldings.length === 0 ? (
+                <div className="text-center py-6">
+                  <Users className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
+                  <p className="text-text-secondary text-sm">No LP tokens issued yet</p>
+                  <p className="text-text-tertiary text-xs mt-1">LP tokens are minted when LPs buy shares</p>
+                </div>
+              ) : (
+                <>
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30">
+                      <span className="text-xs text-text-secondary">Total Shares Issued</span>
+                      <p className="text-lg font-bold text-prmx-cyan">
+                        {lpHoldings.reduce((sum, h) => sum + Number(h.shares), 0).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-background-tertiary/50 border border-border-secondary">
+                      <span className="text-xs text-text-secondary">Number of Holders</span>
+                      <p className="text-lg font-bold">
+                        {lpHoldings.length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Holders List */}
+                  <div className="space-y-2">
+                    <p className="text-sm text-text-secondary font-medium">Holders</p>
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                      {lpHoldings.map((holding, idx) => {
+                        const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares), 0);
+                        const ownership = totalShares > 0 ? (Number(holding.shares) / totalShares) * 100 : 0;
+                        const accountInfo = api.getAccountByAddress(holding.holder);
+                        
+                        return (
+                          <div 
+                            key={holding.holder}
+                            className={cn(
+                              "p-3 rounded-xl border transition-all",
+                              idx === 0 
+                                ? "bg-prmx-cyan/10 border-prmx-cyan/30" 
+                                : "bg-background-tertiary/30 border-border-secondary"
+                            )}
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <div className={cn(
+                                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
+                                  idx === 0 ? "bg-prmx-cyan text-black" : "bg-background-tertiary text-text-secondary"
+                                )}>
+                                  {idx + 1}
+                                </div>
+                                <span className="font-medium text-sm">
+                                  {accountInfo?.name || formatAddress(holding.holder)}
+                                </span>
+                                {accountInfo && (
+                                  <Badge variant="default" className="text-xs">
+                                    {accountInfo.role}
+                                  </Badge>
+                                )}
+                                {idx === 0 && (
+                                  <Badge variant="cyan" className="text-xs">Top Holder</Badge>
+                                )}
+                              </div>
+                              <span className="text-sm font-semibold text-prmx-cyan">
+                                {ownership.toFixed(1)}%
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-text-tertiary ml-8">
+                              <span className="font-mono">{formatAddress(holding.holder)}</span>
+                              <span>{Number(holding.shares).toLocaleString()} shares</span>
+                            </div>
+                            {holding.lockedShares > 0n && (
+                              <div className="flex items-center gap-1 text-xs text-warning ml-8 mt-1">
+                                <Lock className="w-3 h-3" />
+                                {Number(holding.lockedShares).toLocaleString()} locked (in orderbook)
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Ownership Chart (simple bar) */}
+                  <div className="space-y-2">
+                    <p className="text-xs text-text-tertiary">Ownership Distribution</p>
+                    <div className="h-3 rounded-full bg-background-tertiary/50 overflow-hidden flex">
+                      {lpHoldings.map((holding, idx) => {
+                        const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares), 0);
+                        const width = totalShares > 0 ? (Number(holding.shares) / totalShares) * 100 : 0;
+                        const colors = ['bg-prmx-cyan', 'bg-prmx-purple', 'bg-success', 'bg-warning', 'bg-error'];
+                        return (
+                          <div 
+                            key={holding.holder}
+                            className={cn(colors[idx % colors.length], "h-full")}
+                            style={{ width: `${width}%` }}
+                            title={`${api.getAccountByAddress(holding.holder)?.name || formatAddress(holding.holder)}: ${width.toFixed(1)}%`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
           {/* V2 Oracle Details (V2 policies only) */}
           {policy.policyVersion === 'V2' && (

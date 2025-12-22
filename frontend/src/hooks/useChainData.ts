@@ -504,9 +504,10 @@ let cachedGenesisHash: string | null = null;
 /**
  * Validate trade history against current chain genesis hash
  * Clears history if chain was reset (genesis hash changed)
+ * @returns true if history was cleared (chain reset detected)
  */
-export async function validateTradeHistoryGenesis(): Promise<void> {
-  if (typeof window === 'undefined') return;
+export async function validateTradeHistoryGenesis(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
   
   try {
     const api = await getApi();
@@ -515,17 +516,30 @@ export async function validateTradeHistoryGenesis(): Promise<void> {
     
     const storedGenesis = localStorage.getItem(TRADE_HISTORY_GENESIS_KEY);
     
+    let wasCleared = false;
+    
     if (storedGenesis && storedGenesis !== currentGenesis) {
       console.log('[TradeHistory] Chain reset detected - clearing old trade history');
       console.log(`  Previous genesis: ${storedGenesis.slice(0, 18)}...`);
       console.log(`  Current genesis:  ${currentGenesis.slice(0, 18)}...`);
       localStorage.removeItem(TRADE_HISTORY_KEY);
+      wasCleared = true;
+    } else if (!storedGenesis) {
+      // First time - also check if there's stale trade history
+      const existingTrades = localStorage.getItem(TRADE_HISTORY_KEY);
+      if (existingTrades) {
+        console.log('[TradeHistory] No stored genesis but trades exist - clearing stale history');
+        localStorage.removeItem(TRADE_HISTORY_KEY);
+        wasCleared = true;
+      }
     }
     
     // Store current genesis
     localStorage.setItem(TRADE_HISTORY_GENESIS_KEY, currentGenesis);
+    return wasCleared;
   } catch (error) {
     console.warn('[TradeHistory] Failed to validate genesis:', error);
+    return false;
   }
 }
 
@@ -600,7 +614,11 @@ export function useTradeHistory() {
   // Validate genesis hash on chain connection
   useEffect(() => {
     if (isChainConnected && !genesisValidated) {
-      validateTradeHistoryGenesis().then(() => {
+      validateTradeHistoryGenesis().then((wasCleared) => {
+        if (wasCleared) {
+          // History was cleared, ensure state is empty
+          setTrades([]);
+        }
         setGenesisValidated(true);
       });
     }

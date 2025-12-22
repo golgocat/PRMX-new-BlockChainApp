@@ -1770,7 +1770,7 @@ export default function LpTradingPage() {
           setSelectedTrade(null);
         }}
         title="Trade Details"
-        size="lg"
+        size="md"
       >
         {selectedTrade && (() => {
           const policy = getPolicyById(selectedTrade.policyId);
@@ -1778,151 +1778,137 @@ export default function LpTradingPage() {
           const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
           
           return (
-            <div className="space-y-6">
-              {/* Trade Type Header */}
+            <div className="space-y-5">
+              {/* Trade Summary Card */}
               <div className={cn(
-                "p-4 rounded-xl border",
+                "p-5 rounded-xl",
                 selectedTrade.type === 'buy' 
-                  ? "bg-success/10 border-success/30" 
-                  : "bg-error/10 border-error/30"
+                  ? "bg-gradient-to-br from-success/10 to-success/5 border border-success/20" 
+                  : "bg-gradient-to-br from-error/10 to-error/5 border border-error/20"
               )}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
                     <div className={cn(
-                      "w-12 h-12 rounded-xl flex items-center justify-center",
+                      "w-14 h-14 rounded-xl flex items-center justify-center shrink-0",
                       selectedTrade.type === 'buy' ? "bg-success/20" : "bg-error/20"
                     )}>
                       {selectedTrade.type === 'buy' ? (
-                        <ArrowDownRight className="w-6 h-6 text-success" />
+                        <ArrowDownRight className="w-7 h-7 text-success" />
                       ) : (
-                        <ArrowUpRight className="w-6 h-6 text-error" />
+                        <ArrowUpRight className="w-7 h-7 text-error" />
                       )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className={cn(
-                          "text-xl font-bold",
-                          selectedTrade.type === 'buy' ? "text-success" : "text-error"
-                        )}>
-                          {selectedTrade.type === 'buy' ? 'Bought' : 'Sold'}
-                        </span>
-                        <span className="text-xl font-semibold text-text-primary">
-                          {selectedTrade.shares} share{selectedTrade.shares > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <p className="text-sm text-text-secondary mt-1">
+                      <p className={cn(
+                        "text-sm font-medium uppercase tracking-wide",
+                        selectedTrade.type === 'buy' ? "text-success" : "text-error"
+                      )}>
+                        {selectedTrade.type === 'buy' ? 'Purchased' : 'Sold'}
+                      </p>
+                      <p className="text-2xl font-bold mt-0.5">
+                        {selectedTrade.shares} Share{selectedTrade.shares > 1 ? 's' : ''}
+                      </p>
+                      <p className="text-sm text-text-tertiary mt-1">
                         {new Date(selectedTrade.timestamp).toLocaleString()}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
+                    <p className="text-sm text-text-tertiary">Total</p>
                     <p className="text-2xl font-bold">${selectedTrade.totalAmount.toFixed(2)}</p>
                     <p className="text-sm text-text-tertiary">
-                      ${selectedTrade.pricePerShare.toFixed(2)} per share
+                      @ ${selectedTrade.pricePerShare.toFixed(2)}/share
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Policy Info */}
+              {/* Policy & Market Info */}
               {policy && market && (
-                <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                      <Shield className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{policy.label || `Policy #${selectedTrade.policyId}`}</h4>
-                        <Badge 
-                          variant={policy.policyVersion === 'V2' ? 'purple' : 'default'} 
-                          className="text-xs"
-                        >
-                          {policy.policyVersion || 'V1'}
-                        </Badge>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-border-secondary">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center shrink-0">
+                        <Shield className="w-5 h-5 text-white" />
                       </div>
-                      <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5">
-                        <MapPin className="w-3 h-3" />
-                        {market.name}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{policy.label || `Policy #${selectedTrade.policyId}`}</span>
+                          <Badge 
+                            variant={policy.policyVersion === 'V2' ? 'purple' : 'default'} 
+                            className="text-xs"
+                          >
+                            {policy.policyVersion || 'V1'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-text-secondary flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {market.name}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={policy.status === 'Active' ? 'success' : 'default'}>
+                      {policy.status}
+                    </Badge>
+                  </div>
+                  
+                  {/* Key Metrics - 2x2 Grid */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-3 rounded-xl bg-background-tertiary/50">
+                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Strike</p>
+                      <p className="text-lg font-semibold mt-1 flex items-center gap-1.5">
+                        <Droplets className="w-4 h-4 text-prmx-cyan" />
+                        {policy.strikeMm ? `${policy.strikeMm / 10}mm` : `${market.strikeValue}mm`}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-background-tertiary/50">
+                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Max Payout</p>
+                      <p className="text-lg font-semibold text-success mt-1">
+                        {formatUSDT(market.payoutPerShare)}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-background-tertiary/50">
+                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Time Left</p>
+                      <p className={cn(
+                        "text-lg font-semibold mt-1 flex items-center gap-1.5",
+                        daysRemaining <= 3 ? "text-warning" : ""
+                      )}>
+                        <Clock className="w-4 h-4" />
+                        {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-background-tertiary/50">
+                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Coverage</p>
+                      <p className="text-sm font-medium mt-1">
+                        {new Date(policy.coverageStart * 1000).toLocaleDateString()} - {new Date(policy.coverageEnd * 1000).toLocaleDateString()}
                       </p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div className="p-2 rounded-lg bg-background-primary/50">
-                      <div className="text-xs text-text-tertiary mb-1">Strike Threshold</div>
-                      <div className="font-medium flex items-center gap-1">
-                        <Droplets className="w-3 h-3 text-prmx-cyan" />
-                        {policy.strikeMm ? `${policy.strikeMm / 10} mm` : `${market.strikeValue} mm`}
-                      </div>
-                    </div>
-                    <div className="p-2 rounded-lg bg-background-primary/50">
-                      <div className="text-xs text-text-tertiary mb-1">Max Payout</div>
-                      <div className="font-medium text-success">{formatUSDT(market.payoutPerShare)}/share</div>
-                    </div>
-                    <div className="p-2 rounded-lg bg-background-primary/50">
-                      <div className="text-xs text-text-tertiary mb-1">Time Left</div>
-                      <div className={cn(
-                        "font-medium flex items-center gap-1",
-                        daysRemaining <= 3 ? "text-warning" : "text-text-primary"
-                      )}>
-                        <Clock className="w-3 h-3" />
-                        {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
-                      </div>
-                    </div>
-                    <div className="p-2 rounded-lg bg-background-primary/50">
-                      <div className="text-xs text-text-tertiary mb-1">Policy Status</div>
-                      <div className="font-medium">
-                        <Badge variant={policy.status === 'Active' ? 'success' : 'default'} className="text-xs">
-                          {policy.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
-              {/* Trade Details Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-background-tertiary/50">
-                  <div className="text-sm text-text-secondary mb-1">Trade ID</div>
-                  <div className="font-mono text-sm break-all">{selectedTrade.id}</div>
-                </div>
-                <div className="p-4 rounded-xl bg-background-tertiary/50">
-                  <div className="text-sm text-text-secondary mb-1">Your Account</div>
-                  <div className="font-mono text-sm">{formatAddress(selectedTrade.trader)}</div>
-                </div>
-                {selectedTrade.counterparty && (
-                  <div className="p-4 rounded-xl bg-background-tertiary/50 col-span-2">
-                    <div className="text-sm text-text-secondary mb-1">Counterparty</div>
-                    <div className="font-mono text-sm">{selectedTrade.counterparty}</div>
+              {/* Transaction Info */}
+              <div className="space-y-3 pt-2">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide font-medium">Transaction Details</p>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between py-2 border-b border-border-secondary/50">
+                    <span className="text-sm text-text-secondary">Your Account</span>
+                    <span className="font-mono text-sm">{formatAddress(selectedTrade.trader)}</span>
                   </div>
-                )}
+                  {selectedTrade.counterparty && (
+                    <div className="flex items-center justify-between py-2 border-b border-border-secondary/50">
+                      <span className="text-sm text-text-secondary">Counterparty</span>
+                      <span className="font-mono text-sm">{selectedTrade.counterparty}</span>
+                    </div>
+                  )}
+                  <div className="flex items-start justify-between py-2">
+                    <span className="text-sm text-text-secondary">Trade ID</span>
+                    <span className="font-mono text-xs text-text-tertiary break-all text-right max-w-[200px]">
+                      {selectedTrade.id}
+                    </span>
+                  </div>
+                </div>
               </div>
-
-              {/* Coverage Period */}
-              {policy && (
-                <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
-                  <div className="text-sm text-text-secondary mb-2">Coverage Period</div>
-                  <div className="flex items-center gap-4">
-                    <div>
-                      <div className="text-xs text-text-tertiary">Start</div>
-                      <div className="font-medium">{new Date(policy.coverageStart * 1000).toLocaleDateString()}</div>
-                    </div>
-                    <div className="flex-1 h-1 bg-prmx-cyan/20 rounded relative">
-                      <div 
-                        className="absolute left-0 top-0 h-full bg-prmx-cyan rounded"
-                        style={{ 
-                          width: `${Math.max(0, Math.min(100, 100 - (daysRemaining / 7) * 100))}%`
-                        }}
-                      />
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-text-tertiary">End</div>
-                      <div className="font-medium">{new Date(policy.coverageEnd * 1000).toLocaleDateString()}</div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Close Button */}
               <Button
@@ -1931,7 +1917,7 @@ export default function LpTradingPage() {
                   setShowTradeDetailModal(false);
                   setSelectedTrade(null);
                 }}
-                className="w-full"
+                className="w-full mt-2"
               >
                 Close
               </Button>

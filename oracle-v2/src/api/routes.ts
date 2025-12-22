@@ -4,6 +4,8 @@
 
 import { Application, Request, Response } from 'express';
 import { getMonitors, getBuckets, getEvidence } from '../db/mongo.js';
+import { runEvaluationCycle } from '../scheduler/monitor.js';
+import { evaluateMonitor } from '../evaluator/cumulative.js';
 
 /**
  * Setup all API routes
@@ -156,6 +158,62 @@ export function setupRoutes(app: Application): void {
       res.status(500).json({
         success: false,
         error: 'Failed to fetch stats',
+      });
+    }
+  });
+
+  // Trigger immediate evaluation for all active monitors
+  app.post('/v2/monitors/trigger-all', async (req: Request, res: Response) => {
+    try {
+      console.log('🔔 Manual trigger: Evaluating all active monitors');
+      await runEvaluationCycle();
+      
+      res.json({
+        success: true,
+        message: 'Evaluation cycle triggered for all active monitors',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error triggering evaluation cycle:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to trigger evaluation cycle',
+      });
+    }
+  });
+
+  // Trigger immediate evaluation for a specific monitor
+  app.post('/v2/monitors/:id/trigger', async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params; // Format: "market_id:policy_id"
+      const monitors = getMonitors();
+      
+      const monitor = await monitors.findOne({ _id: id });
+      
+      if (!monitor) {
+        return res.status(404).json({
+          success: false,
+          error: `Monitor ${id} not found`,
+        });
+      }
+      
+      console.log(`🔔 Manual trigger: Evaluating monitor ${id} (policy ${monitor.policy_id})`);
+      await evaluateMonitor(monitor);
+      
+      // Fetch updated monitor state
+      const updatedMonitor = await monitors.findOne({ _id: id });
+      
+      res.json({
+        success: true,
+        message: `Evaluation triggered for monitor ${id}`,
+        monitor: updatedMonitor,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error triggering monitor evaluation:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to trigger monitor evaluation',
       });
     }
   });

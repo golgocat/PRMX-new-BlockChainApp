@@ -2,6 +2,8 @@
  * REST API routes for V2 Oracle Service
  */
 import { getMonitors, getBuckets } from '../db/mongo.js';
+import { runEvaluationCycle } from '../scheduler/monitor.js';
+import { evaluateMonitor } from '../evaluator/cumulative.js';
 /**
  * Setup all API routes
  */
@@ -92,19 +94,11 @@ export function setupRoutes(app) {
     // Get hourly buckets for a monitor
     app.get('/v2/monitors/:id/buckets', async (req, res) => {
         try {
-            const { id } = req.params;
+            const { id } = req.params; // Format: "market_id:policy_id"
             const buckets = getBuckets();
-            // Parse monitor ID to get policy_id
-            const [, policyIdStr] = id.split(':');
-            const policyId = parseInt(policyIdStr, 10);
-            if (isNaN(policyId)) {
-                return res.status(400).json({
-                    success: false,
-                    error: 'Invalid monitor ID format (expected market_id:policy_id)',
-                });
-            }
+            // Query by monitor_id which matches the format "market_id:policy_id"
             const docs = await buckets
-                .find({ policy_id: policyId })
+                .find({ monitor_id: id })
                 .sort({ hour_utc: -1 })
                 .limit(168) // Last 7 days of hourly data
                 .toArray();
@@ -112,6 +106,7 @@ export function setupRoutes(app) {
                 success: true,
                 data: docs,
                 count: docs.length,
+                monitor_id: id,
             });
         }
         catch (error) {
@@ -150,6 +145,56 @@ export function setupRoutes(app) {
             res.status(500).json({
                 success: false,
                 error: 'Failed to fetch stats',
+            });
+        }
+    });
+    // Trigger immediate evaluation for all active monitors
+    app.post('/v2/monitors/trigger-all', async (req, res) => {
+        try {
+            console.log('🔔 Manual trigger: Evaluating all active monitors');
+            await runEvaluationCycle();
+            res.json({
+                success: true,
+                message: 'Evaluation cycle triggered for all active monitors',
+                timestamp: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            console.error('Error triggering evaluation cycle:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to trigger evaluation cycle',
+            });
+        }
+    });
+    // Trigger immediate evaluation for a specific monitor
+    app.post('/v2/monitors/:id/trigger', async (req, res) => {
+        try {
+            const { id } = req.params; // Format: "market_id:policy_id"
+            const monitors = getMonitors();
+            const monitor = await monitors.findOne({ _id: id });
+            if (!monitor) {
+                return res.status(404).json({
+                    success: false,
+                    error: `Monitor ${id} not found`,
+                });
+            }
+            console.log(`🔔 Manual trigger: Evaluating monitor ${id} (policy ${monitor.policy_id})`);
+            await evaluateMonitor(monitor);
+            // Fetch updated monitor state
+            const updatedMonitor = await monitors.findOne({ _id: id });
+            res.json({
+                success: true,
+                message: `Evaluation triggered for monitor ${id}`,
+                monitor: updatedMonitor,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            console.error('Error triggering monitor evaluation:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to trigger monitor evaluation',
             });
         }
     });

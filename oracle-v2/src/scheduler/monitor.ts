@@ -23,8 +23,9 @@ export async function startScheduler(): Promise<void> {
 
 /**
  * Run a single evaluation cycle for all active monitors
+ * Exported for manual triggering via API
  */
-async function runEvaluationCycle(): Promise<void> {
+export async function runEvaluationCycle(): Promise<void> {
   console.log('\n═══════════════════════════════════════════════════════════');
   console.log(`🔄 Running evaluation cycle at ${new Date().toISOString()}`);
   console.log('═══════════════════════════════════════════════════════════');

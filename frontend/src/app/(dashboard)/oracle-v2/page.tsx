@@ -19,13 +19,15 @@ import {
   ChevronDown,
   Droplets,
   Code,
-  Copy
+  Copy,
+  Plus
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
+import { SkeletonMonitorCard, SkeletonStatsCard } from '@/components/ui/Skeleton';
 import * as api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
@@ -47,6 +49,34 @@ export default function OracleV2Page() {
   // State for raw data modal
   const [selectedBucket, setSelectedBucket] = useState<api.V2Bucket | null>(null);
   const [showRawDataModal, setShowRawDataModal] = useState(false);
+  
+  // State for backfilling
+  const [backfillingMonitors, setBackfillingMonitors] = useState<Set<string>>(new Set());
+  
+  // Backfill missing hourly buckets for a monitor
+  const handleBackfill = async (monitorId: string) => {
+    setBackfillingMonitors(prev => new Set(prev).add(monitorId));
+    try {
+      const result = await api.backfillV2MonitorBuckets(monitorId);
+      if (result.success) {
+        toast.success(`Backfilled ${result.backfilled_buckets} missing hours`);
+        // Refresh bucket data
+        const buckets = await api.getV2MonitorBuckets(monitorId);
+        setBucketData(prev => new Map(prev).set(monitorId, buckets));
+      } else {
+        toast.error(result.message);
+      }
+    } catch (err) {
+      toast.error('Failed to backfill missing data');
+      console.error('Backfill error:', err);
+    } finally {
+      setBackfillingMonitors(prev => {
+        const next = new Set(prev);
+        next.delete(monitorId);
+        return next;
+      });
+    }
+  };
   
   // Toggle monitor expansion and fetch bucket data
   const toggleMonitorExpanded = async (monitorId: string) => {
@@ -249,9 +279,10 @@ export default function OracleV2Page() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-12 text-center">
-              <RefreshCw className="w-8 h-8 animate-spin mx-auto text-text-tertiary" />
-              <p className="text-text-secondary mt-3">Loading monitors...</p>
+            <div className="space-y-4 transition-fade-in">
+              {[1, 2, 3].map((i) => (
+                <SkeletonMonitorCard key={i} />
+              ))}
             </div>
           ) : !serviceHealthy ? (
             <div className="py-12 text-center">
@@ -411,10 +442,33 @@ export default function OracleV2Page() {
                     {/* Expanded Hourly Readings */}
                     {expandedMonitors.has(monitor._id) && (
                       <div className="pt-4 mt-2 border-t border-border-secondary">
-                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                          <Droplets className="w-4 h-4 text-prmx-cyan" />
-                          Raw Bucket Data (Hourly Readings)
-                        </h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-semibold flex items-center gap-2">
+                            <Droplets className="w-4 h-4 text-prmx-cyan" />
+                            Raw Bucket Data (Hourly Readings)
+                          </h4>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBackfill(monitor._id);
+                            }}
+                            disabled={backfillingMonitors.has(monitor._id)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-prmx-purple/10 text-prmx-purple hover:bg-prmx-purple/20 transition-colors disabled:opacity-50"
+                            title="Fill in missing hours with 0mm readings"
+                          >
+                            {backfillingMonitors.has(monitor._id) ? (
+                              <>
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Backfilling...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3 h-3" />
+                                Backfill Missing
+                              </>
+                            )}
+                          </button>
+                        </div>
                         
                         {loadingBuckets.has(monitor._id) ? (
                           <div className="flex items-center justify-center py-8">
@@ -461,7 +515,10 @@ export default function OracleV2Page() {
                                       {idx === 0 && (
                                         <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
                                       )}
-                                      {hasRawData && (
+                                      {bucket.backfilled && (
+                                        <Badge variant="secondary" className="text-xs ml-1">Backfilled</Badge>
+                                      )}
+                                      {hasRawData && !bucket.backfilled && (
                                         <Code className="w-3 h-3 text-text-tertiary ml-1" />
                                       )}
                                     </div>
@@ -655,10 +712,33 @@ export default function OracleV2Page() {
                     {/* Expanded Hourly Readings */}
                     {expandedMonitors.has(monitor._id) && (
                       <div className="pt-4 mt-2 border-t border-border-secondary">
-                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                          <Droplets className="w-4 h-4 text-prmx-cyan" />
-                          Raw Bucket Data (Hourly Readings)
-                        </h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-semibold flex items-center gap-2">
+                            <Droplets className="w-4 h-4 text-prmx-cyan" />
+                            Raw Bucket Data (Hourly Readings)
+                          </h4>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleBackfill(monitor._id);
+                            }}
+                            disabled={backfillingMonitors.has(monitor._id)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg bg-prmx-purple/10 text-prmx-purple hover:bg-prmx-purple/20 transition-colors disabled:opacity-50"
+                            title="Fill in missing hours with 0mm readings"
+                          >
+                            {backfillingMonitors.has(monitor._id) ? (
+                              <>
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Backfilling...
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-3 h-3" />
+                                Backfill Missing
+                              </>
+                            )}
+                          </button>
+                        </div>
                         
                         {loadingBuckets.has(monitor._id) ? (
                           <div className="flex items-center justify-center py-8">
@@ -705,7 +785,10 @@ export default function OracleV2Page() {
                                       {idx === 0 && (
                                         <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
                                       )}
-                                      {hasRawData && (
+                                      {bucket.backfilled && (
+                                        <Badge variant="secondary" className="text-xs ml-1">Backfilled</Badge>
+                                      )}
+                                      {hasRawData && !bucket.backfilled && (
                                         <Code className="w-3 h-3 text-text-tertiary ml-1" />
                                       )}
                                     </div>

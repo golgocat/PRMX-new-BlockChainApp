@@ -70,6 +70,7 @@ export default function NewPolicyPage() {
   const [coverageStartDate, setCoverageStartDate] = useState<Date | undefined>(undefined);
   const [policyVersion, setPolicyVersion] = useState<'V1' | 'V2'>('V1');
   const [v2DurationDays, setV2DurationDays] = useState(2); // 2-7 days for V2
+  const [v2StrikeMm, setV2StrikeMm] = useState(50); // Strike threshold in mm (1-300)
   
   // Duration depends on version: V1 = 1 day, V2 = user-selected (2-7 days)
   const coverageDurationDays = policyVersion === 'V2' ? v2DurationDays : 1;
@@ -77,16 +78,38 @@ export default function NewPolicyPage() {
   // Check if selected market supports V2 (only Manila, marketId = 0)
   const isV2Available = selectedMarket?.id === 0;
 
-  // Pre-select market from URL params (from landing page quote calculator)
+  // Pre-select market and V2 params from URL params (from landing page quote calculator)
   useEffect(() => {
     if (!marketsLoading && markets.length > 0 && preselectedMarketId && !selectedMarket) {
       const market = markets.find(m => m.id === parseInt(preselectedMarketId));
       if (market) {
         setSelectedMarket(market);
+        
+        // Check for V2 params from quote calculator
+        const version = searchParams.get('version');
+        const duration = searchParams.get('duration');
+        const strike = searchParams.get('strike');
+        
+        if (version === 'V2' && market.id === 0) {
+          setPolicyVersion('V2');
+          if (duration) {
+            const durationDays = parseInt(duration);
+            if (durationDays >= 2 && durationDays <= 7) {
+              setV2DurationDays(durationDays);
+            }
+          }
+          if (strike) {
+            const strikeMm = parseInt(strike);
+            if (strikeMm >= 1 && strikeMm <= 300) {
+              setV2StrikeMm(strikeMm);
+            }
+          }
+        }
+        
         setCurrentStep(2); // Skip to Coverage Details step
       }
     }
-  }, [markets, marketsLoading, preselectedMarketId, selectedMarket]);
+  }, [markets, marketsLoading, preselectedMarketId, selectedMarket, searchParams]);
 
   // Poll for quote result
   useEffect(() => {
@@ -166,6 +189,7 @@ export default function NewPolicyPage() {
           longitude: selectedMarket.centerLongitude,
           shares: sharesNum,
           durationDays: v2DurationDays,
+          strikeMm: v2StrikeMm,
         });
       } else {
         // V1 quote request (24-hour rolling)
@@ -473,7 +497,10 @@ export default function NewPolicyPage() {
                 </div>
                 <div>
                   <h4 className="font-semibold">{selectedMarket.name}</h4>
-                  <p className="text-sm text-text-secondary">Strike: {selectedMarket.strikeValue} mm</p>
+                  <p className="text-sm text-text-secondary">
+                    Strike: {policyVersion === 'V2' && isV2Available ? v2StrikeMm : selectedMarket.strikeValue} mm
+                    {policyVersion === 'V2' && isV2Available && ' (custom)'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -572,6 +599,49 @@ export default function NewPolicyPage() {
                 />
               )}
             </div>
+
+            {/* V2 Strike Threshold Selector */}
+            {policyVersion === 'V2' && isV2Available && (
+              <div className="p-4 rounded-xl bg-prmx-purple/5 border border-prmx-purple/20">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Droplets className="w-4 h-4 text-prmx-purple" />
+                  Strike Threshold
+                  <Badge variant="purple">Custom</Badge>
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-text-secondary">Rainfall trigger threshold</span>
+                    <span className="font-mono font-bold text-prmx-purple text-lg">{v2StrikeMm}mm</span>
+                  </div>
+                  <div className="relative">
+                    <div className="h-3 bg-background-tertiary rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-prmx-purple to-prmx-purple/70 rounded-full transition-all"
+                        style={{ width: `${((v2StrikeMm - 1) / (300 - 1)) * 100}%` }}
+                      />
+                    </div>
+                    <input
+                      type="range"
+                      min="1"
+                      max="300"
+                      step="1"
+                      value={v2StrikeMm}
+                      onChange={(e) => setV2StrikeMm(parseInt(e.target.value))}
+                      className="absolute inset-0 w-full h-3 opacity-0 cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-text-tertiary">
+                    <span>1mm</span>
+                    <span>50mm</span>
+                    <span>150mm</span>
+                    <span>300mm</span>
+                  </div>
+                  <p className="text-xs text-text-tertiary">
+                    Payout triggers when cumulative rainfall over {v2DurationDays} days exceeds {v2StrikeMm}mm
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* Summary */}
             <div className={`p-4 rounded-xl border ${

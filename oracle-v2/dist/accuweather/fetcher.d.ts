@@ -39,6 +39,16 @@ export declare function fetchPrecipitation(locationKey: string, startTime: numbe
  */
 export declare function fetchCurrentConditions(locationKey: string): Promise<CurrentConditionsData | null>;
 /**
+ * Fetch historical precipitation data for the past 24 hours
+ * Uses the Historical Current Conditions endpoint (available on Starter tier)
+ *
+ * This endpoint returns 24 hourly observations, each with its own PrecipitationSummary
+ *
+ * @param locationKey - AccuWeather location key
+ * @returns Array of 24 precipitation records (one per hour)
+ */
+export declare function fetchHistorical24Hours(locationKey: string): Promise<PrecipitationRecord[]>;
+/**
  * Resolve AccuWeather location key from coordinates
  * (Manila is cached, but this is here for future expansion)
  */

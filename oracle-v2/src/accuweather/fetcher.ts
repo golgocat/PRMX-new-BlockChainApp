@@ -182,6 +182,92 @@ export async function fetchCurrentConditions(locationKey: string): Promise<Curre
 }
 
 /**
+ * Fetch historical precipitation data for the past 24 hours
+ * Uses the Historical Current Conditions endpoint (available on Starter tier)
+ * 
+ * This endpoint returns 24 hourly observations, each with its own PrecipitationSummary
+ * 
+ * @param locationKey - AccuWeather location key
+ * @returns Array of 24 precipitation records (one per hour)
+ */
+export async function fetchHistorical24Hours(locationKey: string): Promise<PrecipitationRecord[]> {
+  if (!config.accuweatherApiKey) {
+    throw new Error('AccuWeather API key not configured');
+  }
+  
+  const records: PrecipitationRecord[] = [];
+  
+  try {
+    // Use Historical Current Conditions endpoint (Starter tier)
+    const url = `${config.accuweatherBaseUrl}/currentconditions/v1/${locationKey}/historical/24`;
+    
+    console.log(`🌐 Calling AccuWeather Historical 24h API: ${url}`);
+    console.log(`   Location: ${locationKey}`);
+    
+    const response = await axios.get(url, {
+      params: {
+        apikey: config.accuweatherApiKey,
+        details: true,
+      },
+    });
+    
+    console.log(`   ✅ API response status: ${response.status}`);
+    
+    if (response.data && Array.isArray(response.data)) {
+      console.log(`   📊 Received ${response.data.length} hourly observations`);
+      
+      for (const observation of response.data) {
+        const precipSummary = observation.PrecipitationSummary;
+        const pastHourMm = precipSummary?.PastHour?.Metric?.Value || 0;
+        
+        records.push({
+          dateTime: observation.LocalObservationDateTime,
+          precipitationMm: pastHourMm,
+          rawData: {
+            LocalObservationDateTime: observation.LocalObservationDateTime,
+            EpochTime: observation.EpochTime,
+            WeatherText: observation.WeatherText,
+            WeatherIcon: observation.WeatherIcon,
+            HasPrecipitation: observation.HasPrecipitation,
+            PrecipitationType: observation.PrecipitationType,
+            Temperature: observation.Temperature,
+            RelativeHumidity: observation.RelativeHumidity,
+            Wind: observation.Wind,
+            Visibility: observation.Visibility,
+            CloudCover: observation.CloudCover,
+            Pressure: observation.Pressure,
+            PrecipitationSummary: observation.PrecipitationSummary,
+            _extracted: {
+              pastHourMm,
+              fetchedAt: new Date().toISOString(),
+              locationKey,
+              source: 'historical/24',
+            }
+          }
+        });
+      }
+      
+      // Log summary
+      const totalPrecip = records.reduce((sum, r) => sum + r.precipitationMm, 0);
+      console.log(`   💧 Total precipitation over 24h: ${totalPrecip.toFixed(1)} mm`);
+      console.log(`   📦 Created ${records.length} hourly records`);
+    } else {
+      console.log(`   ⚠️  Unexpected response format:`, typeof response.data);
+    }
+    
+    return records;
+    
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      const errorDetail = error.response?.data?.detail || error.message;
+      console.error(`   ❌ AccuWeather API error: ${error.response?.status} - ${errorDetail}`);
+      throw new Error(`AccuWeather API error: ${error.response?.status} - ${errorDetail}`);
+    }
+    throw error;
+  }
+}
+
+/**
  * Resolve AccuWeather location key from coordinates
  * (Manila is cached, but this is here for future expansion)
  */

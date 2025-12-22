@@ -522,9 +522,14 @@ pub mod pallet {
             // Generate policy label using global policy ID (e.g., "manila-1" for policy_id=0)
             let policy_label = Self::generate_policy_label(req.market_id, policy_id);
 
-            // Get strike value from market for V2 policies
+            // Get strike value for V2 policies:
+            // - Use custom strike from quote if provided
+            // - Otherwise fall back to market's default strike
             let strike_mm = if req.policy_version == prmx_primitives::PolicyVersion::V2 {
-                T::MarketsApi::strike_value(req.market_id).ok()
+                match req.strike_mm {
+                    Some(custom_strike) => Some(custom_strike),
+                    None => T::MarketsApi::strike_value(req.market_id).ok(),
+                }
             } else {
                 None
             };

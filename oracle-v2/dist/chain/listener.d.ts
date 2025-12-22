@@ -19,7 +19,7 @@ export declare function subscribeToV2PolicyCreated(onPolicyCreated: (policy: {
     lon: number;
 }) => Promise<void>): Promise<void>;
 /**
- * Handle V2PolicyCreated event - create monitor document
+ * Handle V2PolicyCreated event - create monitor document and fetch 24h historical data
  */
 export declare function handleV2PolicyCreated(policy: {
     policy_id: number;

@@ -478,6 +478,7 @@ export async function requestQuoteV2(
     longitude: number;
     shares: number;
     durationDays: number;    // 2-7 days
+    strikeMm: number;        // Custom strike threshold in mm (1-300)
   }
 ): Promise<number> {
   const api = await getApi();
@@ -489,8 +490,14 @@ export async function requestQuoteV2(
   if (params.durationDays < 2 || params.durationDays > 7) {
     throw new Error('V2 policy duration must be 2-7 days');
   }
+  if (params.strikeMm < 1 || params.strikeMm > 300) {
+    throw new Error('V2 strike threshold must be between 1mm and 300mm');
+  }
   
   const expectedQuoteId = await getNextQuoteId();
+  
+  // Scale strike to match on-chain storage (mm * 10)
+  const scaledStrike = params.strikeMm * 10;
   
   return new Promise((resolve, reject) => {
     api.tx.prmxQuote.requestPolicyQuoteV2(
@@ -500,7 +507,8 @@ export async function requestQuoteV2(
       params.latitude,
       params.longitude,
       params.shares,
-      params.durationDays
+      params.durationDays,
+      scaledStrike
     ).signAndSend(signer, ({ status, events, dispatchError }) => {
       if (dispatchError) {
         if (dispatchError.isModule) {
@@ -1763,6 +1771,7 @@ export interface V2Bucket {
   mm: number;         // Rainfall in mm (scaled by 10)
   raw_data?: Record<string, unknown>; // Raw AccuWeather API response
   fetched_at?: string; // When this bucket was last updated
+  backfilled?: boolean; // True if this bucket was backfilled (no actual data)
 }
 
 /**
@@ -1781,6 +1790,43 @@ export async function getV2MonitorBuckets(monitorId: string): Promise<V2Bucket[]
   } catch (err) {
     console.error('Failed to fetch V2 monitor buckets:', err);
     return [];
+  }
+}
+
+/**
+ * Backfill missing hourly buckets for a V2 monitor
+ * This fills gaps in the data with 0mm readings
+ */
+export async function backfillV2MonitorBuckets(monitorId: string): Promise<{
+  success: boolean;
+  message: string;
+  backfilled_buckets: number;
+  total_buckets: number;
+}> {
+  try {
+    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors/${monitorId}/backfill`, {
+      method: 'POST',
+    });
+    const json = await response.json();
+    
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to backfill buckets');
+    }
+    
+    return {
+      success: true,
+      message: json.message,
+      backfilled_buckets: json.backfilled_buckets,
+      total_buckets: json.total_buckets,
+    };
+  } catch (err) {
+    console.error('Failed to backfill V2 monitor buckets:', err);
+    return {
+      success: false,
+      message: err instanceof Error ? err.message : 'Failed to backfill',
+      backfilled_buckets: 0,
+      total_buckets: 0,
+    };
   }
 }
 

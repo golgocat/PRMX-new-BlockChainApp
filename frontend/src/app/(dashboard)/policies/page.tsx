@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/Input';
 import { StatCard } from '@/components/ui/StatCard';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
+import { SkeletonTable, SkeletonStatsCard } from '@/components/ui/Skeleton';
 import { formatUSDT, formatTimeRemaining, formatDateTimeUTCCompact, formatCoordinates, formatAddress } from '@/lib/utils';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMyPolicies, usePolicies, useMarkets } from '@/hooks/useChainData';
@@ -261,11 +262,20 @@ export default function PoliciesPage() {
             </TableHead>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin mx-auto text-text-tertiary" />
-                  </TableCell>
-                </TableRow>
+                <>
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <TableRow key={i} className="animate-pulse">
+                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-24 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-28 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-6 w-16 bg-background-tertiary/50 rounded-full" /></TableCell>
+                      <TableCell><div className="h-8 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                    </TableRow>
+                  ))}
+                </>
               ) : filteredPolicies.length === 0 ? (
                 <TableEmpty
                   icon={<Shield className="w-8 h-8" />}

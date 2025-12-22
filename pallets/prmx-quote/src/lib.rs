@@ -124,6 +124,8 @@ pub struct QuoteRequestInfo<AccountId> {
     pub early_trigger: bool,
     /// Duration in days (used for V2 validation)
     pub duration_days: u8,
+    /// Custom strike threshold in mm * 10 (V2 only, e.g., 500 = 50mm)
+    pub strike_mm: Option<u32>,
 }
 
 /// Quote result info (generic version for trait)
@@ -171,6 +173,9 @@ pub mod pallet {
         pub early_trigger: bool,
         /// Duration in days (for V2 validation: 2-7 days)
         pub duration_days: u8,
+        /// Custom strike threshold in mm * 10 (V2 only, e.g., 500 = 50mm)
+        /// If None, uses market's default strike value
+        pub strike_mm: Option<u32>,
     }
 
     /// Quote result from the offchain worker
@@ -407,6 +412,8 @@ pub mod pallet {
         NotQuoteProvider,
         /// V2 quote not allowed for this market/duration.
         V2NotAllowed,
+        /// Invalid strike threshold (must be 10-3000, i.e., 1mm-300mm).
+        InvalidStrike,
     }
 
     // =========================================================================
@@ -510,6 +517,7 @@ pub mod pallet {
                 event_type: prmx_primitives::EventType::Rainfall24hRolling,
                 early_trigger: false,
                 duration_days: 0, // Not used for V1
+                strike_mm: None,  // V1 uses market's default strike
             };
 
             // Store quote request
@@ -662,6 +670,7 @@ pub mod pallet {
         /// - `longitude`: Longitude scaled by 1e6.
         /// - `shares`: Number of shares (1 share = 100 USDT coverage).
         /// - `duration_days`: Coverage duration in days (2-7 for V2).
+        /// - `strike_mm`: Custom strike threshold in mm * 10 (e.g., 500 = 50mm). Range: 10-3000 (1mm-300mm).
         #[pallet::call_index(7)]
         #[pallet::weight(10_000)]
         pub fn request_policy_quote_v2(
@@ -673,11 +682,15 @@ pub mod pallet {
             longitude: i32,
             shares: u128,
             duration_days: u8,
+            strike_mm: u32,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
             // Validate shares
             ensure!(shares > 0, Error::<T>::InvalidShares);
+
+            // Validate strike range: 10-3000 (1mm-300mm when scaled by 10)
+            ensure!(strike_mm >= 10 && strike_mm <= 3000, Error::<T>::InvalidStrike);
 
             // Check market is open
             ensure!(
@@ -700,7 +713,7 @@ pub mod pallet {
                 now,
             ).map_err(|_| Error::<T>::InvalidCoverageWindow)?;
 
-            // Create V2 quote request
+            // Create V2 quote request with custom strike
             let quote_id = NextQuoteId::<T>::get();
             let quote_request = QuoteRequest::<T> {
                 quote_id,
@@ -717,6 +730,7 @@ pub mod pallet {
                 event_type: prmx_primitives::EventType::CumulativeRainfallWindow,
                 early_trigger: true, // V2 default
                 duration_days,
+                strike_mm: Some(strike_mm), // Custom strike for V2
             };
 
             // Store quote request
@@ -999,10 +1013,15 @@ pub mod pallet {
             api_url: &[u8],
         ) -> Result<PartsPerMillion, &'static str> {
             // Get market data
-            let strike_mm = T::MarketsApi::strike_value(req.market_id)
-                .map_err(|_| "Market not found")?;
             let payout_per_share = T::MarketsApi::payout_per_share(req.market_id)
                 .map_err(|_| "Market not found")?;
+            
+            // Get strike value: use custom strike for V2, market default for V1
+            let strike_mm = match req.strike_mm {
+                Some(custom_strike) => custom_strike,
+                None => T::MarketsApi::strike_value(req.market_id)
+                    .map_err(|_| "Market not found")?,
+            };
 
             // Convert lat/lon to floats (stored as scaled by 1e6)
             let lat = req.latitude as f64 / 1_000_000.0;
@@ -1305,6 +1324,7 @@ pub mod pallet {
                 event_type: req.event_type,
                 early_trigger: req.early_trigger,
                 duration_days: req.duration_days,
+                strike_mm: req.strike_mm,
             })
         }
 

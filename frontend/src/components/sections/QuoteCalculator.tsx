@@ -23,6 +23,7 @@ export function QuoteCalculator() {
   // V2 Policy state (only for Manila)
   const [policyVersion, setPolicyVersion] = useState<'V1' | 'V2'>('V1')
   const [v2DurationDays, setV2DurationDays] = useState(3)
+  const [v2StrikeMm, setV2StrikeMm] = useState(50) // Strike threshold in mm (1-300)
   
   // Check if selected market supports V2 (Manila = market.id === 0)
   const isV2Supported = selectedMarket?.id === 0
@@ -71,6 +72,7 @@ export function QuoteCalculator() {
     if (selectedMarket?.id === 0 && policyVersion === 'V2') {
       params.set('version', 'V2')
       params.set('duration', v2DurationDays.toString())
+      params.set('strike', v2StrikeMm.toString())
     }
     
     router.push(`/policies/new?${params.toString()}`)
@@ -278,6 +280,38 @@ export function QuoteCalculator() {
                           </div>
                         </div>
                       )}
+                      
+                      {/* V2 Strike Threshold Slider */}
+                      {policyVersion === 'V2' && (
+                        <div className="mt-3">
+                          <div className="flex justify-between mb-2">
+                            <p className="text-xs text-zinc-500">Strike Threshold</p>
+                            <span className="text-xs font-mono text-brand-violet font-bold">{v2StrikeMm}mm</span>
+                          </div>
+                          <div className="relative">
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-brand-violet to-brand-violet/70 rounded-full transition-all"
+                                style={{ width: `${((v2StrikeMm - 1) / (300 - 1)) * 100}%` }}
+                              />
+                            </div>
+                            <input
+                              type="range"
+                              min="1"
+                              max="300"
+                              step="1"
+                              value={v2StrikeMm}
+                              onChange={(e) => setV2StrikeMm(parseInt(e.target.value))}
+                              className="absolute inset-0 w-full h-2 opacity-0 cursor-pointer"
+                            />
+                          </div>
+                          <div className="flex justify-between text-[10px] text-zinc-600 mt-1">
+                            <span>1mm</span>
+                            <span>150mm</span>
+                            <span>300mm</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -295,13 +329,13 @@ export function QuoteCalculator() {
                         <span className="text-sm text-zinc-400">Rainfall Threshold</span>
                       </div>
                       <span className="text-white font-mono font-bold">
-                        {selectedMarket.strikeValue}mm / {policyVersion === 'V2' && isV2Supported ? `${v2DurationDays}d` : '24h'}
+                        {policyVersion === 'V2' && isV2Supported ? v2StrikeMm : selectedMarket.strikeValue}mm / {policyVersion === 'V2' && isV2Supported ? `${v2DurationDays}d` : '24h'}
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 mt-2">
                       {policyVersion === 'V2' && isV2Supported ? (
                         <>
-                          Payout triggers when <span className="text-brand-violet font-medium">cumulative rainfall over {v2DurationDays} days</span> exceeds this threshold in {selectedMarket.name}.
+                          Payout triggers when <span className="text-brand-violet font-medium">cumulative rainfall over {v2DurationDays} days</span> exceeds {v2StrikeMm}mm in {selectedMarket.name}.
                           <span className="text-brand-violet"> Early trigger enabled.</span>
                         </>
                       ) : (

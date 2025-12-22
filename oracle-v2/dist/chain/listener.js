@@ -3,7 +3,8 @@
  */
 import { ApiPromise, WsProvider } from '@polkadot/api';
 import { config } from '../config.js';
-import { getMonitors, makeMonitorId, checkChainRestart } from '../db/mongo.js';
+import { getMonitors, getBuckets, makeMonitorId, checkChainRestart } from '../db/mongo.js';
+import { fetchHistorical24Hours } from '../accuweather/fetcher.js';
 let api = null;
 /**
  * Connect to the PRMX chain and check for chain restart
@@ -102,10 +103,11 @@ async function handleV2Settlement(policyId, outcome, cumulativeMm, evidenceHash)
     console.log(`📝 Updated monitor ${monitorId}: state=${newState}, cumulative=${cumulativeMm / 10}mm`);
 }
 /**
- * Handle V2PolicyCreated event - create monitor document
+ * Handle V2PolicyCreated event - create monitor document and fetch 24h historical data
  */
 export async function handleV2PolicyCreated(policy) {
     const monitors = getMonitors();
+    const buckets = getBuckets();
     const monitorId = makeMonitorId(policy.market_id, policy.policy_id);
     // Check if monitor already exists
     const existing = await monitors.findOne({ _id: monitorId });
@@ -114,6 +116,7 @@ export async function handleV2PolicyCreated(policy) {
         return;
     }
     const now = new Date();
+    const locationKey = config.manilaLocationKey; // Manila hardcoded for V2
     const monitor = {
         _id: monitorId,
         market_id: policy.market_id,
@@ -126,12 +129,67 @@ export async function handleV2PolicyCreated(policy) {
         state: 'monitoring',
         cumulative_mm: 0,
         last_fetch_at: 0,
-        location_key: config.manilaLocationKey, // Manila hardcoded for V2
+        location_key: locationKey,
         created_at: now,
         updated_at: now,
     };
     await monitors.insertOne(monitor);
     console.log(`✅ Created monitor: ${monitorId}`);
+    // Immediately fetch 24h historical data for context
+    console.log(`🌐 Fetching 24h historical data for new policy ${policy.policy_id}...`);
+    try {
+        const records = await fetchHistorical24Hours(locationKey);
+        console.log(`   ✅ Fetched ${records.length} hourly records`);
+        let bucketsCreated = 0;
+        let cumulativeMm = 0;
+        for (const record of records) {
+            const recordTime = new Date(record.dateTime).getTime() / 1000;
+            // Only store buckets within the coverage period
+            if (recordTime >= policy.coverage_start && recordTime <= policy.coverage_end) {
+                const hourUtc = normalizeToHour(record.dateTime);
+                const bucketId = `${monitorId}:${hourUtc.replace(/[-:TZ]/g, '').slice(0, 10)}`;
+                const mmScaled = Math.round(record.precipitationMm * 10);
+                await buckets.updateOne({ _id: bucketId }, {
+                    $set: {
+                        monitor_id: monitorId,
+                        hour_utc: hourUtc,
+                        mm: mmScaled,
+                        raw_data: record.rawData,
+                        fetched_at: new Date(),
+                        backfilled: false,
+                    }
+                }, { upsert: true });
+                bucketsCreated++;
+                cumulativeMm += mmScaled;
+            }
+        }
+        // Update monitor with initial cumulative rainfall
+        if (bucketsCreated > 0) {
+            await monitors.updateOne({ _id: monitorId }, {
+                $set: {
+                    cumulative_mm: cumulativeMm,
+                    last_fetch_at: Math.floor(Date.now() / 1000),
+                    updated_at: new Date(),
+                }
+            });
+            console.log(`   📊 Pre-populated ${bucketsCreated} buckets, cumulative=${cumulativeMm / 10}mm`);
+        }
+        else {
+            console.log(`   📊 No buckets in coverage period yet`);
+        }
+    }
+    catch (error) {
+        console.error(`   ⚠️ Failed to fetch historical data:`, error);
+        // Continue - the scheduler will fetch data on the next poll
+    }
+}
+/**
+ * Normalize datetime to hour start (ISO format)
+ */
+function normalizeToHour(dateTime) {
+    const d = new Date(dateTime);
+    d.setMinutes(0, 0, 0);
+    return d.toISOString().slice(0, 13) + ':00:00Z';
 }
 /**
  * Get API instance

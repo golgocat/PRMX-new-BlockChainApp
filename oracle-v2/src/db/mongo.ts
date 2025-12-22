@@ -41,6 +41,7 @@ export interface Bucket {
   mm: number;
   raw_data?: object;       // Raw AccuWeather API response for this reading
   fetched_at?: Date;       // When this bucket was last updated
+  backfilled?: boolean;    // True if this bucket was backfilled (no actual data)
 }
 
 /**

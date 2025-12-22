@@ -22,6 +22,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
+import { SkeletonStatsCard, SkeletonCard } from '@/components/ui/Skeleton';
 import { RainfallChart, PremiumChart } from '@/components/features/RainfallChart';
 import { formatUSDT, formatTimeRemaining, formatAddress } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';

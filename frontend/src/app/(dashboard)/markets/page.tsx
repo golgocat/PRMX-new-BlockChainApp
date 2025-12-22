@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
+import { SkeletonMarketCard, SkeletonStatsCard } from '@/components/ui/Skeleton';
 import { formatCoordinates, formatBasisPoints, secondsToDays } from '@/lib/utils';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMarkets, usePolicies, useRainfallData } from '@/hooks/useChainData';
@@ -201,8 +202,10 @@ export default function MarketsPage() {
 
       {/* Markets Grid */}
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <RefreshCw className="w-8 h-8 animate-spin text-text-tertiary" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 transition-fade-in">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <SkeletonMarketCard key={i} />
+          ))}
         </div>
       ) : filteredMarkets.length === 0 ? (
         <Card>

@@ -34,6 +34,7 @@ export interface Bucket {
     mm: number;
     raw_data?: object;
     fetched_at?: Date;
+    backfilled?: boolean;
 }
 /**
  * Evidence document structure

@@ -45,6 +45,12 @@ export default function MarketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadMarket(false);
+    setIsRefreshing(false);
+  };
+
   // Filter policies for this market
   const marketPolicies = allPolicies.filter(p => p.marketId === marketId);
   const activePolicies = marketPolicies.filter(p => p.status === 'Active');
@@ -179,11 +185,7 @@ export default function MarketDetailPage() {
           <StatusBadge status={market.status} />
           <Button 
             variant="secondary" 
-            onClick={async () => {
-              setIsRefreshing(true);
-              await loadMarket(false);
-              setIsRefreshing(false);
-            }} 
+            onClick={handleRefresh}
             icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
           >
             Refresh

@@ -56,6 +56,12 @@ export default function PolicyDetailPage() {
   const [settling, setSettling] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadPolicy(false);
+    setIsRefreshing(false);
+  };
+
   const handleCopyAddress = async () => {
     if (poolInfo?.address) {
       await navigator.clipboard.writeText(poolInfo.address);
@@ -243,11 +249,7 @@ export default function PolicyDetailPage() {
         </div>
         <Button 
           variant="secondary" 
-          onClick={async () => {
-            setIsRefreshing(true);
-            await loadPolicy(false);
-            setIsRefreshing(false);
-          }} 
+          onClick={handleRefresh}
           icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
         >
           Refresh

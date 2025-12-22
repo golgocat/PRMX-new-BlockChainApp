@@ -45,12 +45,22 @@ interface RainBucketData {
   rawData: Record<string, unknown>; // Raw blockchain data for debugging
 }
 
+interface HourlyBucketData {
+  hourIndex: number;
+  hourUtc: Date;
+  rainfallMm: number;
+  fetchedAt: Date;
+  source: 'current' | 'historical';
+  rawData: Record<string, unknown>;
+}
+
 interface RainfallData {
   marketId: number;
   rollingSumMm: number;
   lastBucketIndex: number;
   lastUpdated: string;
   buckets: RainBucketData[];
+  hourlyBuckets: HourlyBucketData[]; // New: hourly buckets from historical/24
 }
 
 export default function OraclePage() {
@@ -119,8 +129,12 @@ export default function OraclePage() {
           const displayValue = data.rollingSumMm / 10;
           console.log(`[Oracle] Market ${market.id} display value: ${displayValue}mm`);
           
-          // Also fetch individual bucket readings
+          // Fetch individual bucket readings (legacy)
           const buckets = await api.getRainBuckets(market.id);
+          
+          // Fetch hourly buckets (new historical/24 data)
+          const hourlyBuckets = await api.getHourlyBuckets(market.id);
+          console.log(`[Oracle] Market ${market.id} hourly buckets:`, hourlyBuckets.length);
           
           return {
             marketId: market.id,
@@ -128,6 +142,7 @@ export default function OraclePage() {
             lastBucketIndex: data.lastBucketIndex,
             lastUpdated: new Date(data.lastBucketIndex * 3600 * 1000).toISOString(),
             buckets,
+            hourlyBuckets,
           };
         }
         return null;
@@ -609,13 +624,16 @@ export default function OraclePage() {
                     </div>
 
                     {/* Expand/Collapse Button for Bucket Details */}
-                    {data && data.buckets.length > 0 && (
+                    {data && (data.hourlyBuckets.length > 0 || data.buckets.length > 0) && (
                       <button
                         onClick={() => toggleMarketExpanded(market.id)}
                         className="w-full flex items-center justify-center gap-2 py-2 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-secondary"
                       >
                         <List className="w-4 h-4" />
-                        {expandedMarkets.has(market.id) ? 'Hide' : 'Show'} Hourly Readings ({data.buckets.length})
+                        {expandedMarkets.has(market.id) ? 'Hide' : 'Show'} Hourly Readings ({data.hourlyBuckets.length || data.buckets.length})
+                        {data.hourlyBuckets.length > 0 && (
+                          <Badge variant="purple" className="text-[10px]">Historical</Badge>
+                        )}
                         {expandedMarkets.has(market.id) ? (
                           <ChevronUp className="w-4 h-4" />
                         ) : (
@@ -624,15 +642,78 @@ export default function OraclePage() {
                       </button>
                     )}
 
-                    {/* Expanded Bucket Details */}
+                    {/* Expanded Bucket Details - Prefer hourly buckets (historical/24) over legacy */}
                     {data && expandedMarkets.has(market.id) && (
                       <div className="border-t border-border-secondary pt-4 mt-2">
                         <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
                           <Droplets className="w-4 h-4 text-prmx-cyan" />
                           Hourly Rainfall Readings (Past 24h)
+                          {data.hourlyBuckets.length > 0 && (
+                            <Badge variant="purple" className="text-[10px]">AccuWeather Historical/24</Badge>
+                          )}
                         </h4>
                         <div className="max-h-64 overflow-y-auto space-y-2">
-                          {data.buckets.length > 0 ? (
+                          {/* Prefer hourly buckets (new) over legacy buckets */}
+                          {data.hourlyBuckets.length > 0 ? (
+                            data.hourlyBuckets.map((bucket, idx) => (
+                              <div 
+                                key={bucket.hourIndex}
+                                onClick={() => {
+                                  // Convert to common format for modal
+                                  setSelectedBucket({
+                                    bucketIndex: bucket.hourIndex,
+                                    timestamp: bucket.hourUtc,
+                                    rainfallMm: bucket.rainfallMm,
+                                    blockNumber: 0,
+                                    rawData: bucket.rawData,
+                                  });
+                                  setShowRawDataModal(true);
+                                }}
+                                className={cn(
+                                  'flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer transition-all hover:ring-1 hover:ring-prmx-cyan/50',
+                                  idx === 0 ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' : 'bg-background-tertiary/30 hover:bg-background-tertiary/50'
+                                )}
+                                title="Click to view raw data"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <Clock className="w-3 h-3 text-text-tertiary" />
+                                  <span className="text-text-secondary">
+                                    {bucket.hourUtc.toLocaleTimeString([], { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit',
+                                      hour12: true 
+                                    })}
+                                  </span>
+                                  <span className="text-text-tertiary text-xs">
+                                    {bucket.hourUtc.toLocaleDateString([], { 
+                                      month: 'short', 
+                                      day: 'numeric' 
+                                    })}
+                                  </span>
+                                  <span className="text-prmx-cyan text-xs font-medium">
+                                    ({getUtcOffsetString()})
+                                  </span>
+                                  {idx === 0 && (
+                                    <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
+                                  )}
+                                  <Badge 
+                                    variant={bucket.source === 'historical' ? 'purple' : 'default'}
+                                    className="text-[10px] ml-1"
+                                  >
+                                    {bucket.source === 'historical' ? 'Hist' : 'Live'}
+                                  </Badge>
+                                  <Code className="w-3 h-3 text-text-tertiary ml-1" />
+                                </div>
+                                <div className={cn(
+                                  'font-mono font-semibold',
+                                  bucket.rainfallMm > 0 ? 'text-prmx-cyan' : 'text-text-tertiary'
+                                )}>
+                                  {bucket.rainfallMm.toFixed(1)} mm
+                                </div>
+                              </div>
+                            ))
+                          ) : data.buckets.length > 0 ? (
+                            // Fallback to legacy buckets
                             data.buckets.map((bucket, idx) => (
                               <div 
                                 key={bucket.bucketIndex}
@@ -667,6 +748,7 @@ export default function OraclePage() {
                                   {idx === 0 && (
                                     <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
                                   )}
+                                  <Badge variant="default" className="text-[10px] ml-1">Legacy</Badge>
                                   <Code className="w-3 h-3 text-text-tertiary ml-1" />
                                 </div>
                                 <div className={cn(
@@ -687,7 +769,10 @@ export default function OraclePage() {
                         <div className="mt-3 pt-3 border-t border-border-secondary flex items-center justify-between text-sm">
                           <span className="text-text-secondary">Total (Sum of readings)</span>
                           <span className="font-semibold text-prmx-cyan">
-                            {data.buckets.reduce((sum, b) => sum + b.rainfallMm, 0).toFixed(1)} mm
+                            {(data.hourlyBuckets.length > 0 
+                              ? data.hourlyBuckets.reduce((sum, b) => sum + b.rainfallMm, 0) 
+                              : data.buckets.reduce((sum, b) => sum + b.rainfallMm, 0)
+                            ).toFixed(1)} mm
                           </span>
                         </div>
                       </div>

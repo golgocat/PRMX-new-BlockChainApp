@@ -1038,6 +1038,69 @@ export async function getRainBuckets(marketId: number): Promise<RainBucket[]> {
 }
 
 /**
+ * Hourly bucket data from AccuWeather historical/24 endpoint
+ */
+export interface HourlyBucket {
+  hourIndex: number;       // hour_index (unix timestamp / 3600)
+  hourUtc: Date;           // Date object for the hour
+  rainfallMm: number;      // Rainfall in mm (already divided by 10)
+  fetchedAt: Date;         // When this was fetched
+  source: 'current' | 'historical';  // Data source
+  rawData: Record<string, unknown>;
+}
+
+/**
+ * Get hourly bucket readings for a market (past 24 hours)
+ * Uses the new HourlyBuckets storage that stores individual hourly readings
+ */
+export async function getHourlyBuckets(marketId: number): Promise<HourlyBucket[]> {
+  const api = await getApi();
+  
+  // Get current hour index
+  const now = Math.floor(Date.now() / 1000);
+  const currentHourIndex = Math.floor(now / 3600);
+  const oldestHourIndex = currentHourIndex - 24;
+  
+  const buckets: HourlyBucket[] = [];
+  
+  // Fetch each hour in the 24-hour range
+  for (let hourIdx = oldestHourIndex; hourIdx <= currentHourIndex; hourIdx++) {
+    try {
+      const bucket = await api.query.prmxOracle.hourlyBuckets(marketId, hourIdx);
+      
+      if (!(bucket as any).isNone) {
+        const data = (bucket as any).unwrap().toJSON();
+        // Handle both camelCase and snake_case
+        const mm = data.mm ?? 0;
+        const fetchedAt = data.fetchedAt ?? data.fetched_at ?? 0;
+        const source = data.source ?? 0;
+        
+        buckets.push({
+          hourIndex: hourIdx,
+          hourUtc: new Date(hourIdx * 3600 * 1000),
+          rainfallMm: mm / 10, // Convert from tenths of mm to mm
+          fetchedAt: new Date(fetchedAt * 1000),
+          source: source === 0 ? 'current' : 'historical',
+          rawData: {
+            marketId,
+            hourIndex: hourIdx,
+            ...data,
+            _note: 'mm is in tenths of mm (e.g., 100 = 10.0mm)',
+          },
+        });
+      }
+    } catch (err) {
+      console.error(`Failed to fetch hourly bucket ${hourIdx} for market ${marketId}:`, err);
+    }
+  }
+  
+  // Sort by hour descending (newest first)
+  buckets.sort((a, b) => b.hourIndex - a.hourIndex);
+  
+  return buckets;
+}
+
+/**
  * Settlement result for a policy
  */
 export interface SettlementResult {

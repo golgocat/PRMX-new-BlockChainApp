@@ -235,6 +235,20 @@ pub mod pallet {
         pub rolling_sum_mm: Millimeters,
     }
 
+    /// Hourly bucket for V1 oracle using AccuWeather historical/24 endpoint
+    /// Stores individual hourly rainfall readings for accurate rolling window calculation
+    #[derive(
+        Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen, Default,
+    )]
+    pub struct HourlyBucket {
+        /// Rainfall amount in mm (scaled by 10, so 12.5mm = 125)
+        pub mm: Millimeters,
+        /// Unix timestamp when this bucket was fetched
+        pub fetched_at: u64,
+        /// Data source: 0 = current conditions, 1 = historical/24
+        pub source: u8,
+    }
+
     /// On-chain log of threshold trigger events
     /// Records comprehensive data when a policy is auto-settled due to threshold breach
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -349,6 +363,21 @@ pub mod pallet {
     #[pallet::getter(fn rolling_state)]
     pub type RollingState<T: Config> =
         StorageMap<_, Blake2_128Concat, LocationId, RollingWindowState, OptionQuery>;
+
+    /// Hourly buckets for V1 oracle (per market_id and hour_index)
+    /// Stores individual hourly rainfall readings from AccuWeather historical/24 endpoint
+    /// hour_index = unix_timestamp / 3600 (hour since Unix epoch)
+    #[pallet::storage]
+    #[pallet::getter(fn hourly_buckets)]
+    pub type HourlyBuckets<T: Config> = StorageDoubleMap<
+        _,
+        Blake2_128Concat,
+        MarketId,
+        Blake2_128Concat,
+        u64, // hour_index
+        HourlyBucket,
+        OptionQuery,
+    >;
 
     /// Authorized oracle providers (accounts that can submit data)
     #[pallet::storage]
@@ -1070,6 +1099,115 @@ pub mod pallet {
                     "🧹 Cleared pending fetch request for market {}",
                     market_id
                 );
+            }
+
+            Ok(())
+        }
+
+        /// Submit 24 hourly rainfall readings from OCW
+        /// Uses AccuWeather historical/24 endpoint data for more accurate rolling window
+        /// Each entry is (epoch_time, rainfall_mm_scaled)
+        #[pallet::call_index(13)]
+        #[pallet::weight(Weight::from_parts(100_000, 0))]
+        pub fn submit_hourly_rainfall_from_ocw(
+            origin: OriginFor<T>,
+            market_id: MarketId,
+            hourly_data: BoundedVec<(u64, Millimeters), ConstU32<24>>, // Max 24 hourly readings
+        ) -> DispatchResult {
+            // Verify signed by an oracle provider
+            let who = ensure_signed(origin)?;
+            ensure!(
+                OracleProviders::<T>::get(&who),
+                Error::<T>::NotOracleProvider
+            );
+
+            // Validate market exists
+            ensure!(
+                pallet_prmx_markets::Markets::<T>::contains_key(market_id),
+                Error::<T>::MarketNotFound
+            );
+
+            let now = Self::current_timestamp();
+            let current_hour_index = now / 3600;
+            let oldest_valid_hour = current_hour_index.saturating_sub(24);
+            
+            log::info!(
+                target: "prmx-oracle",
+                "🌧️ OCW hourly rainfall: {} readings for market {}",
+                hourly_data.len(),
+                market_id
+            );
+
+            // Store each hourly bucket
+            let mut rolling_sum: Millimeters = 0;
+            let mut buckets_stored = 0u32;
+            
+            for (epoch_time, rainfall_mm) in hourly_data.iter() {
+                let hour_index = *epoch_time / 3600;
+                
+                // Skip buckets older than 24 hours
+                if hour_index < oldest_valid_hour {
+                    continue;
+                }
+                
+                // Sanity check
+                if *rainfall_mm > MAX_RAINFALL_MM {
+                    continue;
+                }
+                
+                let bucket = HourlyBucket {
+                    mm: *rainfall_mm,
+                    fetched_at: now,
+                    source: 1, // historical/24
+                };
+                
+                HourlyBuckets::<T>::insert(market_id, hour_index, bucket);
+                rolling_sum = rolling_sum.saturating_add(*rainfall_mm);
+                buckets_stored += 1;
+            }
+
+            // Cleanup old buckets (older than 24 hours from current hour)
+            // Iterate and remove old entries
+            let mut removed = 0u32;
+            for (hour_idx, _) in HourlyBuckets::<T>::iter_prefix(market_id) {
+                if hour_idx < oldest_valid_hour {
+                    HourlyBuckets::<T>::remove(market_id, hour_idx);
+                    removed += 1;
+                }
+            }
+
+            // Recalculate rolling sum from all stored buckets
+            let mut actual_rolling_sum: Millimeters = 0;
+            for (_, bucket) in HourlyBuckets::<T>::iter_prefix(market_id) {
+                actual_rolling_sum = actual_rolling_sum.saturating_add(bucket.mm);
+            }
+
+            // Update the legacy RollingState for backwards compatibility
+            let bucket_idx = bucket_index_for_timestamp(now);
+            let state = RollingWindowState {
+                last_bucket_index: bucket_idx,
+                oldest_bucket_index: bucket_idx.saturating_sub(24),
+                rolling_sum_mm: actual_rolling_sum,
+            };
+            RollingState::<T>::insert(market_id, state);
+
+            Self::deposit_event(Event::RollingSumUpdated {
+                location_id: market_id,
+                rolling_sum_mm: actual_rolling_sum,
+            });
+
+            log::info!(
+                target: "prmx-oracle",
+                "✅ Stored {} hourly buckets for market {} (removed {} old), rolling sum = {:.1}mm",
+                buckets_stored,
+                market_id,
+                removed,
+                actual_rolling_sum as f64 / 10.0
+            );
+
+            // Clear any pending fetch request
+            if PendingFetchRequests::<T>::contains_key(market_id) {
+                PendingFetchRequests::<T>::remove(market_id);
             }
 
             Ok(())
@@ -2239,6 +2377,7 @@ pub mod pallet {
         }
 
         /// Fetch rainfall data and submit signed transaction to update on-chain storage
+        /// Now uses historical/24 endpoint and stores individual hourly buckets
         fn fetch_and_store_rainfall(
             api_key: &[u8],
             location_key: &str,
@@ -2248,45 +2387,55 @@ pub mod pallet {
                 Ok(rainfall_data) => {
                     log::info!(
                         target: "prmx-oracle",
-                        "Fetched {} rainfall records for market {}",
+                        "📊 Fetched {} hourly rainfall records for market {}",
                         rainfall_data.len(),
                         market_id
                     );
 
-                    // Get the 24h rainfall value (the first/only entry should be the 24h total)
-                    if let Some((timestamp, rainfall_mm)) = rainfall_data.first() {
+                    if !rainfall_data.is_empty() {
+                        // Calculate total for logging
+                        let total_mm: Millimeters = rainfall_data.iter().map(|(_, mm)| *mm).sum();
                         log::info!(
                             target: "prmx-oracle",
-                            "🌧️ Submitting signed tx to update on-chain: market {} = {:.1} mm",
+                            "🌧️ Submitting {} hourly readings for market {} (total: {:.1} mm)",
+                            rainfall_data.len(),
                             market_id,
-                            *rainfall_mm as f64 / 10.0
+                            total_mm as f64 / 10.0
                         );
 
-                        // Submit signed transaction to update on-chain storage
-                        let result = Self::submit_rainfall_signed_tx(market_id, *rainfall_mm);
+                        // Submit hourly data via signed transaction
+                        let result = Self::submit_hourly_rainfall_signed_tx(market_id, rainfall_data.clone());
                         
                         match result {
                             Ok(()) => {
                                 log::info!(
                                     target: "prmx-oracle",
-                                    "✅ Signed tx submitted for market {} with {:.1} mm",
+                                    "✅ Hourly rainfall submitted for market {} ({} readings)",
                                     market_id,
-                                    *rainfall_mm as f64 / 10.0
+                                    rainfall_data.len()
                                 );
                             }
                             Err(e) => {
                                 log::warn!(
                                     target: "prmx-oracle",
-                                    "❌ Failed to submit signed tx for market {}: {}",
+                                    "❌ Failed to submit hourly rainfall for market {}: {}",
                                     market_id,
                                     e
                                 );
-                                // Also store in offchain index as fallback
-                                let key = Self::rainfall_data_key(market_id, *timestamp);
-                                let value = rainfall_mm.to_le_bytes();
-                                sp_io::offchain_index::set(&key, &value);
+                                // Fallback: try legacy single-value submission with total
+                                if let Some((timestamp, _)) = rainfall_data.first() {
+                                    let key = Self::rainfall_data_key(market_id, *timestamp);
+                                    let value = total_mm.to_le_bytes();
+                                    sp_io::offchain_index::set(&key, &value);
+                                }
                             }
                         }
+                    } else {
+                        log::debug!(
+                            target: "prmx-oracle",
+                            "No rainfall data returned for market {}",
+                            market_id
+                        );
                     }
                 }
                 Err(e) => {
@@ -2351,6 +2500,63 @@ pub mod pallet {
             }
 
             Err("All signed transactions failed")
+        }
+
+        /// Submit hourly rainfall data via signed transaction
+        /// Uses the new submit_hourly_rainfall_from_ocw extrinsic
+        fn submit_hourly_rainfall_signed_tx(
+            market_id: MarketId,
+            hourly_data: Vec<(u64, Millimeters)>,
+        ) -> Result<(), &'static str> {
+            use frame_system::offchain::{Signer, SendSignedTransaction};
+
+            // Get signer from keystore
+            let signer = Signer::<T, T::AuthorityId>::all_accounts();
+            
+            if !signer.can_sign() {
+                log::warn!(
+                    target: "prmx-oracle",
+                    "⚠️ No oracle authority keys found in keystore. Cannot submit hourly rainfall tx."
+                );
+                return Err("No oracle authority keys in keystore");
+            }
+
+            // Convert to BoundedVec (max 24 entries)
+            let bounded_data: BoundedVec<(u64, Millimeters), ConstU32<24>> = 
+                hourly_data.into_iter().take(24).collect::<Vec<_>>().try_into()
+                    .map_err(|_| "Failed to create bounded vec")?;
+
+            // Create the call
+            let call = Call::<T>::submit_hourly_rainfall_from_ocw {
+                market_id,
+                hourly_data: bounded_data,
+            };
+
+            // Send signed transaction
+            let results = signer.send_signed_transaction(|_account| call.clone());
+
+            for (acc, result) in &results {
+                match result {
+                    Ok(()) => {
+                        log::info!(
+                            target: "prmx-oracle",
+                            "✅ Hourly rainfall tx sent from account {:?}",
+                            acc.id
+                        );
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            target: "prmx-oracle",
+                            "❌ Hourly rainfall tx from account {:?} failed: {:?}",
+                            acc.id,
+                            e
+                        );
+                    }
+                }
+            }
+
+            Err("All signed transactions failed for hourly rainfall")
         }
 
         /// Submit a signed transaction to bind market location on-chain
@@ -2551,6 +2757,8 @@ pub mod pallet {
         /// Fetch AccuWeather current conditions with rainfall data
         /// Uses the starter-plan-compatible endpoint with details=true
         /// which includes PrecipitationSummary.Past24Hours
+        /// Fetch 24 hours of hourly rainfall data from AccuWeather Historical endpoint
+        /// Uses /historical/24 endpoint (available on Starter tier) to get individual hourly readings
         fn fetch_accuweather_rainfall(
             api_key: &[u8],
             location_key: &str,
@@ -2560,25 +2768,25 @@ pub mod pallet {
             let api_key_str =
                 core::str::from_utf8(api_key).map_err(|_| "Invalid API key encoding")?;
 
-            // Build URL: /currentconditions/v1/{locationKey}?apikey=XXX&details=true
-            // This endpoint is available on starter plan and includes Past24Hours precipitation
+            // Build URL: /currentconditions/v1/{locationKey}/historical/24?apikey=XXX&details=true
+            // This Starter tier endpoint returns 24 hourly observations
             let url = alloc::format!(
-                "{}/currentconditions/v1/{}?apikey={}&details=true",
+                "{}/currentconditions/v1/{}/historical/24?apikey={}&details=true",
                 ACCUWEATHER_BASE_URL,
                 location_key,
                 api_key_str
             );
 
-            log::debug!(
+            log::info!(
                 target: "prmx-oracle",
-                "Fetching rainfall from AccuWeather for location {}",
+                "🌐 Fetching 24h historical rainfall from AccuWeather for location {}",
                 location_key
             );
 
             // Make HTTP request
             let request = http::Request::get(&url);
             let timeout = sp_io::offchain::timestamp()
-                .add(sp_runtime::offchain::Duration::from_millis(15_000));
+                .add(sp_runtime::offchain::Duration::from_millis(30_000)); // Longer timeout for historical data
 
             let pending = request
                 .deadline(timeout)
@@ -2601,8 +2809,8 @@ pub mod pallet {
 
             let body = response.body().collect::<Vec<u8>>();
 
-            // Parse JSON to extract rainfall data
-            Self::extract_rainfall_data(&body)
+            // Parse JSON to extract 24 hourly rainfall records
+            Self::extract_hourly_rainfall_data(&body)
         }
 
         /// Extract "Key" value from AccuWeather JSON response
@@ -2621,8 +2829,9 @@ pub mod pallet {
             Err("Could not find Key in JSON response")
         }
 
-        /// Extract rainfall data from AccuWeather current conditions response
+        /// Extract rainfall data from AccuWeather current conditions response (legacy)
         /// The response contains PrecipitationSummary.Past24Hours with total 24h rainfall
+        #[allow(dead_code)]
         fn extract_rainfall_data(json: &[u8]) -> Result<Vec<(u64, Millimeters)>, &'static str> {
             let json_str = core::str::from_utf8(json).map_err(|_| "Invalid JSON encoding")?;
 
@@ -2676,6 +2885,89 @@ pub mod pallet {
                 );
             }
 
+            Ok(results)
+        }
+
+        /// Extract 24 hourly rainfall readings from AccuWeather historical/24 response
+        /// The response is an array of 24 hourly observations, each with PrecipitationSummary.PastHour
+        fn extract_hourly_rainfall_data(json: &[u8]) -> Result<Vec<(u64, Millimeters)>, &'static str> {
+            let json_str = core::str::from_utf8(json).map_err(|_| "Invalid JSON encoding")?;
+            
+            let mut results: Vec<(u64, Millimeters)> = Vec::new();
+            
+            // The response is an array of objects: [{"EpochTime":123,...,"PrecipitationSummary":{...}},...]
+            // Parse each observation
+            let mut search_start = 0;
+            let mut observations_parsed = 0u32;
+            
+            while let Some(epoch_pos) = json_str[search_start..].find("\"EpochTime\":") {
+                let abs_epoch_pos = search_start + epoch_pos + 12;
+                
+                // Extract EpochTime value
+                let epoch_end = json_str[abs_epoch_pos..]
+                    .find(|c: char| !c.is_ascii_digit())
+                    .unwrap_or(0);
+                
+                let epoch = json_str[abs_epoch_pos..abs_epoch_pos + epoch_end]
+                    .parse::<u64>()
+                    .unwrap_or(0);
+                
+                if epoch == 0 {
+                    search_start = abs_epoch_pos;
+                    continue;
+                }
+                
+                // Look for PastHour rainfall near this observation
+                // Search within the next ~500 chars for the PastHour value
+                let search_window_end = core::cmp::min(abs_epoch_pos + 500, json_str.len());
+                let search_window = &json_str[abs_epoch_pos..search_window_end];
+                
+                let mut rainfall_mm: Millimeters = 0;
+                
+                // Look for "PastHour":{"Metric":{"Value":X.X
+                if let Some(past_hour_pos) = search_window.find("\"PastHour\":{\"Metric\":{\"Value\":") {
+                    let value_start = past_hour_pos + 31;
+                    if value_start < search_window.len() {
+                        let remaining = &search_window[value_start..];
+                        let value_end = remaining
+                            .find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
+                            .unwrap_or(0);
+                        if value_end > 0 {
+                            if let Ok(precip) = remaining[..value_end].parse::<f64>() {
+                                // Convert to mm * 10 for storage
+                                rainfall_mm = (precip * 10.0) as Millimeters;
+                            }
+                        }
+                    }
+                }
+                
+                results.push((epoch, rainfall_mm));
+                observations_parsed += 1;
+                
+                // Move to next observation
+                search_start = abs_epoch_pos + 1;
+                
+                // Safety limit
+                if observations_parsed >= 24 {
+                    break;
+                }
+            }
+            
+            if !results.is_empty() {
+                let total_mm: Millimeters = results.iter().map(|(_, mm)| *mm).sum();
+                log::info!(
+                    target: "prmx-oracle",
+                    "📊 AccuWeather historical/24: {} hourly observations, total rainfall {:.1}mm",
+                    results.len(),
+                    total_mm as f64 / 10.0
+                );
+            } else {
+                log::warn!(
+                    target: "prmx-oracle",
+                    "⚠️ No hourly observations found in historical/24 response"
+                );
+            }
+            
             Ok(results)
         }
     }

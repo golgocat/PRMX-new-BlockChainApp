@@ -75,8 +75,9 @@ export default function PolicyDetailPage() {
     loadPolicy();
     
     // Auto-refresh every 10 seconds for real-time settlement updates
+    // Use isInitialLoad=false to prevent scroll jumps and loading state
     const interval = setInterval(() => {
-      loadPolicy();
+      loadPolicy(false);
     }, 10000);
     
     return () => clearInterval(interval);

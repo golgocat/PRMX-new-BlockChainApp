@@ -297,6 +297,14 @@ export default function MarketDetailPage() {
                     <span className="text-text-secondary">Min Lead Time</span>
                     <p className="font-medium">{secondsToDays(market.windowRules.minLeadTimeSecs)} days</p>
                   </div>
+                  <div>
+                    <span className="text-text-secondary">Event Type</span>
+                    <p className="font-medium">Rolling 24h sum</p>
+                  </div>
+                  <div>
+                    <span className="text-text-secondary">Early Trigger</span>
+                    <p className="font-medium text-text-tertiary">Disabled</p>
+                  </div>
                 </div>
               </div>
               

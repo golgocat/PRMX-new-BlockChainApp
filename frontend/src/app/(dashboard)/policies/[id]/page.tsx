@@ -140,7 +140,8 @@ export default function PolicyDetailPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadPolicy(false);
-    setIsRefreshing(false);
+    // Ensure animation is visible for at least 500ms
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   const handleSettle = async (eventOccurred: boolean) => {

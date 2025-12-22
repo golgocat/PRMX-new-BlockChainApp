@@ -87,7 +87,8 @@ export default function MarketDetailPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadMarket(false);
-    setIsRefreshing(false);
+    // Ensure animation is visible for at least 500ms
+    setTimeout(() => setIsRefreshing(false), 500);
   };
 
   const now = Math.floor(Date.now() / 1000);

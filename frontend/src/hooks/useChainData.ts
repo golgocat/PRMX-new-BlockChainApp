@@ -695,8 +695,16 @@ export function useLpPositionOutcomes() {
         const holding = holdingsMap.get(policyId);
         const currentShares = holding ? Number(holding.shares) : 0;
         
-        // Calculate investment cost from trade history
+        // Calculate shares and investment cost from trade history
         const policyTrades = trades.filter(t => t.policyId === policyId);
+        const totalSharesBought = policyTrades
+          .filter(t => t.type === 'buy')
+          .reduce((sum, t) => sum + t.shares, 0);
+        const totalSharesSold = policyTrades
+          .filter(t => t.type === 'sell')
+          .reduce((sum, t) => sum + t.shares, 0);
+        const netSharesFromTrades = totalSharesBought - totalSharesSold;
+        
         const totalBuyCost = policyTrades
           .filter(t => t.type === 'buy')
           .reduce((sum, t) => sum + t.totalAmount, 0);
@@ -704,6 +712,10 @@ export function useLpPositionOutcomes() {
           .filter(t => t.type === 'sell')
           .reduce((sum, t) => sum + t.totalAmount, 0);
         const netCost = totalBuyCost - totalSellRevenue;
+        
+        // Use trade history shares for settled policies (since on-chain shares are 0)
+        // For active policies, prefer currentShares from chain
+        const sharesForCalculation = policy.status === 'Settled' ? netSharesFromTrades : (currentShares || netSharesFromTrades);
         
         // Check if policy is settled
         let outcome: LpPositionOutcome['outcome'] = 'active';
@@ -719,15 +731,26 @@ export function useLpPositionOutcomes() {
               settledAt = settlement.settledAt;
               
               if (settlement.eventOccurred) {
-                // Event occurred - LPs lost their capital
+                // Event occurred - LPs lost their capital (premium paid out to policyholder)
                 outcome = 'event_triggered';
                 payoutReceived = 0;
               } else {
-                // Policy matured - LPs get their capital back
+                // Policy matured - LPs get their capital back PLUS their share of the premium
                 outcome = 'matured';
-                // Calculate share of returned capital
-                const shareRatio = currentShares / policy.capitalPool.totalShares;
-                payoutReceived = Number(settlement.returnedToLps) / 1_000_000 * shareRatio;
+                // The LP gets back:
+                // 1. Their original investment (capital)
+                // 2. Their proportional share of the collected premium
+                // 
+                // Since this is a "no event" scenario, LPs profit = their share of premium
+                // returnedToLps = total capital pool + unspent premium
+                // 
+                // Calculate user's share based on their shares vs total shares at settlement
+                // Use sharesForCalculation since currentShares is 0 after settlement
+                const totalShares = policy.capitalPool.totalShares;
+                if (totalShares > 0 && sharesForCalculation > 0) {
+                  const shareRatio = sharesForCalculation / totalShares;
+                  payoutReceived = Number(settlement.returnedToLps) / 1_000_000 * shareRatio;
+                }
               }
             }
           } catch (err) {
@@ -735,16 +758,16 @@ export function useLpPositionOutcomes() {
           }
         } else if (policy.status === 'Expired') {
           outcome = 'matured';
-          // If expired but not settled yet, estimate payout
+          // If expired but not settled yet, estimate payout based on max payout per share
           const payoutPerShare = market ? Number(market.payoutPerShare) / 1_000_000 : 100;
-          payoutReceived = currentShares * payoutPerShare;
+          payoutReceived = sharesForCalculation * payoutPerShare;
         }
         
         positionOutcomes.push({
           policyId,
           marketId: policy.marketId,
           marketName: market?.name || `Market ${policy.marketId}`,
-          sharesHeld: currentShares,
+          sharesHeld: sharesForCalculation,
           investmentCost: netCost,
           outcome,
           payoutReceived,

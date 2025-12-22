@@ -811,30 +811,37 @@ export async function getLpHoldingsForPolicy(policyId: number): Promise<LpHoldin
     if ((storedPolicyId as any).toNumber() === policyId) {
       const data = (value as any).toJSON();
       const shares = BigInt(data.lpShares || data.shares || '0');
-      // Only include holders with > 0 shares
-      if (shares > BigInt(0)) {
+      const lockedShares = BigInt(data.lockedShares || '0');
+      const totalShares = shares + lockedShares;
+      
+      // Only include holders with > 0 total shares (free + locked)
+      if (totalShares > BigInt(0)) {
         holdings.push({
           policyId,
           holder: accountId.toString(),
           shares,
-          lockedShares: BigInt(data.lockedShares || '0'),
+          lockedShares,
         });
       }
     }
   }
   
-  // Sort by shares (descending)
-  holdings.sort((a, b) => (b.shares > a.shares ? 1 : -1));
+  // Sort by total shares (free + locked) descending
+  holdings.sort((a, b) => {
+    const totalA = a.shares + a.lockedShares;
+    const totalB = b.shares + b.lockedShares;
+    return totalB > totalA ? 1 : -1;
+  });
   
   return holdings;
 }
 
 /**
- * Get total LP shares issued for a policy
+ * Get total LP shares issued for a policy (free + locked)
  */
 export async function getTotalLpShares(policyId: number): Promise<bigint> {
   const holdings = await getLpHoldingsForPolicy(policyId);
-  return holdings.reduce((sum, h) => sum + h.shares, BigInt(0));
+  return holdings.reduce((sum, h) => sum + h.shares + h.lockedShares, BigInt(0));
 }
 
 // ============================================================================

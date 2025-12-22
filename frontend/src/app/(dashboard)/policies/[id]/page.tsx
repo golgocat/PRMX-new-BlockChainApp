@@ -533,7 +533,7 @@ export default function PolicyDetailPage() {
                     <div className="p-3 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30">
                       <span className="text-xs text-text-secondary">Total Shares Issued</span>
                       <p className="text-lg font-bold text-prmx-cyan">
-                        {lpHoldings.reduce((sum, h) => sum + Number(h.shares), 0).toLocaleString()}
+                        {lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0).toLocaleString()}
                       </p>
                     </div>
                     <div className="p-3 rounded-xl bg-background-tertiary/50 border border-border-secondary">
@@ -549,8 +549,9 @@ export default function PolicyDetailPage() {
                     <p className="text-sm text-text-secondary font-medium">Holders</p>
                     <div className="max-h-48 overflow-y-auto space-y-2">
                       {lpHoldings.map((holding, idx) => {
-                        const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares), 0);
-                        const ownership = totalShares > 0 ? (Number(holding.shares) / totalShares) * 100 : 0;
+                        const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0);
+                        const holderTotal = Number(holding.shares) + Number(holding.lockedShares);
+                        const ownership = totalShares > 0 ? (holderTotal / totalShares) * 100 : 0;
                         const accountInfo = api.getAccountByAddress(holding.holder);
                         
                         return (
@@ -589,12 +590,16 @@ export default function PolicyDetailPage() {
                             </div>
                             <div className="flex items-center justify-between text-xs text-text-tertiary ml-8">
                               <span className="font-mono">{formatAddress(holding.holder)}</span>
-                              <span>{Number(holding.shares).toLocaleString()} shares</span>
+                              <span>{holderTotal.toLocaleString()} shares</span>
                             </div>
-                            {holding.lockedShares > 0n && (
-                              <div className="flex items-center gap-1 text-xs text-warning ml-8 mt-1">
-                                <Lock className="w-3 h-3" />
-                                {Number(holding.lockedShares).toLocaleString()} locked (in orderbook)
+                            {Number(holding.lockedShares) > 0 && (
+                              <div className="flex items-center gap-1 text-xs text-text-tertiary ml-8 mt-1">
+                                <span className="text-success">{Number(holding.shares).toLocaleString()} free</span>
+                                <span>•</span>
+                                <span className="text-warning flex items-center gap-1">
+                                  <Lock className="w-3 h-3" />
+                                  {Number(holding.lockedShares).toLocaleString()} locked
+                                </span>
                               </div>
                             )}
                           </div>
@@ -608,8 +613,9 @@ export default function PolicyDetailPage() {
                     <p className="text-xs text-text-tertiary">Ownership Distribution</p>
                     <div className="h-3 rounded-full bg-background-tertiary/50 overflow-hidden flex">
                       {lpHoldings.map((holding, idx) => {
-                        const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares), 0);
-                        const width = totalShares > 0 ? (Number(holding.shares) / totalShares) * 100 : 0;
+                        const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0);
+                        const holderTotal = Number(holding.shares) + Number(holding.lockedShares);
+                        const width = totalShares > 0 ? (holderTotal / totalShares) * 100 : 0;
                         const colors = ['bg-prmx-cyan', 'bg-prmx-purple', 'bg-success', 'bg-warning', 'bg-error'];
                         return (
                           <div 

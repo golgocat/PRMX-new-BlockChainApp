@@ -19,6 +19,21 @@ export function QuoteCalculator() {
   const [markets, setMarkets] = useState<Market[]>([])
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // V2 Policy state (only for Manila)
+  const [policyVersion, setPolicyVersion] = useState<'V1' | 'V2'>('V1')
+  const [v2DurationDays, setV2DurationDays] = useState(3)
+  
+  // Check if selected market supports V2 (Manila = market.id === 0)
+  const isV2Supported = selectedMarket?.id === 0
+  
+  // Handle market selection - reset to V1 if market doesn't support V2
+  const handleMarketSelect = (market: Market) => {
+    setSelectedMarket(market)
+    if (market.id !== 0) {
+      setPolicyVersion('V1')
+    }
+  }
 
   // Fetch markets from the API
   useEffect(() => {
@@ -51,6 +66,13 @@ export function QuoteCalculator() {
       params.set('marketId', selectedMarket.id.toString())
     }
     params.set('coverage', coverage.toString())
+    
+    // Pass V2 params if Manila is selected with V2 version
+    if (selectedMarket?.id === 0 && policyVersion === 'V2') {
+      params.set('version', 'V2')
+      params.set('duration', v2DurationDays.toString())
+    }
+    
     router.push(`/policies/new?${params.toString()}`)
   }
 
@@ -176,7 +198,7 @@ export function QuoteCalculator() {
                       {markets.map((market) => (
                         <button
                           key={market.id}
-                          onClick={() => setSelectedMarket(market)}
+                          onClick={() => handleMarketSelect(market)}
                           className={`p-3 rounded-xl text-left transition-all ${
                             selectedMarket?.id === market.id
                               ? 'bg-brand-teal/20 border border-brand-teal/30'
@@ -189,26 +211,102 @@ export function QuoteCalculator() {
                             {market.name}
                           </p>
                           <p className="text-xs text-zinc-500">Strike: {market.strikeValue}mm</p>
+                          <div className="flex gap-1 mt-1">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700/50 text-zinc-400">V1</span>
+                            {market.id === 0 && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-brand-violet/30 text-brand-violet">V2</span>
+                            )}
+                          </div>
                         </button>
                       ))}
+                    </div>
+                  )}
+                  
+                  {/* V1/V2 Version Toggle (only for Manila) */}
+                  {isV2Supported && selectedMarket && (
+                    <div className="mt-4 p-3 rounded-xl bg-zinc-800/30 border border-zinc-700/50">
+                      <p className="text-xs text-zinc-500 mb-2">Select Oracle Version</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => setPolicyVersion('V1')}
+                          className={`p-2 rounded-lg text-center transition-all ${
+                            policyVersion === 'V1'
+                              ? 'bg-brand-teal/20 border border-brand-teal/30'
+                              : 'bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600'
+                          }`}
+                        >
+                          <p className={`text-xs font-medium ${
+                            policyVersion === 'V1' ? 'text-brand-teal' : 'text-white'
+                          }`}>
+                            V1 - 24h Rolling
+                          </p>
+                        </button>
+                        <button
+                          onClick={() => setPolicyVersion('V2')}
+                          className={`p-2 rounded-lg text-center transition-all ${
+                            policyVersion === 'V2'
+                              ? 'bg-brand-violet/20 border border-brand-violet/30'
+                              : 'bg-zinc-800/50 border border-zinc-700/50 hover:border-zinc-600'
+                          }`}
+                        >
+                          <p className={`text-xs font-medium ${
+                            policyVersion === 'V2' ? 'text-brand-violet' : 'text-white'
+                          }`}>
+                            V2 - Cumulative
+                          </p>
+                        </button>
+                      </div>
+                      
+                      {/* V2 Duration Selector */}
+                      {policyVersion === 'V2' && (
+                        <div className="mt-3">
+                          <p className="text-xs text-zinc-500 mb-2">Coverage Duration</p>
+                          <div className="flex gap-1.5">
+                            {[2, 3, 4, 5, 6, 7].map((days) => (
+                              <button
+                                key={days}
+                                onClick={() => setV2DurationDays(days)}
+                                className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                                  v2DurationDays === days
+                                    ? 'bg-brand-violet/30 border border-brand-violet/50 text-brand-violet'
+                                    : 'bg-zinc-800/50 border border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
+                                }`}
+                              >
+                                {days}d
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
 
                 {/* Threshold Info */}
                 {selectedMarket && (
-                  <div className="mb-10 p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50">
+                  <div className={`mb-10 p-4 rounded-xl border ${
+                    policyVersion === 'V2' && isV2Supported
+                      ? 'bg-brand-violet/10 border-brand-violet/30'
+                      : 'bg-zinc-800/30 border-zinc-700/50'
+                  }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Droplets size={18} className="text-brand-teal" />
+                        <Droplets size={18} className={policyVersion === 'V2' && isV2Supported ? 'text-brand-violet' : 'text-brand-teal'} />
                         <span className="text-sm text-zinc-400">Rainfall Threshold</span>
                       </div>
                       <span className="text-white font-mono font-bold">
-                        {selectedMarket.strikeValue}mm / 24h
+                        {selectedMarket.strikeValue}mm / {policyVersion === 'V2' && isV2Supported ? `${v2DurationDays}d` : '24h'}
                       </span>
                     </div>
                     <p className="text-xs text-zinc-500 mt-2">
-                      Payout triggers when 24-hour rainfall exceeds this threshold in {selectedMarket.name}
+                      {policyVersion === 'V2' && isV2Supported ? (
+                        <>
+                          Payout triggers when <span className="text-brand-violet font-medium">cumulative rainfall over {v2DurationDays} days</span> exceeds this threshold in {selectedMarket.name}.
+                          <span className="text-brand-violet"> Early trigger enabled.</span>
+                        </>
+                      ) : (
+                        <>Payout triggers when 24-hour rainfall exceeds this threshold in {selectedMarket.name}</>
+                      )}
                     </p>
                   </div>
                 )}

@@ -477,9 +477,9 @@ export default function PolicyDetailPage() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-text-secondary text-sm">LP Shares</span>
+                      <span className="text-text-secondary text-sm">LP Tokens</span>
                       <span className="font-medium">
-                        {Number(defiInfo.position.lpShares).toLocaleString()}
+                        {(Number(defiInfo.position.lpShares) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </span>
                     </div>
                   </div>

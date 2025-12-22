@@ -291,7 +291,14 @@ export default function MarketsPage() {
                       </div>
                       <div>
                         <p className="text-xs text-text-tertiary">Coverage Duration</p>
-                        <p className="font-semibold text-prmx-cyan">24 hours</p>
+                        {market.id === 0 ? (
+                          <div className="space-y-0.5">
+                            <p className="font-semibold text-prmx-cyan text-sm">2-7 days <span className="text-xs text-text-tertiary font-normal">(V2)</span></p>
+                            <p className="text-xs text-text-secondary">24 hours <span className="text-text-tertiary">(V1)</span></p>
+                          </div>
+                        ) : (
+                          <p className="font-semibold text-prmx-cyan">24 hours</p>
+                        )}
                       </div>
                     </div>
 

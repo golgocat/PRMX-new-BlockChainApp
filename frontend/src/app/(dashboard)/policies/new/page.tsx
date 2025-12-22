@@ -111,12 +111,12 @@ export default function NewPolicyPage() {
     }
   }, [markets, marketsLoading, preselectedMarketId, selectedMarket, searchParams]);
 
-  // Poll for quote result
+  // Poll for quote result (silent refresh to prevent UI flicker)
   useEffect(() => {
     if (quoteRequestId === null || currentStep !== 3) return;
     
     const pollInterval = setInterval(async () => {
-      await refreshQuotes();
+      await refreshQuotes(true); // Silent refresh
       const quote = quotes.find(q => q.id === quoteRequestId);
       if (quote) {
         setCurrentQuote(quote);

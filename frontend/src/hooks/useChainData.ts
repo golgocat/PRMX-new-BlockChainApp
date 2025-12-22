@@ -76,10 +76,12 @@ export function useMarket(marketId: number | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || marketId === null) return;
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -88,7 +90,9 @@ export function useMarket(marketId: number | null) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch market');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [isChainConnected, marketId]);
 
@@ -96,7 +100,7 @@ export function useMarket(marketId: number | null) {
     refresh();
   }, [refresh]);
 
-  return { market, loading, error, refresh };
+  return { market, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -220,10 +224,12 @@ export function useLpOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected) return;
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -261,7 +267,9 @@ export function useLpOrders() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch orders');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [isChainConnected]);
 
@@ -269,7 +277,7 @@ export function useLpOrders() {
     refresh();
   }, [refresh]);
 
-  return { orders, loading, error, refresh };
+  return { orders, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -281,10 +289,12 @@ export function useMyLpHoldings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || !selectedAccount) return;
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -293,7 +303,9 @@ export function useMyLpHoldings() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch LP holdings');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [isChainConnected, selectedAccount]);
 
@@ -301,7 +313,7 @@ export function useMyLpHoldings() {
     refresh();
   }, [refresh]);
 
-  return { holdings, loading, error, refresh };
+  return { holdings, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -316,10 +328,12 @@ export function useRainfallData(marketId: number | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || marketId === null) return;
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -333,7 +347,9 @@ export function useRainfallData(marketId: number | null) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch rainfall data');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [isChainConnected, marketId]);
 
@@ -341,7 +357,7 @@ export function useRainfallData(marketId: number | null) {
     refresh();
   }, [refresh]);
 
-  return { rainfallData, loading, error, refresh };
+  return { rainfallData, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -448,10 +464,12 @@ export function useQuoteRequests() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected) return;
     
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     setError(null);
     
     try {
@@ -460,7 +478,9 @@ export function useQuoteRequests() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch quotes');
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [isChainConnected]);
 
@@ -468,7 +488,7 @@ export function useQuoteRequests() {
     refresh();
   }, [refresh]);
 
-  return { quotes, loading, error, refresh };
+  return { quotes, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 // ============================================================================

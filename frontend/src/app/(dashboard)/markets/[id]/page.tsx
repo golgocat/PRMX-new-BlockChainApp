@@ -468,7 +468,7 @@ export default function MarketDetailPage() {
                     <TableRow key={policy.id} className="cursor-pointer hover:bg-background-tertiary/50">
                       <TableCell>
                         <Link href={`/policies/${policy.id}`} className="font-medium hover:text-prmx-cyan">
-                          #{policy.id + 1}
+                          #{policy.id}
                         </Link>
                       </TableCell>
                       <TableCell>

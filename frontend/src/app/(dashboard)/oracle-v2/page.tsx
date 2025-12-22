@@ -258,7 +258,7 @@ export default function OracleV2Page() {
                             {getStateBadge(monitor.state)}
                           </div>
                           <p className="text-xs text-text-tertiary">
-                            Policy ID: #{monitor.policy_id + 1} • Monitor: {monitor._id}
+                            Policy ID: #{monitor.policy_id} • Monitor: {monitor._id}
                           </p>
                         </div>
                       </div>

@@ -134,7 +134,7 @@ async function main() {
       policyId1 = event.data[0].toNumber();
     }
   }
-  console.log(`   Policy ID: ${policyId1 + 1} (manila-${policyId1 + 1})\n`);
+  console.log(`   Policy ID: ${policyId1} (manila-${policyId1})\n`);
 
   // Get Bob's balance before settlement
   const bobBalanceBefore = await getUsdtBalance(api, bob.address);
@@ -245,7 +245,7 @@ async function main() {
       policyId2 = event.data[0].toNumber();
     }
   }
-  console.log(`   Policy ID: ${policyId2 + 1} (manila-${policyId2 + 1})\n`);
+  console.log(`   Policy ID: ${policyId2} (manila-${policyId2})\n`);
 
   // Get Charlie's balance before settlement
   const charlieBalanceBefore = await getUsdtBalance(api, charlie.address);
@@ -294,10 +294,10 @@ async function main() {
   console.log('\n╔════════════════════════════════════════════════════════════════╗');
   console.log('║                         SUMMARY                                ║');
   console.log('╠════════════════════════════════════════════════════════════════╣');
-  console.log(`║  Policy #${policyId1 + 1} (Bob)     → TRIGGERED (cumulative ≥ strike)   ║`);
+  console.log(`║  Policy #${policyId1} (Bob)     → TRIGGERED (cumulative ≥ strike)   ║`);
   console.log(`║    Payout: ${formatUsdt(bobBalanceAfter - bobBalanceBefore)} USDT (${Number(bobBalanceAfter - bobBalanceBefore) / USDT_MULTIPLIER / 100} shares × $100)    ║`);
   console.log('╠────────────────────────────────────────────────────────────────╣');
-  console.log(`║  Policy #${policyId2 + 1} (Charlie) → MATURED (no event)               ║`);
+  console.log(`║  Policy #${policyId2} (Charlie) → MATURED (no event)               ║`);
   console.log(`║    Payout: ${formatUsdt(charlieBalanceAfter - charlieBalanceBefore)} USDT (premium returned to DAO)            ║`);
   console.log('╚════════════════════════════════════════════════════════════════╝\n');
 

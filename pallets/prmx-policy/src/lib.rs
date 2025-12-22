@@ -901,9 +901,9 @@ pub mod pallet {
             now_secs
         }
 
-        /// Generate a human-readable policy label like "manila-1", "tokyo-2".
-        /// Uses global policy_id + 1 for consistent numbering across UI.
-        /// e.g., policy_id=0 -> "manila-1", policy_id=3 -> "manila-4"
+        /// Generate a human-readable policy label like "manila-0", "tokyo-1".
+        /// Uses global policy_id directly for consistent 0-indexed numbering.
+        /// e.g., policy_id=0 -> "manila-0", policy_id=3 -> "manila-3"
         fn generate_policy_label(market_id: MarketId, policy_id: PolicyId) -> BoundedVec<u8, ConstU32<32>> {
             // Get market name from MarketsApi
             let market_name_bytes = T::MarketsApi::market_name(market_id)
@@ -913,8 +913,8 @@ pub mod pallet {
             let market_name = core::str::from_utf8(&market_name_bytes)
                 .unwrap_or("unknown");
             
-            // Use global policy_id + 1 for the number (1-indexed for user display)
-            let policy_number = policy_id + 1;
+            // Use global policy_id directly (0-indexed for consistency with Monitor ID)
+            let policy_number = policy_id;
 
             // Generate label: "manila-1", "tokyo-2", etc.
             let label_string = alloc::format!(

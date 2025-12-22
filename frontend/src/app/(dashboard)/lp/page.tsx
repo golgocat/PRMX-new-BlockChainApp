@@ -42,7 +42,7 @@ import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory,
 import * as api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
-import type { LpAskOrder, Policy, DaoSolvencyInfo, PolicyDefiInfo, LpTradeRecord } from '@/types';
+import type { LpAskOrder, Policy, DaoSolvencyInfo, PolicyDefiInfo, LpTradeRecord, LpPositionOutcome } from '@/types';
 import { encodeAddress, decodeAddress } from '@polkadot/util-crypto';
 
 // Helper to compare addresses (handles different encodings)
@@ -103,6 +103,8 @@ export default function LpTradingPage() {
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [showTradeDetailModal, setShowTradeDetailModal] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<LpTradeRecord | null>(null);
+  const [showOutcomeDetailModal, setShowOutcomeDetailModal] = useState(false);
+  const [selectedOutcome, setSelectedOutcome] = useState<LpPositionOutcome | null>(null);
   
   // DeFi solvency state
   const [solvencyInfo, setSolvencyInfo] = useState<DaoSolvencyInfo | null>(null);
@@ -1007,11 +1009,15 @@ export default function LpTradingPage() {
                     {outcomes.map((outcome) => (
                       <div
                         key={outcome.policyId}
+                        onClick={() => {
+                          setSelectedOutcome(outcome);
+                          setShowOutcomeDetailModal(true);
+                        }}
                         className={cn(
-                          "p-4 rounded-xl border",
-                          outcome.outcome === 'matured' && "bg-success/5 border-success/20",
-                          outcome.outcome === 'event_triggered' && "bg-error/5 border-error/20",
-                          outcome.outcome === 'active' && "bg-background-tertiary/50 border-border-secondary"
+                          "p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md",
+                          outcome.outcome === 'matured' && "bg-success/5 border-success/20 hover:border-success/40",
+                          outcome.outcome === 'event_triggered' && "bg-error/5 border-error/20 hover:border-error/40",
+                          outcome.outcome === 'active' && "bg-background-tertiary/50 border-border-secondary hover:border-prmx-cyan/40"
                         )}
                       >
                         <div className="flex items-center justify-between mb-3">
@@ -1916,6 +1922,232 @@ export default function LpTradingPage() {
                 onClick={() => {
                   setShowTradeDetailModal(false);
                   setSelectedTrade(null);
+                }}
+                className="w-full mt-2"
+              >
+                Close
+              </Button>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Position Outcome Detail Modal */}
+      <Modal
+        isOpen={showOutcomeDetailModal}
+        onClose={() => {
+          setShowOutcomeDetailModal(false);
+          setSelectedOutcome(null);
+        }}
+        title="Position Outcome Details"
+        size="md"
+      >
+        {selectedOutcome && (() => {
+          const policy = getPolicyById(selectedOutcome.policyId);
+          const market = getMarketById(selectedOutcome.marketId);
+          const isProfit = selectedOutcome.profitLoss >= 0;
+          const returnPercent = selectedOutcome.investmentCost > 0 
+            ? (selectedOutcome.profitLoss / selectedOutcome.investmentCost) * 100 
+            : 0;
+          
+          return (
+            <div className="space-y-5">
+              {/* Outcome Summary Card */}
+              <div className={cn(
+                "p-5 rounded-xl",
+                selectedOutcome.outcome === 'matured' && "bg-gradient-to-br from-success/10 to-success/5 border border-success/20",
+                selectedOutcome.outcome === 'event_triggered' && "bg-gradient-to-br from-error/10 to-error/5 border border-error/20",
+                selectedOutcome.outcome === 'active' && "bg-gradient-to-br from-prmx-cyan/10 to-prmx-cyan/5 border border-prmx-cyan/20"
+              )}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={cn(
+                      "w-14 h-14 rounded-xl flex items-center justify-center shrink-0",
+                      selectedOutcome.outcome === 'matured' && "bg-success/20",
+                      selectedOutcome.outcome === 'event_triggered' && "bg-error/20",
+                      selectedOutcome.outcome === 'active' && "bg-prmx-cyan/20"
+                    )}>
+                      {selectedOutcome.outcome === 'matured' && <CheckCircle2 className="w-7 h-7 text-success" />}
+                      {selectedOutcome.outcome === 'event_triggered' && <XCircle className="w-7 h-7 text-error" />}
+                      {selectedOutcome.outcome === 'active' && <Clock className="w-7 h-7 text-prmx-cyan" />}
+                    </div>
+                    <div>
+                      <p className={cn(
+                        "text-sm font-medium uppercase tracking-wide",
+                        selectedOutcome.outcome === 'matured' && "text-success",
+                        selectedOutcome.outcome === 'event_triggered' && "text-error",
+                        selectedOutcome.outcome === 'active' && "text-prmx-cyan"
+                      )}>
+                        {selectedOutcome.outcome === 'matured' && 'Policy Matured'}
+                        {selectedOutcome.outcome === 'event_triggered' && 'Rainfall Event'}
+                        {selectedOutcome.outcome === 'active' && 'In Progress'}
+                      </p>
+                      <p className="text-2xl font-bold mt-0.5">
+                        {selectedOutcome.sharesHeld} Share{selectedOutcome.sharesHeld !== 1 ? 's' : ''}
+                      </p>
+                      {selectedOutcome.settledAt && (
+                        <p className="text-sm text-text-tertiary mt-1">
+                          Settled: {new Date(selectedOutcome.settledAt * 1000).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-text-tertiary">
+                      {isProfit ? 'Profit' : 'Loss'}
+                    </p>
+                    <p className={cn(
+                      "text-2xl font-bold",
+                      isProfit ? "text-success" : "text-error"
+                    )}>
+                      {isProfit ? '+' : ''}{selectedOutcome.profitLoss.toFixed(2)} USDT
+                    </p>
+                    <p className={cn(
+                      "text-sm",
+                      isProfit ? "text-success/70" : "text-error/70"
+                    )}>
+                      {isProfit ? '+' : ''}{returnPercent.toFixed(1)}% return
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Policy & Market Info */}
+              {policy && market && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-3 border-b border-border-secondary">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center shrink-0">
+                        <Shield className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{policy.label || `Policy #${selectedOutcome.policyId}`}</span>
+                          <Badge 
+                            variant={policy.policyVersion === 'V2' ? 'purple' : 'default'} 
+                            className="text-xs"
+                          >
+                            {policy.policyVersion || 'V1'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-text-secondary flex items-center gap-1">
+                          <MapPin className="w-3 h-3" />
+                          {market.name}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant={
+                        selectedOutcome.outcome === 'matured' ? 'success' : 
+                        selectedOutcome.outcome === 'event_triggered' ? 'destructive' : 
+                        'default'
+                      }
+                    >
+                      {selectedOutcome.outcome === 'matured' && 'Matured'}
+                      {selectedOutcome.outcome === 'event_triggered' && 'Triggered'}
+                      {selectedOutcome.outcome === 'active' && 'Active'}
+                    </Badge>
+                  </div>
+                </div>
+              )}
+
+              {/* Financial Summary */}
+              <div className="space-y-3">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide font-medium">Financial Summary</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-background-tertiary/50">
+                    <p className="text-xs text-text-tertiary uppercase tracking-wide">Investment</p>
+                    <p className="text-lg font-semibold mt-1">
+                      ${selectedOutcome.investmentCost.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-background-tertiary/50">
+                    <p className="text-xs text-text-tertiary uppercase tracking-wide">Payout Received</p>
+                    <p className={cn(
+                      "text-lg font-semibold mt-1",
+                      selectedOutcome.payoutReceived > 0 ? "text-success" : ""
+                    )}>
+                      ${selectedOutcome.payoutReceived.toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-background-tertiary/50">
+                    <p className="text-xs text-text-tertiary uppercase tracking-wide">Shares Held</p>
+                    <p className="text-lg font-semibold mt-1">
+                      {selectedOutcome.sharesHeld}
+                    </p>
+                  </div>
+                  <div className={cn(
+                    "p-3 rounded-xl",
+                    isProfit ? "bg-success/10" : "bg-error/10"
+                  )}>
+                    <p className="text-xs text-text-tertiary uppercase tracking-wide">Net P&L</p>
+                    <p className={cn(
+                      "text-lg font-semibold mt-1",
+                      isProfit ? "text-success" : "text-error"
+                    )}>
+                      {isProfit ? '+' : ''}${selectedOutcome.profitLoss.toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Coverage Info */}
+              {policy && (
+                <div className="space-y-3">
+                  <p className="text-xs text-text-tertiary uppercase tracking-wide font-medium">Coverage Period</p>
+                  <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-text-tertiary">Start</p>
+                        <p className="font-medium">{new Date(policy.coverageStart * 1000).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex-1 mx-4 h-2 bg-prmx-cyan/20 rounded-full relative overflow-hidden">
+                        <div 
+                          className="absolute left-0 top-0 h-full bg-prmx-cyan rounded-full"
+                          style={{ width: '100%' }}
+                        />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-xs text-text-tertiary">End</p>
+                        <p className="font-medium">{new Date(policy.coverageEnd * 1000).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Outcome Explanation */}
+              <div className={cn(
+                "p-4 rounded-xl border",
+                selectedOutcome.outcome === 'matured' && "bg-success/5 border-success/20",
+                selectedOutcome.outcome === 'event_triggered' && "bg-error/5 border-error/20",
+                selectedOutcome.outcome === 'active' && "bg-prmx-cyan/5 border-prmx-cyan/20"
+              )}>
+                <p className="text-sm">
+                  {selectedOutcome.outcome === 'matured' && (
+                    <>
+                      <span className="font-medium text-success">No rainfall event occurred.</span> The policy matured without triggering, and you received a payout of ${selectedOutcome.payoutReceived.toFixed(2)} for your {selectedOutcome.sharesHeld} share{selectedOutcome.sharesHeld !== 1 ? 's' : ''}.
+                    </>
+                  )}
+                  {selectedOutcome.outcome === 'event_triggered' && (
+                    <>
+                      <span className="font-medium text-error">A rainfall event was triggered.</span> The threshold was exceeded, resulting in a payout to the policyholder. Your LP investment of ${selectedOutcome.investmentCost.toFixed(2)} was used to cover the claim.
+                    </>
+                  )}
+                  {selectedOutcome.outcome === 'active' && (
+                    <>
+                      <span className="font-medium text-prmx-cyan">This position is still active.</span> The policy has not yet matured. Your potential outcome depends on whether a rainfall event occurs before the coverage period ends.
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* Close Button */}
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowOutcomeDetailModal(false);
+                  setSelectedOutcome(null);
                 }}
                 className="w-full mt-2"
               >

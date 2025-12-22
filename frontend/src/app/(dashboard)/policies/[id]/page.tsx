@@ -23,7 +23,8 @@ import {
   Check,
   Lock,
   Activity,
-  Zap
+  Zap,
+  Info
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -514,16 +515,147 @@ export default function PolicyDetailPage() {
             </Card>
           )}
 
-          {/* LP Token Holders */}
-          <Card className="border-prmx-cyan/30">
+          {/* LP Token Holders / Settlement Payouts */}
+          <Card className={policy.status === 'Settled' ? 'border-success/30' : 'border-prmx-cyan/30'}>
             <CardHeader className="pb-2">
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                <Users className="w-5 h-5 text-prmx-cyan" />
-                LP Token Holders
+                {policy.status === 'Settled' ? (
+                  <>
+                    <Wallet className="w-5 h-5 text-success" />
+                    Settlement Payouts
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-5 h-5 text-prmx-cyan" />
+                    LP Token Holders
+                  </>
+                )}
               </h2>
             </CardHeader>
             <CardContent className="space-y-4">
-              {lpHoldings.length === 0 ? (
+              {policy.status === 'Settled' && settlementResult ? (
+                // Show settlement payout breakdown
+                <div className="space-y-4">
+                  {settlementResult.eventOccurred ? (
+                    // Event triggered - policyholder got paid
+                    <>
+                      <div className="p-4 rounded-xl bg-success/10 border border-success/30">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5 text-success" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-success">Policyholder Payout</p>
+                            <p className="text-xs text-text-secondary">Rainfall exceeded strike threshold</p>
+                          </div>
+                        </div>
+                        <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-text-tertiary">Recipient</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="font-medium">{api.getAccountByAddress(policy.holder)?.name || 'Policyholder'}</span>
+                                <span className="text-xs text-text-tertiary font-mono">{formatAddress(policy.holder)}</span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs text-text-tertiary">Payout</p>
+                              <p className="text-xl font-bold text-success">{formatUSDT(settlementResult.payoutToHolder)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* LPs lost their capital */}
+                      <div className="p-4 rounded-xl bg-error/5 border border-error/20">
+                        <div className="flex items-center gap-2 mb-2">
+                          <XCircle className="w-4 h-4 text-error" />
+                          <p className="text-sm font-medium text-error">LP Capital Used for Payout</p>
+                        </div>
+                        <p className="text-xs text-text-secondary">
+                          The LP capital pool was used to pay the policyholder. LPs received no return on this policy.
+                        </p>
+                        <div className="mt-3 p-2 rounded-lg bg-background-tertiary/50">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-text-secondary">Total LP Shares</span>
+                            <span className="font-medium">{policy.capitalPool.totalShares.toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between text-sm mt-1">
+                            <span className="text-text-secondary">Returned to LPs</span>
+                            <span className="font-medium text-error">$0.00</span>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    // No event - LPs got their capital back
+                    <>
+                      <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-lg bg-prmx-cyan/20 flex items-center justify-center">
+                            <Users className="w-5 h-5 text-prmx-cyan" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-prmx-cyan">LP Capital Returned</p>
+                            <p className="text-xs text-text-secondary">No rainfall event - LPs profit from premium</p>
+                          </div>
+                        </div>
+                        
+                        {/* Summary */}
+                        <div className="grid grid-cols-2 gap-3 mb-4">
+                          <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
+                            <p className="text-xs text-text-tertiary">Total Returned</p>
+                            <p className="text-lg font-bold text-prmx-cyan">{formatUSDT(settlementResult.returnedToLps)}</p>
+                          </div>
+                          <div className="p-3 rounded-lg bg-background-tertiary/50 border border-border-secondary">
+                            <p className="text-xs text-text-tertiary">Total Shares</p>
+                            <p className="text-lg font-bold">{policy.capitalPool.totalShares.toLocaleString()}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Per-share calculation */}
+                        <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-xs text-text-tertiary">Return per Share</p>
+                              <p className="text-sm text-text-secondary mt-1">
+                                Each LP share received proportional payout
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-success">
+                                {policy.capitalPool.totalShares > 0 
+                                  ? `$${(Number(settlementResult.returnedToLps) / 1_000_000 / policy.capitalPool.totalShares).toFixed(4)}`
+                                  : 'N/A'
+                                }
+                              </p>
+                              <p className="text-xs text-text-tertiary">per share</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Policyholder got nothing */}
+                      <div className="p-3 rounded-lg bg-background-tertiary/30 border border-border-secondary">
+                        <div className="flex items-center gap-2 text-sm">
+                          <Shield className="w-4 h-4 text-text-tertiary" />
+                          <span className="text-text-secondary">Policyholder received:</span>
+                          <span className="font-medium">$0.00</span>
+                          <span className="text-text-tertiary">(no event occurred)</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
+                  {/* Note about LP token burn */}
+                  <div className="p-3 rounded-lg bg-background-tertiary/20 border border-border-secondary">
+                    <p className="text-xs text-text-tertiary flex items-center gap-2">
+                      <Info className="w-3 h-3" />
+                      LP tokens were burned upon settlement. Payouts were distributed automatically.
+                    </p>
+                  </div>
+                </div>
+              ) : lpHoldings.length === 0 ? (
                 <div className="text-center py-6">
                   <Users className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
                   <p className="text-text-secondary text-sm">No LP tokens issued yet</p>

@@ -2650,7 +2650,8 @@ pub mod pallet {
                 // Check if the in-flight marker is stale (older than 30 blocks worth of time)
                 // Each block is ~6 seconds, so 30 blocks = ~180 seconds = 3 minutes
                 // This prevents permanent blocking if a transaction fails
-                const MAX_INFLIGHT_AGE_MS: u64 = 180_000; // 3 minutes
+                // NOTE: current_timestamp() returns SECONDS (not milliseconds)
+                const MAX_INFLIGHT_AGE_SECS: u64 = 180; // 3 minutes in seconds
                 
                 if timestamp_bytes.len() >= 8 {
                     let mut bytes = [0u8; 8];
@@ -2658,7 +2659,7 @@ pub mod pallet {
                     let submitted_at = u64::from_le_bytes(bytes);
                     let now = Self::current_timestamp();
                     
-                    if now.saturating_sub(submitted_at) < MAX_INFLIGHT_AGE_MS {
+                    if now.saturating_sub(submitted_at) < MAX_INFLIGHT_AGE_SECS {
                         return true;
                     }
                     // Marker is stale, clear it

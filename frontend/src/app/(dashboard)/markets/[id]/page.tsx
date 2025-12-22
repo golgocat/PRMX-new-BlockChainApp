@@ -310,7 +310,7 @@ export default function MarketDetailPage() {
                   </div>
                   <div>
                     <span className="text-text-secondary">Early Trigger</span>
-                    <p className="font-medium text-text-tertiary">Disabled</p>
+                    <p className="font-medium text-success">Enabled</p>
                   </div>
                 </div>
               </div>

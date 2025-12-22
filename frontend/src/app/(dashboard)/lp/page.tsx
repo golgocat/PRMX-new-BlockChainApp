@@ -105,6 +105,8 @@ export default function LpTradingPage() {
   const [selectedTrade, setSelectedTrade] = useState<LpTradeRecord | null>(null);
   const [showOutcomeDetailModal, setShowOutcomeDetailModal] = useState(false);
   const [selectedOutcome, setSelectedOutcome] = useState<LpPositionOutcome | null>(null);
+  const [showOrderDetailModal, setShowOrderDetailModal] = useState(false);
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<LpAskOrder | null>(null);
   
   // DeFi solvency state
   const [solvencyInfo, setSolvencyInfo] = useState<DaoSolvencyInfo | null>(null);
@@ -612,10 +614,16 @@ export default function LpTradingPage() {
                     const potentialReturn = market ? calculatePotentialReturn(order.priceUsdt, market.payoutPerShare) : 0;
                     
                     return (
-                      <div key={order.orderId} className={cn(
-                        "p-4 hover:bg-background-tertiary/30 transition-colors",
-                        isOwner && "border-l-4 border-l-prmx-cyan bg-prmx-cyan/5"
-                      )}>
+                      <div 
+                        key={order.orderId} 
+                        onClick={() => {
+                          setSelectedOrderForDetail(order);
+                          setShowOrderDetailModal(true);
+                        }}
+                        className={cn(
+                          "p-4 hover:bg-background-tertiary/30 transition-colors cursor-pointer",
+                          isOwner && "border-l-4 border-l-prmx-cyan bg-prmx-cyan/5"
+                        )}>
                         {/* Header Row */}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
@@ -2153,6 +2161,212 @@ export default function LpTradingPage() {
               >
                 Close
               </Button>
+            </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Order Detail Modal */}
+      <Modal
+        isOpen={showOrderDetailModal}
+        onClose={() => {
+          setShowOrderDetailModal(false);
+          setSelectedOrderForDetail(null);
+        }}
+        title="Order Details"
+        size="md"
+      >
+        {selectedOrderForDetail && (() => {
+          const order = selectedOrderForDetail;
+          const policy = getPolicyById(order.policyId);
+          const market = policy ? getMarketById(policy.marketId) : null;
+          const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
+          const potentialReturn = market ? calculatePotentialReturn(order.priceUsdt, market.payoutPerShare) : 0;
+          const isOwner = isSameAddress(order.seller, selectedAccount?.address);
+          const totalValue = order.remaining * order.priceUsdt;
+          const sellerInfo = api.getAccountByAddress(order.seller);
+          
+          return (
+            <div className="space-y-5">
+              {/* Order Header */}
+              <div className={cn(
+                "p-5 rounded-xl border",
+                isOwner 
+                  ? "bg-prmx-cyan/10 border-prmx-cyan/30" 
+                  : "bg-background-tertiary/50 border-border-secondary"
+              )}>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-prmx-gradient flex items-center justify-center shrink-0">
+                      <Shield className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xl font-bold">{policy?.label || `Policy #${order.policyId}`}</span>
+                        <Badge 
+                          variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                          className="text-xs"
+                        >
+                          {policy?.policyVersion || 'V1'}
+                        </Badge>
+                        <Badge variant="error" className="text-xs">Sell Order</Badge>
+                        {isOwner && <Badge variant="cyan" className="text-xs">Your Order</Badge>}
+                      </div>
+                      {market && (
+                        <p className="text-sm text-text-secondary flex items-center gap-1 mt-1">
+                          <MapPin className="w-3 h-3" />
+                          {market.name}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Price & Value */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-success/10 border border-success/20">
+                  <p className="text-xs text-text-tertiary uppercase tracking-wide">Price per Share</p>
+                  <p className="text-2xl font-bold text-success mt-1">{formatUSDT(order.priceUsdt)}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/20">
+                  <p className="text-xs text-text-tertiary uppercase tracking-wide">Total Value</p>
+                  <p className="text-2xl font-bold text-prmx-cyan mt-1">{formatUSDT(totalValue)}</p>
+                </div>
+              </div>
+
+              {/* Order Details Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-3 rounded-xl bg-background-tertiary/50">
+                  <p className="text-xs text-text-tertiary">Available Shares</p>
+                  <p className="text-lg font-semibold mt-1">{order.remaining.toString()}</p>
+                </div>
+                <div className="p-3 rounded-xl bg-background-tertiary/50">
+                  <p className="text-xs text-text-tertiary">Original Quantity</p>
+                  <p className="text-lg font-semibold mt-1">{order.quantity.toString()}</p>
+                </div>
+                {market && (
+                  <>
+                    <div className="p-3 rounded-xl bg-background-tertiary/50">
+                      <p className="text-xs text-text-tertiary">Strike Threshold</p>
+                      <p className="text-lg font-semibold mt-1 flex items-center gap-1.5">
+                        <Droplets className="w-4 h-4 text-prmx-cyan" />
+                        {policy?.strikeMm ? `${policy.strikeMm / 10}mm` : `${market.strikeValue}mm`}
+                      </p>
+                    </div>
+                    <div className="p-3 rounded-xl bg-background-tertiary/50">
+                      <p className="text-xs text-text-tertiary">Max Payout per Share</p>
+                      <p className="text-lg font-semibold mt-1 text-success">{formatUSDT(market.payoutPerShare)}</p>
+                    </div>
+                  </>
+                )}
+                <div className="p-3 rounded-xl bg-background-tertiary/50">
+                  <p className="text-xs text-text-tertiary">Time Remaining</p>
+                  <p className={cn(
+                    "text-lg font-semibold mt-1 flex items-center gap-1.5",
+                    daysRemaining <= 3 ? "text-warning" : ""
+                  )}>
+                    <Clock className="w-4 h-4" />
+                    {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
+                  </p>
+                </div>
+                {potentialReturn > 0 && (
+                  <div className="p-3 rounded-xl bg-background-tertiary/50">
+                    <p className="text-xs text-text-tertiary">Potential Return</p>
+                    <p className={cn(
+                      "text-lg font-semibold mt-1 flex items-center gap-1.5",
+                      potentialReturn >= 50 ? "text-success" : "text-prmx-cyan"
+                    )}>
+                      <TrendingUp className="w-4 h-4" />
+                      +{potentialReturn.toFixed(1)}%
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Seller Info */}
+              <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
+                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Seller</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-prmx-gradient flex items-center justify-center">
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium">
+                      {isOwner ? (
+                        <span className="text-prmx-cyan">You</span>
+                      ) : (
+                        sellerInfo?.name || 'Unknown'
+                      )}
+                    </p>
+                    <p className="text-xs text-text-tertiary font-mono">{order.seller}</p>
+                    {sellerInfo && !isOwner && (
+                      <Badge variant="default" className="text-xs mt-1">{sellerInfo.role}</Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Coverage Period */}
+              {policy && (
+                <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
+                  <p className="text-xs text-text-tertiary uppercase tracking-wide mb-3">Coverage Period</p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-text-tertiary">Start</p>
+                      <p className="font-medium">{new Date(policy.coverageStart * 1000).toLocaleDateString()}</p>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-text-tertiary" />
+                    <div className="text-right">
+                      <p className="text-xs text-text-tertiary">End</p>
+                      <p className="font-medium">{new Date(policy.coverageEnd * 1000).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Order ID */}
+              <div className="p-3 rounded-xl bg-background-tertiary/30 border border-border-secondary">
+                <p className="text-xs text-text-tertiary">Order ID</p>
+                <p className="font-mono text-sm mt-0.5">{order.orderId}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                {isOwner ? (
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setShowOrderDetailModal(false);
+                      handleCancelOrder(order.orderId);
+                    }}
+                    loading={cancellingOrderId === order.orderId}
+                    className="flex-1"
+                  >
+                    Cancel Order
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => {
+                      setShowOrderDetailModal(false);
+                      handleOpenBuyModal(order);
+                    }}
+                    className="flex-1"
+                  >
+                    Buy Shares
+                  </Button>
+                )}
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowOrderDetailModal(false);
+                    setSelectedOrderForDetail(null);
+                  }}
+                  className="flex-1"
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           );
         })()}

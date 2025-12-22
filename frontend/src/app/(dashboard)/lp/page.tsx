@@ -10,6 +10,7 @@ import {
   RefreshCw,
   ArrowUpRight,
   ArrowDownRight,
+  ArrowRight,
   ChevronRight,
   MapPin,
   Calendar,
@@ -25,7 +26,8 @@ import {
   CheckCircle2,
   XCircle,
   TrendingDown,
-  Trash2
+  Trash2,
+  Users
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge, StatusBadge } from '@/components/ui/Badge';

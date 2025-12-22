@@ -71,8 +71,8 @@ export default function MarketDetailPage() {
       toast.error('Failed to load market details');
     } finally {
       if (isInitialLoad) {
-        setLoading(false);
-      }
+      setLoading(false);
+    }
     }
   }, [marketId]);
 
@@ -165,7 +165,7 @@ export default function MarketDetailPage() {
               </div>
               <div>
                 <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold">{market.name}</h1>
+                <h1 className="text-3xl font-bold">{market.name}</h1>
                   {/* V1/V2 badges - Manila (id=0) supports V2 */}
                   {marketId === 0 ? (
                     <div className="flex gap-1.5">
@@ -297,13 +297,13 @@ export default function MarketDetailPage() {
                   <span className="text-xs text-text-tertiary">24-hour rolling rainfall</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm pl-2 border-l-2 border-border-secondary">
-                  <div>
+                <div>
                     <span className="text-text-secondary">Duration</span>
-                    <p className="font-medium text-prmx-cyan">24 hours</p>
-                  </div>
-                  <div>
-                    <span className="text-text-secondary">Min Lead Time</span>
-                    <p className="font-medium">{secondsToDays(market.windowRules.minLeadTimeSecs)} days</p>
+                  <p className="font-medium text-prmx-cyan">24 hours</p>
+                </div>
+                <div>
+                  <span className="text-text-secondary">Min Lead Time</span>
+                  <p className="font-medium">{secondsToDays(market.windowRules.minLeadTimeSecs)} days</p>
                   </div>
                   <div>
                     <span className="text-text-secondary">Event Type</span>

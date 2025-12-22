@@ -1129,13 +1129,19 @@ pub mod pallet {
 
             let now = Self::current_timestamp();
             let current_hour_index = now / 3600;
-            let oldest_valid_hour = current_hour_index.saturating_sub(24);
+            // Accept data up to 25 hours old to account for timing differences between
+            // AccuWeather's observation time and chain processing time
+            let oldest_acceptable_hour = current_hour_index.saturating_sub(25);
+            // But only keep 24 hours for display/calculation purposes
+            let oldest_display_hour = current_hour_index.saturating_sub(24);
             
             log::info!(
                 target: "prmx-oracle",
-                "🌧️ OCW hourly rainfall: {} readings for market {}",
+                "🌧️ OCW hourly rainfall: {} readings for market {} (hours {} to {})",
                 hourly_data.len(),
-                market_id
+                market_id,
+                oldest_acceptable_hour,
+                current_hour_index
             );
 
             // Store each hourly bucket
@@ -1145,8 +1151,14 @@ pub mod pallet {
             for (epoch_time, rainfall_mm) in hourly_data.iter() {
                 let hour_index = *epoch_time / 3600;
                 
-                // Skip buckets older than 24 hours
-                if hour_index < oldest_valid_hour {
+                // Skip buckets older than 25 hours (gives 1 hour buffer for timing)
+                if hour_index < oldest_acceptable_hour {
+                    log::debug!(
+                        target: "prmx-oracle",
+                        "⏭️ Skipping bucket {} (too old, oldest acceptable: {})",
+                        hour_index,
+                        oldest_acceptable_hour
+                    );
                     continue;
                 }
                 
@@ -1166,21 +1178,36 @@ pub mod pallet {
                 buckets_stored += 1;
             }
 
-            // Cleanup old buckets (older than 24 hours from current hour)
-            // Iterate and remove old entries
+            // Cleanup old buckets (older than 25 hours from current hour)
+            // Use 25 hours to match the acceptance window and avoid race conditions
             let mut removed = 0u32;
             for (hour_idx, _) in HourlyBuckets::<T>::iter_prefix(market_id) {
-                if hour_idx < oldest_valid_hour {
+                if hour_idx < oldest_acceptable_hour {
                     HourlyBuckets::<T>::remove(market_id, hour_idx);
                     removed += 1;
                 }
             }
 
-            // Recalculate rolling sum from all stored buckets
+            // Recalculate rolling sum from buckets within the 24-hour display window
             let mut actual_rolling_sum: Millimeters = 0;
-            for (_, bucket) in HourlyBuckets::<T>::iter_prefix(market_id) {
-                actual_rolling_sum = actual_rolling_sum.saturating_add(bucket.mm);
+            let mut bucket_count = 0u32;
+            for (hour_idx, bucket) in HourlyBuckets::<T>::iter_prefix(market_id) {
+                // Only include buckets within the 24-hour display window for the rolling sum
+                if hour_idx >= oldest_display_hour {
+                    actual_rolling_sum = actual_rolling_sum.saturating_add(bucket.mm);
+                    bucket_count += 1;
+                }
             }
+            
+            log::info!(
+                target: "prmx-oracle",
+                "📊 Market {} rolling sum: {:.1}mm from {} buckets (stored: {}, removed: {})",
+                market_id,
+                actual_rolling_sum as f64 / 10.0,
+                bucket_count,
+                buckets_stored,
+                removed
+            );
 
             // Update the legacy RollingState for backwards compatibility
             let bucket_idx = bucket_index_for_timestamp(now);

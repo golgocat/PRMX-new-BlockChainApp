@@ -1112,24 +1112,24 @@ export interface HourlyBucket {
 /**
  * Get hourly bucket readings for a market (past 24 hours)
  * Uses the new HourlyBuckets storage that stores individual hourly readings
+ * Fetches ALL stored buckets for the market (on-chain cleanup already handles expiry)
  */
 export async function getHourlyBuckets(marketId: number): Promise<HourlyBucket[]> {
   const api = await getApi();
   
-  // Get current hour index
-  const now = Math.floor(Date.now() / 1000);
-  const currentHourIndex = Math.floor(now / 3600);
-  const oldestHourIndex = currentHourIndex - 24;
-  
   const buckets: HourlyBucket[] = [];
   
-  // Fetch each hour in the 24-hour range
-  for (let hourIdx = oldestHourIndex; hourIdx <= currentHourIndex; hourIdx++) {
-    try {
-      const bucket = await api.query.prmxOracle.hourlyBuckets(marketId, hourIdx);
+  try {
+    // Fetch all hourly buckets for this market using entries()
+    // This is more reliable than predicting hour indices based on browser time
+    const entries = await api.query.prmxOracle.hourlyBuckets.entries(marketId);
+    
+    for (const [key, value] of entries) {
+      // Extract hour index from the key (it's the second key in the StorageDoubleMap)
+      const hourIdx = Number((key.args[1] as any).toString());
       
-      if (!(bucket as any).isNone) {
-        const data = (bucket as any).unwrap().toJSON();
+      if (!(value as any).isNone) {
+        const data = (value as any).toJSON();
         // Handle both camelCase and snake_case
         const mm = data.mm ?? 0;
         const fetchedAt = data.fetchedAt ?? data.fetched_at ?? 0;
@@ -1149,9 +1149,9 @@ export async function getHourlyBuckets(marketId: number): Promise<HourlyBucket[]
           },
         });
       }
-    } catch (err) {
-      console.error(`Failed to fetch hourly bucket ${hourIdx} for market ${marketId}:`, err);
     }
+  } catch (err) {
+    console.error(`Failed to fetch hourly buckets for market ${marketId}:`, err);
   }
   
   // Sort by hour descending (newest first)

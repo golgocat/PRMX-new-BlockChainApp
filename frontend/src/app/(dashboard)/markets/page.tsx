@@ -244,7 +244,7 @@ export default function MarketsPage() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold">{market.name}</h3>
+                          <h3 className="text-lg font-semibold">{market.name}</h3>
                             {/* V1/V2 Badge - Manila (id=0) supports V2 */}
                             {market.id === 0 ? (
                               <div className="flex gap-1">
@@ -297,7 +297,7 @@ export default function MarketsPage() {
                             <p className="text-xs text-text-secondary">24 hours <span className="text-text-tertiary">(V1)</span></p>
                           </div>
                         ) : (
-                          <p className="font-semibold text-prmx-cyan">24 hours</p>
+                        <p className="font-semibold text-prmx-cyan">24 hours</p>
                         )}
                       </div>
                     </div>

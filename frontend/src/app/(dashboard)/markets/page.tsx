@@ -129,7 +129,7 @@ export default function MarketsPage() {
         <div className="flex items-center gap-3">
           <Button
             variant="secondary"
-            icon={<RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />}
+            icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
             onClick={handleRefresh}
           >
             Refresh

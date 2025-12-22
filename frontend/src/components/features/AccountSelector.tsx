@@ -188,7 +188,7 @@ export function AccountSelector() {
                     className="p-1 hover:bg-background-secondary rounded transition-colors"
                     title="Refresh balances"
                   >
-                    <RefreshCw className={cn('w-4 h-4 text-text-tertiary', isRefreshing && 'animate-spin')} />
+                    <RefreshCw className={cn('w-4 h-4 text-text-tertiary transition-transform', isRefreshing && 'animate-spin')} />
                   </button>
                 </div>
               </div>

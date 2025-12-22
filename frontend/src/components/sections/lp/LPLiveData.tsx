@@ -139,7 +139,7 @@ export function LPLiveData() {
               disabled={refreshing}
               className="mt-6 md:mt-0 flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300 transition-all disabled:opacity-50 shadow-sm"
             >
-              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+              <RefreshCw size={16} className={`transition-transform ${refreshing ? 'animate-spin' : ''}`} />
               <span className="text-sm font-ui">Refresh</span>
             </button>
           </div>

@@ -31,7 +31,7 @@ import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
-import { formatUSDT, formatDate, formatDateTimeUTC, formatAddress, formatCoordinates, formatTimeRemaining } from '@/lib/utils';
+import { formatUSDT, formatDate, formatDateTimeUTC, formatAddress, formatCoordinates, formatTimeRemaining, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { Policy, Market, PolicyDefiInfo, V2Monitor } from '@/types';
 import type { SettlementResult } from '@/lib/api';
@@ -52,6 +52,7 @@ export default function PolicyDetailPage() {
   const [defiInfo, setDefiInfo] = useState<PolicyDefiInfo | null>(null);
   const [v2Monitor, setV2Monitor] = useState<V2Monitor | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [settling, setSettling] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -236,7 +237,15 @@ export default function PolicyDetailPage() {
             </p>
           </div>
         </div>
-        <Button variant="secondary" onClick={loadPolicy} icon={<RefreshCw className="w-4 h-4" />}>
+        <Button 
+          variant="secondary" 
+          onClick={async () => {
+            setIsRefreshing(true);
+            await loadPolicy();
+            setIsRefreshing(false);
+          }} 
+          icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
+        >
           Refresh
         </Button>
       </div>

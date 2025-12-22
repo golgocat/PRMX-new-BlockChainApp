@@ -27,7 +27,7 @@ import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, Tabl
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { usePolicies } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
-import { formatUSDT, formatCoordinates, formatDateTimeUTCCompact, formatBasisPoints, secondsToDays, formatAddress } from '@/lib/utils';
+import { formatUSDT, formatCoordinates, formatDateTimeUTCCompact, formatBasisPoints, secondsToDays, formatAddress, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { Market, Policy } from '@/types';
 
@@ -43,6 +43,7 @@ export default function MarketDetailPage() {
   const [market, setMarket] = useState<Market | null>(null);
   const [rainfallData, setRainfallData] = useState<{ rollingSumMm: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Filter policies for this market
   const marketPolicies = allPolicies.filter(p => p.marketId === marketId);
@@ -172,7 +173,15 @@ export default function MarketDetailPage() {
         </div>
         <div className="flex items-center gap-3">
           <StatusBadge status={market.status} />
-          <Button variant="secondary" onClick={loadMarket} icon={<RefreshCw className="w-4 h-4" />}>
+          <Button 
+            variant="secondary" 
+            onClick={async () => {
+              setIsRefreshing(true);
+              await loadMarket();
+              setIsRefreshing(false);
+            }} 
+            icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
+          >
             Refresh
           </Button>
         </div>

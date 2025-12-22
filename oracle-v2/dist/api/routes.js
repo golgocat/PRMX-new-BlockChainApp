@@ -4,7 +4,7 @@
 import { getMonitors, getBuckets } from '../db/mongo.js';
 import { runEvaluationCycle } from '../scheduler/monitor.js';
 import { evaluateMonitor } from '../evaluator/cumulative.js';
-import { fetchPrecipitation } from '../accuweather/fetcher.js';
+import { fetchCurrentConditions } from '../accuweather/fetcher.js';
 /**
  * Setup all API routes
  */
@@ -203,24 +203,28 @@ export function setupRoutes(app) {
     app.get('/v2/test/accuweather/:locationKey', async (req, res) => {
         try {
             const { locationKey } = req.params;
-            const now = Math.floor(Date.now() / 1000);
-            const startTime = now - 86400; // Last 24 hours
             console.log(`🧪 Testing AccuWeather API for location ${locationKey}`);
-            console.log(`   Time window: ${new Date(startTime * 1000).toISOString()} to ${new Date(now * 1000).toISOString()}`);
-            const records = await fetchPrecipitation(locationKey, startTime, now);
+            // Fetch current conditions (available on Starter tier)
+            const currentConditions = await fetchCurrentConditions(locationKey);
+            if (!currentConditions) {
+                return res.status(404).json({
+                    success: false,
+                    error: 'No current conditions data available',
+                });
+            }
             res.json({
                 success: true,
                 locationKey,
-                timeWindow: {
-                    start: new Date(startTime * 1000).toISOString(),
-                    end: new Date(now * 1000).toISOString(),
+                observationTime: currentConditions.observationDateTime,
+                epochTime: currentConditions.epochTime,
+                precipitation: {
+                    pastHourMm: currentConditions.pastHourMm,
+                    past3HoursMm: currentConditions.past3HoursMm,
+                    past6HoursMm: currentConditions.past6HoursMm,
+                    past12HoursMm: currentConditions.past12HoursMm,
+                    past24HoursMm: currentConditions.past24HoursMm,
                 },
-                recordsCount: records.length,
-                records: records.map(r => ({
-                    dateTime: r.dateTime,
-                    precipitationMm: r.precipitationMm,
-                    timestamp: new Date(r.dateTime).getTime() / 1000,
-                })),
+                note: 'Using Current Conditions endpoint (Starter tier). Hourly buckets are built incrementally over time.',
             });
         }
         catch (error) {

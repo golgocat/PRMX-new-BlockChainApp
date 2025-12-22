@@ -1,14 +1,18 @@
 /**
  * AccuWeather precipitation data fetcher
+ *
+ * Uses Current Conditions endpoint (available on Starter tier)
+ * to fetch real-time precipitation data and build hourly buckets.
  */
 import axios from 'axios';
 import { config } from '../config.js';
 /**
- * Fetch historical precipitation data from AccuWeather
+ * Fetch current precipitation data from AccuWeather
+ * Uses the Current Conditions endpoint (available on Starter tier)
  *
  * @param locationKey - AccuWeather location key
- * @param startTime - Start of window (unix timestamp)
- * @param endTime - End of window (unix timestamp)
+ * @param startTime - Start of window (unix timestamp) - used for logging
+ * @param endTime - End of window (unix timestamp) - used for logging
  */
 export async function fetchPrecipitation(locationKey, startTime, endTime) {
     if (!config.accuweatherApiKey) {
@@ -16,10 +20,10 @@ export async function fetchPrecipitation(locationKey, startTime, endTime) {
     }
     const records = [];
     try {
-        // AccuWeather historical data API (24-hour history)
-        const url = `${config.accuweatherBaseUrl}/currentconditions/v1/${locationKey}/historical/24`;
-        console.log(`🌐 Calling AccuWeather API: ${url}`);
-        console.log(`   Time window: ${new Date(startTime * 1000).toISOString()} to ${new Date(endTime * 1000).toISOString()}`);
+        // Use Current Conditions endpoint (available on Starter tier)
+        const url = `${config.accuweatherBaseUrl}/currentconditions/v1/${locationKey}`;
+        console.log(`🌐 Calling AccuWeather Current Conditions API: ${url}`);
+        console.log(`   Location: ${locationKey}`);
         const response = await axios.get(url, {
             params: {
                 apikey: config.accuweatherApiKey,
@@ -27,37 +31,82 @@ export async function fetchPrecipitation(locationKey, startTime, endTime) {
             },
         });
         console.log(`   ✅ API response status: ${response.status}`);
-        console.log(`   📦 Response data type: ${Array.isArray(response.data) ? 'array' : typeof response.data}`);
-        console.log(`   📦 Response data length: ${Array.isArray(response.data) ? response.data.length : 'N/A'}`);
-        if (response.data && Array.isArray(response.data)) {
-            console.log(`   🔍 Processing ${response.data.length} records from API...`);
-            for (const record of response.data) {
-                const recordTime = new Date(record.LocalObservationDateTime).getTime() / 1000;
-                const precipMm = record.PrecipitationSummary?.Precipitation?.Metric?.Value || 0;
-                console.log(`   📅 Record: ${record.LocalObservationDateTime} (${new Date(recordTime * 1000).toISOString()}), precip: ${precipMm}mm`);
-                console.log(`      Time check: ${recordTime} >= ${startTime} && ${recordTime} <= ${endTime} = ${recordTime >= startTime && recordTime <= endTime}`);
-                // Only include records within our window
-                if (recordTime >= startTime && recordTime <= endTime) {
-                    records.push({
-                        dateTime: record.LocalObservationDateTime,
-                        precipitationMm: precipMm,
-                    });
-                    console.log(`      ✅ Included in results`);
-                }
-                else {
-                    console.log(`      ⏭️  Skipped (outside time window)`);
-                }
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+            const current = response.data[0];
+            const precipSummary = current.PrecipitationSummary;
+            if (precipSummary) {
+                const pastHourMm = precipSummary.PastHour?.Metric?.Value || 0;
+                const past3HoursMm = precipSummary.Past3Hours?.Metric?.Value || 0;
+                const past6HoursMm = precipSummary.Past6Hours?.Metric?.Value || 0;
+                const past12HoursMm = precipSummary.Past12Hours?.Metric?.Value || 0;
+                const past24HoursMm = precipSummary.Past24Hours?.Metric?.Value || 0;
+                console.log(`   💧 Precipitation Summary:`);
+                console.log(`      Past Hour:    ${pastHourMm} mm`);
+                console.log(`      Past 3 Hours: ${past3HoursMm} mm`);
+                console.log(`      Past 6 Hours: ${past6HoursMm} mm`);
+                console.log(`      Past 12 Hours: ${past12HoursMm} mm`);
+                console.log(`      Past 24 Hours: ${past24HoursMm} mm`);
+                // Create a single record for the current hour with PastHour rainfall
+                // This will be used to create/update the current hourly bucket
+                records.push({
+                    dateTime: current.LocalObservationDateTime,
+                    precipitationMm: pastHourMm,
+                });
+                console.log(`   📦 Created record for ${current.LocalObservationDateTime}: ${pastHourMm}mm (past hour)`);
+            }
+            else {
+                console.log(`   ⚠️  No precipitation summary in response`);
             }
         }
         else {
             console.log(`   ⚠️  Unexpected response format:`, typeof response.data);
         }
-        console.log(`📊 Fetched ${records.length} precipitation records for location ${locationKey} (after filtering)`);
+        console.log(`📊 Fetched ${records.length} precipitation records for location ${locationKey}`);
         return records;
     }
     catch (error) {
         if (axios.isAxiosError(error)) {
-            throw new Error(`AccuWeather API error: ${error.response?.status} - ${error.message}`);
+            const errorDetail = error.response?.data?.detail || error.message;
+            throw new Error(`AccuWeather API error: ${error.response?.status} - ${errorDetail}`);
+        }
+        throw error;
+    }
+}
+/**
+ * Fetch current conditions with full precipitation summary
+ * Returns structured data about precipitation over different time windows
+ */
+export async function fetchCurrentConditions(locationKey) {
+    if (!config.accuweatherApiKey) {
+        throw new Error('AccuWeather API key not configured');
+    }
+    try {
+        const url = `${config.accuweatherBaseUrl}/currentconditions/v1/${locationKey}`;
+        const response = await axios.get(url, {
+            params: {
+                apikey: config.accuweatherApiKey,
+                details: true,
+            },
+        });
+        if (response.data && Array.isArray(response.data) && response.data.length > 0) {
+            const current = response.data[0];
+            const precipSummary = current.PrecipitationSummary;
+            return {
+                pastHourMm: precipSummary?.PastHour?.Metric?.Value || 0,
+                past3HoursMm: precipSummary?.Past3Hours?.Metric?.Value || 0,
+                past6HoursMm: precipSummary?.Past6Hours?.Metric?.Value || 0,
+                past12HoursMm: precipSummary?.Past12Hours?.Metric?.Value || 0,
+                past24HoursMm: precipSummary?.Past24Hours?.Metric?.Value || 0,
+                observationDateTime: current.LocalObservationDateTime,
+                epochTime: current.EpochTime,
+            };
+        }
+        return null;
+    }
+    catch (error) {
+        if (axios.isAxiosError(error)) {
+            const errorDetail = error.response?.data?.detail || error.message;
+            throw new Error(`AccuWeather API error: ${error.response?.status} - ${errorDetail}`);
         }
         throw error;
     }

@@ -243,18 +243,14 @@ export default function PolicyDetailPage() {
         </div>
         <Button 
           variant="secondary" 
-          disabled={isRefreshing}
           onClick={async () => {
-            try {
-              setIsRefreshing(true);
-              await loadPolicy(false);
-            } finally {
-              setIsRefreshing(false);
-            }
+            setIsRefreshing(true);
+            await loadPolicy(false);
+            setIsRefreshing(false);
           }} 
-          icon={<RefreshCw className={cn('w-4 h-4 transition-transform duration-300', isRefreshing && 'animate-spin')} />}
+          icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
         >
-          {isRefreshing ? 'Refreshing...' : 'Refresh'}
+          Refresh
         </Button>
       </div>
 

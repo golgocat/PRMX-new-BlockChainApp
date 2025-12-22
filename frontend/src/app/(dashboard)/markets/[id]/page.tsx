@@ -179,18 +179,14 @@ export default function MarketDetailPage() {
           <StatusBadge status={market.status} />
           <Button 
             variant="secondary" 
-            disabled={isRefreshing}
             onClick={async () => {
-              try {
-                setIsRefreshing(true);
-                await loadMarket(false);
-              } finally {
-                setIsRefreshing(false);
-              }
+              setIsRefreshing(true);
+              await loadMarket(false);
+              setIsRefreshing(false);
             }} 
-            icon={<RefreshCw className={cn('w-4 h-4 transition-transform duration-300', isRefreshing && 'animate-spin')} />}
+            icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
           >
-            {isRefreshing ? 'Refreshing...' : 'Refresh'}
+            Refresh
           </Button>
         </div>
       </div>

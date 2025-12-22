@@ -2784,9 +2784,7 @@ pub mod pallet {
 
         /// Fetch AccuWeather current conditions with rainfall data
         /// Uses the starter-plan-compatible endpoint with details=true
-        /// which includes PrecipitationSummary.Past24Hours
-        /// Fetch 24 hours of hourly rainfall data from AccuWeather Historical endpoint
-        /// Uses /historical/24 endpoint (available on Starter tier) to get individual hourly readings
+        /// which includes PrecipitationSummary.Past24Hours as a single 24h total
         fn fetch_accuweather_rainfall(
             api_key: &[u8],
             location_key: &str,
@@ -2796,10 +2794,10 @@ pub mod pallet {
             let api_key_str =
                 core::str::from_utf8(api_key).map_err(|_| "Invalid API key encoding")?;
 
-            // Build URL: /currentconditions/v1/{locationKey}/historical/24?apikey=XXX&details=true
-            // This Starter tier endpoint returns 24 hourly observations
+            // Build URL: /currentconditions/v1/{locationKey}?apikey=XXX&details=true
+            // This Starter tier endpoint returns current conditions with Past24Hours rainfall total
             let url = alloc::format!(
-                "{}/currentconditions/v1/{}/historical/24?apikey={}&details=true",
+                "{}/currentconditions/v1/{}?apikey={}&details=true",
                 ACCUWEATHER_BASE_URL,
                 location_key,
                 api_key_str
@@ -2807,7 +2805,7 @@ pub mod pallet {
 
             log::info!(
                 target: "prmx-oracle",
-                "🌐 Fetching 24h historical rainfall from AccuWeather for location {}",
+                "🌐 Fetching current conditions with 24h rainfall from AccuWeather for location {}",
                 location_key
             );
 
@@ -2837,8 +2835,8 @@ pub mod pallet {
 
             let body = response.body().collect::<Vec<u8>>();
 
-            // Parse JSON to extract 24 hourly rainfall records
-            Self::extract_hourly_rainfall_data(&body)
+            // Parse JSON to extract Past24Hours rainfall total from current conditions
+            Self::extract_rainfall_data(&body)
         }
 
         /// Extract "Key" value from AccuWeather JSON response
@@ -2857,9 +2855,8 @@ pub mod pallet {
             Err("Could not find Key in JSON response")
         }
 
-        /// Extract rainfall data from AccuWeather current conditions response (legacy)
+        /// Extract rainfall data from AccuWeather current conditions response
         /// The response contains PrecipitationSummary.Past24Hours with total 24h rainfall
-        #[allow(dead_code)]
         fn extract_rainfall_data(json: &[u8]) -> Result<Vec<(u64, Millimeters)>, &'static str> {
             let json_str = core::str::from_utf8(json).map_err(|_| "Invalid JSON encoding")?;
 

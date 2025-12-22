@@ -45,12 +45,6 @@ export default function MarketDetailPage() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadMarket(false);
-    setIsRefreshing(false);
-  };
-
   // Filter policies for this market
   const marketPolicies = allPolicies.filter(p => p.marketId === marketId);
   const activePolicies = marketPolicies.filter(p => p.status === 'Active');
@@ -88,6 +82,12 @@ export default function MarketDetailPage() {
         setLoading(false);
       }
     }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadMarket(false);
+    setIsRefreshing(false);
   };
 
   const now = Math.floor(Date.now() / 1000);

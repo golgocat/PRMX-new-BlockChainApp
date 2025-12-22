@@ -56,12 +56,6 @@ export default function PolicyDetailPage() {
   const [settling, setSettling] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await loadPolicy(false);
-    setIsRefreshing(false);
-  };
-
   const handleCopyAddress = async () => {
     if (poolInfo?.address) {
       await navigator.clipboard.writeText(poolInfo.address);
@@ -141,6 +135,12 @@ export default function PolicyDetailPage() {
         setLoading(false);
       }
     }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadPolicy(false);
+    setIsRefreshing(false);
   };
 
   const handleSettle = async (eventOccurred: boolean) => {

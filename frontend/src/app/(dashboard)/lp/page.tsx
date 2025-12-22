@@ -621,6 +621,12 @@ export default function LpTradingPage() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold">{policy?.label || `Policy #${order.policyId}`}</span>
+                                <Badge 
+                                  variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                                  className="text-xs"
+                                >
+                                  {policy?.policyVersion || 'V1'}
+                                </Badge>
                                 <Badge variant="error" className="text-xs">Sell</Badge>
                                 {isOwner && <Badge variant="cyan" className="text-xs">Your Order</Badge>}
                               </div>
@@ -786,6 +792,12 @@ export default function LpTradingPage() {
                         <div>
                           <div className="flex items-center gap-2">
                           <span className="font-medium group-hover:text-prmx-cyan transition-colors">{policy?.label || `Policy #${holding.policyId}`}</span>
+                            <Badge 
+                              variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                              className="text-xs"
+                            >
+                              {policy?.policyVersion || 'V1'}
+                            </Badge>
                             {/* DeFi Allocation Indicator */}
                             {defiInfo?.isAllocatedToDefi && (
                               <Badge variant="success" className="text-xs px-1.5 py-0.5">
@@ -1308,7 +1320,15 @@ export default function LpTradingPage() {
                     <MapPin className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h4 className="font-semibold">{policy?.label || `Policy #${selectedOrder.policyId}`}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-semibold">{policy?.label || `Policy #${selectedOrder.policyId}`}</h4>
+                      <Badge 
+                        variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                        className="text-xs"
+                      >
+                        {policy?.policyVersion || 'V1'}
+                      </Badge>
+                    </div>
                     <p className="text-xs text-text-secondary">{market.name}</p>
                   </div>
                 </div>
@@ -1498,7 +1518,15 @@ export default function LpTradingPage() {
                 <Shield className="w-7 h-7 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold">{policy?.label || `Policy #${selectedHoldingPolicyId}`}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-xl font-bold">{policy?.label || `Policy #${selectedHoldingPolicyId}`}</h3>
+                  <Badge 
+                    variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                    className="text-sm"
+                  >
+                    {policy?.policyVersion || 'V1'}
+                  </Badge>
+                </div>
                 {market && (
                   <p className="text-text-secondary flex items-center gap-1 mt-1">
                     <MapPin className="w-4 h-4" />

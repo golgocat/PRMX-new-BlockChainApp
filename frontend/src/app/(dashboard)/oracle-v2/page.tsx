@@ -13,7 +13,11 @@ import {
   Shield,
   ExternalLink,
   Wifi,
-  WifiOff
+  WifiOff,
+  List,
+  ChevronUp,
+  ChevronDown,
+  Droplets
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -30,6 +34,41 @@ export default function OracleV2Page() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [serviceHealthy, setServiceHealthy] = useState<boolean | null>(null);
+  
+  // State for expanded hourly readings
+  const [expandedMonitors, setExpandedMonitors] = useState<Set<string>>(new Set());
+  const [bucketData, setBucketData] = useState<Map<string, api.V2Bucket[]>>(new Map());
+  const [loadingBuckets, setLoadingBuckets] = useState<Set<string>>(new Set());
+  
+  // Toggle monitor expansion and fetch bucket data
+  const toggleMonitorExpanded = async (monitorId: string) => {
+    const newExpanded = new Set(expandedMonitors);
+    
+    if (newExpanded.has(monitorId)) {
+      newExpanded.delete(monitorId);
+    } else {
+      newExpanded.add(monitorId);
+      
+      // Fetch bucket data if not already loaded
+      if (!bucketData.has(monitorId)) {
+        setLoadingBuckets(prev => new Set(prev).add(monitorId));
+        try {
+          const buckets = await api.getV2MonitorBuckets(monitorId);
+          setBucketData(prev => new Map(prev).set(monitorId, buckets));
+        } catch (err) {
+          console.error('Failed to fetch buckets for', monitorId, err);
+        } finally {
+          setLoadingBuckets(prev => {
+            const next = new Set(prev);
+            next.delete(monitorId);
+            return next;
+          });
+        }
+      }
+    }
+    
+    setExpandedMonitors(newExpanded);
+  };
 
   const fetchData = async () => {
     try {
@@ -328,6 +367,108 @@ export default function OracleV2Page() {
                           <span className="text-text-secondary">Report submitted:</span>
                           <code className="text-prmx-cyan truncate">{monitor.report_tx_hash}</code>
                         </div>
+                      </div>
+                    )}
+                    
+                    {/* Show Hourly Readings Button */}
+                    <button
+                      onClick={() => toggleMonitorExpanded(monitor._id)}
+                      className="w-full flex items-center justify-center gap-2 py-3 mt-4 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-secondary"
+                    >
+                      <List className="w-4 h-4" />
+                      {loadingBuckets.has(monitor._id) ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : expandedMonitors.has(monitor._id) ? (
+                        <>
+                          Hide Hourly Readings
+                          <ChevronUp className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          Show Hourly Readings
+                          {bucketData.get(monitor._id)?.length !== undefined && (
+                            <span className="text-text-tertiary">({bucketData.get(monitor._id)?.length})</span>
+                          )}
+                          <ChevronDown className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Expanded Hourly Readings */}
+                    {expandedMonitors.has(monitor._id) && (
+                      <div className="pt-4 mt-2 border-t border-border-secondary">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                          <Droplets className="w-4 h-4 text-prmx-cyan" />
+                          Raw Bucket Data (Hourly Readings)
+                        </h4>
+                        
+                        {loadingBuckets.has(monitor._id) ? (
+                          <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="w-5 h-5 animate-spin text-prmx-cyan" />
+                          </div>
+                        ) : (bucketData.get(monitor._id)?.length || 0) > 0 ? (
+                          <>
+                            <div className="max-h-64 overflow-y-auto space-y-2">
+                              {bucketData.get(monitor._id)?.map((bucket, idx) => {
+                                const hourDate = new Date(bucket.hour_utc);
+                                const rainfallMm = bucket.mm / 10; // Convert from scaled value
+                                
+                                return (
+                                  <div 
+                                    key={bucket._id}
+                                    className={cn(
+                                      'flex items-center justify-between p-2 rounded-lg text-sm',
+                                      idx === 0 
+                                        ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
+                                        : 'bg-background-tertiary/30'
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="w-3 h-3 text-text-tertiary" />
+                                      <span className="text-text-secondary">
+                                        {hourDate.toLocaleTimeString([], { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit',
+                                          hour12: true 
+                                        })}
+                                      </span>
+                                      <span className="text-text-tertiary text-xs">
+                                        {hourDate.toLocaleDateString([], { 
+                                          month: 'short', 
+                                          day: 'numeric' 
+                                        })}
+                                      </span>
+                                      {idx === 0 && (
+                                        <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
+                                      )}
+                                    </div>
+                                    <div className={cn(
+                                      'font-mono font-semibold',
+                                      rainfallMm > 0 ? 'text-prmx-cyan' : 'text-text-tertiary'
+                                    )}>
+                                      {rainfallMm.toFixed(1)} mm
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            
+                            {/* Summary */}
+                            <div className="mt-3 pt-3 border-t border-border-secondary flex items-center justify-between text-sm">
+                              <span className="text-text-secondary">Total (Sum of readings)</span>
+                              <span className="font-semibold text-prmx-cyan">
+                                {(bucketData.get(monitor._id)?.reduce((sum, b) => sum + b.mm, 0) || 0) / 10} mm
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center text-text-tertiary text-sm py-4">
+                            No hourly readings available yet
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

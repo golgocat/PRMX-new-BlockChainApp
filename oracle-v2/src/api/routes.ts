@@ -102,22 +102,12 @@ export function setupRoutes(app: Application): void {
   // Get hourly buckets for a monitor
   app.get('/v2/monitors/:id/buckets', async (req: Request, res: Response) => {
     try {
-      const { id } = req.params;
+      const { id } = req.params; // Format: "market_id:policy_id"
       const buckets = getBuckets();
       
-      // Parse monitor ID to get policy_id
-      const [, policyIdStr] = id.split(':');
-      const policyId = parseInt(policyIdStr, 10);
-      
-      if (isNaN(policyId)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid monitor ID format (expected market_id:policy_id)',
-        });
-      }
-      
+      // Query by monitor_id which matches the format "market_id:policy_id"
       const docs = await buckets
-        .find({ policy_id: policyId })
+        .find({ monitor_id: id })
         .sort({ hour_utc: -1 })
         .limit(168) // Last 7 days of hourly data
         .toArray();
@@ -126,6 +116,7 @@ export function setupRoutes(app: Application): void {
         success: true,
         data: docs,
         count: docs.length,
+        monitor_id: id,
       });
     } catch (error) {
       console.error('Error fetching buckets:', error);

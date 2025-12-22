@@ -1754,6 +1754,35 @@ export async function getV2MonitorStats(): Promise<V2MonitorStats> {
 }
 
 /**
+ * V2 Bucket data structure (hourly precipitation reading)
+ */
+export interface V2Bucket {
+  _id: string;        // "0:8:2025122100" (market:policy:hourUTC)
+  monitor_id: string; // "0:8"
+  hour_utc: string;   // ISO hour: "2025-12-21T00:00:00Z"
+  mm: number;         // Rainfall in mm (scaled by 10)
+}
+
+/**
+ * Get hourly buckets for a V2 monitor
+ */
+export async function getV2MonitorBuckets(monitorId: string): Promise<V2Bucket[]> {
+  try {
+    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors/${monitorId}/buckets`);
+    const json = await response.json();
+    
+    if (!json.success) {
+      throw new Error(json.error || 'Failed to fetch V2 buckets');
+    }
+    
+    return json.data || [];
+  } catch (err) {
+    console.error('Failed to fetch V2 monitor buckets:', err);
+    return [];
+  }
+}
+
+/**
  * Check if V2 oracle service is healthy
  */
 export async function checkV2OracleHealth(): Promise<boolean> {

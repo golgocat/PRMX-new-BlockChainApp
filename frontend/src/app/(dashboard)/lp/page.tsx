@@ -42,7 +42,7 @@ import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory,
 import * as api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
-import type { LpAskOrder, Policy, DaoSolvencyInfo, PolicyDefiInfo } from '@/types';
+import type { LpAskOrder, Policy, DaoSolvencyInfo, PolicyDefiInfo, LpTradeRecord } from '@/types';
 import { encodeAddress, decodeAddress } from '@polkadot/util-crypto';
 
 // Helper to compare addresses (handles different encodings)
@@ -101,6 +101,8 @@ export default function LpTradingPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showSellModal, setShowSellModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
+  const [showTradeDetailModal, setShowTradeDetailModal] = useState(false);
+  const [selectedTrade, setSelectedTrade] = useState<LpTradeRecord | null>(null);
   
   // DeFi solvency state
   const [solvencyInfo, setSolvencyInfo] = useState<DaoSolvencyInfo | null>(null);
@@ -913,11 +915,15 @@ export default function LpTradingPage() {
                     {trades.map((trade) => (
                       <div
                         key={trade.id}
+                        onClick={() => {
+                          setSelectedTrade(trade);
+                          setShowTradeDetailModal(true);
+                        }}
                         className={cn(
-                          "p-4 rounded-xl border transition-all",
+                          "p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md",
                           trade.type === 'buy' 
-                            ? "bg-success/5 border-success/20" 
-                            : "bg-error/5 border-error/20"
+                            ? "bg-success/5 border-success/20 hover:border-success/40" 
+                            : "bg-error/5 border-error/20 hover:border-error/40"
                         )}
                       >
                         <div className="flex items-center justify-between mb-2">
@@ -1752,6 +1758,184 @@ export default function LpTradingPage() {
               )}
             </div>
           </div>
+          );
+        })()}
+      </Modal>
+
+      {/* Trade Detail Modal */}
+      <Modal
+        isOpen={showTradeDetailModal}
+        onClose={() => {
+          setShowTradeDetailModal(false);
+          setSelectedTrade(null);
+        }}
+        title="Trade Details"
+        size="lg"
+      >
+        {selectedTrade && (() => {
+          const policy = getPolicyById(selectedTrade.policyId);
+          const market = policy ? getMarketById(policy.marketId) : null;
+          const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
+          
+          return (
+            <div className="space-y-6">
+              {/* Trade Type Header */}
+              <div className={cn(
+                "p-4 rounded-xl border",
+                selectedTrade.type === 'buy' 
+                  ? "bg-success/10 border-success/30" 
+                  : "bg-error/10 border-error/30"
+              )}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "w-12 h-12 rounded-xl flex items-center justify-center",
+                      selectedTrade.type === 'buy' ? "bg-success/20" : "bg-error/20"
+                    )}>
+                      {selectedTrade.type === 'buy' ? (
+                        <ArrowDownRight className="w-6 h-6 text-success" />
+                      ) : (
+                        <ArrowUpRight className="w-6 h-6 text-error" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={cn(
+                          "text-xl font-bold",
+                          selectedTrade.type === 'buy' ? "text-success" : "text-error"
+                        )}>
+                          {selectedTrade.type === 'buy' ? 'Bought' : 'Sold'}
+                        </span>
+                        <span className="text-xl font-semibold text-text-primary">
+                          {selectedTrade.shares} share{selectedTrade.shares > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <p className="text-sm text-text-secondary mt-1">
+                        {new Date(selectedTrade.timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-2xl font-bold">${selectedTrade.totalAmount.toFixed(2)}</p>
+                    <p className="text-sm text-text-tertiary">
+                      ${selectedTrade.pricePerShare.toFixed(2)} per share
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Policy Info */}
+              {policy && market && (
+                <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-semibold">{policy.label || `Policy #${selectedTrade.policyId}`}</h4>
+                        <Badge 
+                          variant={policy.policyVersion === 'V2' ? 'purple' : 'default'} 
+                          className="text-xs"
+                        >
+                          {policy.policyVersion || 'V1'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5">
+                        <MapPin className="w-3 h-3" />
+                        {market.name}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="p-2 rounded-lg bg-background-primary/50">
+                      <div className="text-xs text-text-tertiary mb-1">Strike Threshold</div>
+                      <div className="font-medium flex items-center gap-1">
+                        <Droplets className="w-3 h-3 text-prmx-cyan" />
+                        {policy.strikeMm ? `${policy.strikeMm / 10} mm` : `${market.strikeValue} mm`}
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-background-primary/50">
+                      <div className="text-xs text-text-tertiary mb-1">Max Payout</div>
+                      <div className="font-medium text-success">{formatUSDT(market.payoutPerShare)}/share</div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-background-primary/50">
+                      <div className="text-xs text-text-tertiary mb-1">Time Left</div>
+                      <div className={cn(
+                        "font-medium flex items-center gap-1",
+                        daysRemaining <= 3 ? "text-warning" : "text-text-primary"
+                      )}>
+                        <Clock className="w-3 h-3" />
+                        {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
+                      </div>
+                    </div>
+                    <div className="p-2 rounded-lg bg-background-primary/50">
+                      <div className="text-xs text-text-tertiary mb-1">Policy Status</div>
+                      <div className="font-medium">
+                        <Badge variant={policy.status === 'Active' ? 'success' : 'default'} className="text-xs">
+                          {policy.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Trade Details Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-xl bg-background-tertiary/50">
+                  <div className="text-sm text-text-secondary mb-1">Trade ID</div>
+                  <div className="font-mono text-sm break-all">{selectedTrade.id}</div>
+                </div>
+                <div className="p-4 rounded-xl bg-background-tertiary/50">
+                  <div className="text-sm text-text-secondary mb-1">Your Account</div>
+                  <div className="font-mono text-sm">{formatAddress(selectedTrade.trader)}</div>
+                </div>
+                {selectedTrade.counterparty && (
+                  <div className="p-4 rounded-xl bg-background-tertiary/50 col-span-2">
+                    <div className="text-sm text-text-secondary mb-1">Counterparty</div>
+                    <div className="font-mono text-sm">{selectedTrade.counterparty}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Coverage Period */}
+              {policy && (
+                <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
+                  <div className="text-sm text-text-secondary mb-2">Coverage Period</div>
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <div className="text-xs text-text-tertiary">Start</div>
+                      <div className="font-medium">{new Date(policy.coverageStart * 1000).toLocaleDateString()}</div>
+                    </div>
+                    <div className="flex-1 h-1 bg-prmx-cyan/20 rounded relative">
+                      <div 
+                        className="absolute left-0 top-0 h-full bg-prmx-cyan rounded"
+                        style={{ 
+                          width: `${Math.max(0, Math.min(100, 100 - (daysRemaining / 7) * 100))}%`
+                        }}
+                      />
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-text-tertiary">End</div>
+                      <div className="font-medium">{new Date(policy.coverageEnd * 1000).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowTradeDetailModal(false);
+                  setSelectedTrade(null);
+                }}
+                className="w-full"
+              >
+                Close
+              </Button>
+            </div>
           );
         })()}
       </Modal>

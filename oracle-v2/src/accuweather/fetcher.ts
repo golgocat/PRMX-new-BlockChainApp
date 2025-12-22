@@ -14,6 +14,7 @@ import { config } from '../config.js';
 export interface PrecipitationRecord {
   dateTime: string;     // ISO datetime
   precipitationMm: number;
+  rawData: object;      // Raw AccuWeather API response
 }
 
 /**
@@ -84,9 +85,36 @@ export async function fetchPrecipitation(
         
         // Create a single record for the current hour with PastHour rainfall
         // This will be used to create/update the current hourly bucket
+        // Include the full raw response for debugging/display
         records.push({
           dateTime: current.LocalObservationDateTime,
           precipitationMm: pastHourMm,
+          rawData: {
+            // Full current conditions response
+            LocalObservationDateTime: current.LocalObservationDateTime,
+            EpochTime: current.EpochTime,
+            WeatherText: current.WeatherText,
+            WeatherIcon: current.WeatherIcon,
+            HasPrecipitation: current.HasPrecipitation,
+            PrecipitationType: current.PrecipitationType,
+            Temperature: current.Temperature,
+            RelativeHumidity: current.RelativeHumidity,
+            Wind: current.Wind,
+            Visibility: current.Visibility,
+            CloudCover: current.CloudCover,
+            Pressure: current.Pressure,
+            PrecipitationSummary: current.PrecipitationSummary,
+            // Extracted values for easy reference
+            _extracted: {
+              pastHourMm,
+              past3HoursMm,
+              past6HoursMm,
+              past12HoursMm,
+              past24HoursMm,
+              fetchedAt: new Date().toISOString(),
+              locationKey,
+            }
+          }
         });
         
         console.log(`   📦 Created record for ${current.LocalObservationDateTime}: ${pastHourMm}mm (past hour)`);

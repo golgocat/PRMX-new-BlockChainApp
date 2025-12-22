@@ -39,6 +39,8 @@ export interface Bucket {
   monitor_id: string;
   hour_utc: string;        // ISO hour: "2025-12-21T00:00:00Z"
   mm: number;
+  raw_data?: object;       // Raw AccuWeather API response for this reading
+  fetched_at?: Date;       // When this bucket was last updated
 }
 
 /**

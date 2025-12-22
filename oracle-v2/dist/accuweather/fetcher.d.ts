@@ -10,6 +10,7 @@
 export interface PrecipitationRecord {
     dateTime: string;
     precipitationMm: number;
+    rawData: object;
 }
 /**
  * Current conditions response with precipitation summary

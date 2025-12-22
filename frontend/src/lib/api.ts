@@ -1761,6 +1761,8 @@ export interface V2Bucket {
   monitor_id: string; // "0:8"
   hour_utc: string;   // ISO hour: "2025-12-21T00:00:00Z"
   mm: number;         // Rainfall in mm (scaled by 10)
+  raw_data?: Record<string, unknown>; // Raw AccuWeather API response
+  fetched_at?: string; // When this bucket was last updated
 }
 
 /**

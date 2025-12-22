@@ -50,6 +50,8 @@ export async function evaluateMonitor(monitor) {
                     monitor_id: monitor._id,
                     hour_utc: hourUtc,
                     mm: Math.round(record.precipitationMm * 10), // Convert to tenths of mm
+                    raw_data: record.rawData, // Store raw AccuWeather response
+                    fetched_at: new Date(), // When this bucket was last updated
                 }
             }, { upsert: true });
             bucketsCreated++;

@@ -32,6 +32,8 @@ export interface Bucket {
     monitor_id: string;
     hour_utc: string;
     mm: number;
+    raw_data?: object;
+    fetched_at?: Date;
 }
 /**
  * Evidence document structure

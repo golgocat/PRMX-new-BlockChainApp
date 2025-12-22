@@ -17,14 +17,18 @@ import {
   List,
   ChevronUp,
   ChevronDown,
-  Droplets
+  Droplets,
+  Code,
+  Copy
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
+import { Modal } from '@/components/ui/Modal';
 import * as api from '@/lib/api';
 import { cn } from '@/lib/utils';
+import toast from 'react-hot-toast';
 import type { V2Monitor, V2MonitorStats, Policy } from '@/types';
 
 export default function OracleV2Page() {
@@ -39,6 +43,10 @@ export default function OracleV2Page() {
   const [expandedMonitors, setExpandedMonitors] = useState<Set<string>>(new Set());
   const [bucketData, setBucketData] = useState<Map<string, api.V2Bucket[]>>(new Map());
   const [loadingBuckets, setLoadingBuckets] = useState<Set<string>>(new Set());
+  
+  // State for raw data modal
+  const [selectedBucket, setSelectedBucket] = useState<api.V2Bucket | null>(null);
+  const [showRawDataModal, setShowRawDataModal] = useState(false);
   
   // Toggle monitor expansion and fetch bucket data
   const toggleMonitorExpanded = async (monitorId: string) => {
@@ -415,16 +423,22 @@ export default function OracleV2Page() {
                               {bucketData.get(monitor._id)?.map((bucket, idx) => {
                                 const hourDate = new Date(bucket.hour_utc);
                                 const rainfallMm = bucket.mm / 10; // Convert from scaled value
+                                const hasRawData = !!bucket.raw_data;
                                 
                                 return (
                                   <div 
                                     key={bucket._id}
+                                    onClick={() => {
+                                      setSelectedBucket(bucket);
+                                      setShowRawDataModal(true);
+                                    }}
                                     className={cn(
-                                      'flex items-center justify-between p-2 rounded-lg text-sm',
+                                      'flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer transition-all hover:ring-1 hover:ring-prmx-cyan/50',
                                       idx === 0 
                                         ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
-                                        : 'bg-background-tertiary/30'
+                                        : 'bg-background-tertiary/30 hover:bg-background-tertiary/50'
                                     )}
+                                    title="Click to view raw AccuWeather data"
                                   >
                                     <div className="flex items-center gap-2">
                                       <Clock className="w-3 h-3 text-text-tertiary" />
@@ -443,6 +457,9 @@ export default function OracleV2Page() {
                                       </span>
                                       {idx === 0 && (
                                         <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
+                                      )}
+                                      {hasRawData && (
+                                        <Code className="w-3 h-3 text-text-tertiary ml-1" />
                                       )}
                                     </div>
                                     <div className={cn(
@@ -478,6 +495,169 @@ export default function OracleV2Page() {
           )}
         </CardContent>
       </Card>
+
+      {/* Raw Data Modal */}
+      <Modal
+        isOpen={showRawDataModal}
+        onClose={() => {
+          setShowRawDataModal(false);
+          setSelectedBucket(null);
+        }}
+        title="Raw AccuWeather Data"
+        size="lg"
+      >
+        {selectedBucket && (
+          <div className="space-y-4">
+            {/* Summary */}
+            <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <span className="text-sm text-text-secondary">Bucket ID</span>
+                  <p className="font-mono text-sm font-semibold">{selectedBucket._id}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-text-secondary">Rainfall (Display)</span>
+                  <p className="font-mono font-semibold text-prmx-cyan">{(selectedBucket.mm / 10).toFixed(1)} mm</p>
+                </div>
+                <div>
+                  <span className="text-sm text-text-secondary">Hour (UTC)</span>
+                  <p className="font-mono text-sm">{selectedBucket.hour_utc}</p>
+                </div>
+                <div>
+                  <span className="text-sm text-text-secondary">Local Time</span>
+                  <p className="font-mono text-sm">{new Date(selectedBucket.hour_utc).toLocaleString()}</p>
+                </div>
+                {selectedBucket.fetched_at && (
+                  <div className="col-span-2">
+                    <span className="text-sm text-text-secondary">Fetched At</span>
+                    <p className="font-mono text-sm">{new Date(selectedBucket.fetched_at).toLocaleString()}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Precipitation Summary from Raw Data */}
+            {selectedBucket.raw_data && (
+              <div className="p-4 rounded-xl bg-prmx-purple/10 border border-prmx-purple/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Droplets className="w-4 h-4 text-prmx-purple" />
+                  <span className="font-semibold">Precipitation Summary</span>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <span className="text-text-tertiary">Past Hour</span>
+                    <p className="font-mono font-semibold text-prmx-cyan">
+                      {(selectedBucket.raw_data as Record<string, unknown>)?._extracted 
+                        ? ((selectedBucket.raw_data as Record<string, { pastHourMm?: number }>)?._extracted?.pastHourMm || 0)
+                        : (selectedBucket.mm / 10)} mm
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-text-tertiary">Past 3 Hours</span>
+                    <p className="font-mono font-semibold">
+                      {((selectedBucket.raw_data as Record<string, { past3HoursMm?: number }>)?._extracted?.past3HoursMm || 0)} mm
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-text-tertiary">Past 6 Hours</span>
+                    <p className="font-mono font-semibold">
+                      {((selectedBucket.raw_data as Record<string, { past6HoursMm?: number }>)?._extracted?.past6HoursMm || 0)} mm
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-text-tertiary">Past 12 Hours</span>
+                    <p className="font-mono font-semibold">
+                      {((selectedBucket.raw_data as Record<string, { past12HoursMm?: number }>)?._extracted?.past12HoursMm || 0)} mm
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-text-tertiary">Past 24 Hours</span>
+                    <p className="font-mono font-semibold">
+                      {((selectedBucket.raw_data as Record<string, { past24HoursMm?: number }>)?._extracted?.past24HoursMm || 0)} mm
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Weather Info */}
+            {selectedBucket.raw_data && (
+              <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
+                <div className="flex items-center gap-2 mb-3">
+                  <CloudRain className="w-4 h-4 text-text-secondary" />
+                  <span className="font-semibold">Weather Conditions</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-text-tertiary">Weather</span>
+                    <p className="font-medium">{(selectedBucket.raw_data as Record<string, string>)?.WeatherText || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-text-tertiary">Has Precipitation</span>
+                    <p className="font-medium">
+                      {(selectedBucket.raw_data as Record<string, boolean>)?.HasPrecipitation ? 'Yes' : 'No'}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-text-tertiary">Temperature</span>
+                    <p className="font-medium">
+                      {((selectedBucket.raw_data as Record<string, { Metric?: { Value?: number } }>)?.Temperature?.Metric?.Value || 'N/A')}°C
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-text-tertiary">Humidity</span>
+                    <p className="font-medium">
+                      {(selectedBucket.raw_data as Record<string, number>)?.RelativeHumidity || 'N/A'}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Raw JSON Data */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Code className="w-4 h-4 text-prmx-purple" />
+                <span className="font-semibold">Raw AccuWeather Response</span>
+              </div>
+              {selectedBucket.raw_data ? (
+                <pre className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary overflow-x-auto text-xs font-mono text-text-secondary max-h-64 overflow-y-auto">
+                  {JSON.stringify(selectedBucket.raw_data, null, 2)}
+                </pre>
+              ) : (
+                <div className="p-4 rounded-xl bg-warning/10 border border-warning/30 text-sm text-text-secondary">
+                  <strong className="text-warning">Note:</strong> No raw data available for this bucket. 
+                  This may be an older bucket created before raw data storage was enabled.
+                </div>
+              )}
+            </div>
+
+            {/* Note */}
+            <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
+              <p className="text-xs text-text-secondary">
+                <strong className="text-warning">Note:</strong> The <code className="px-1 py-0.5 rounded bg-background-tertiary">mm</code> field 
+                is stored in <strong>tenths of mm</strong> (e.g., 10 = 1.0mm). 
+                The display value above shows the converted value.
+              </p>
+            </div>
+
+            {/* Copy Button */}
+            {selectedBucket.raw_data && (
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(selectedBucket.raw_data, null, 2));
+                  toast.success('Raw data copied to clipboard!');
+                }}
+                className="w-full"
+                icon={<Copy className="w-4 h-4" />}
+              >
+                Copy Raw JSON
+              </Button>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

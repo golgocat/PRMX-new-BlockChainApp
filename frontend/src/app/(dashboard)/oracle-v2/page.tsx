@@ -236,12 +236,15 @@ export default function OracleV2Page() {
         </CardContent>
       </Card>
 
-      {/* Monitors List */}
+      {/* Active Monitors */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Active Monitors</h2>
-            <Badge variant="cyan">{monitors.length} Monitors</Badge>
+            <h2 className="text-xl font-semibold flex items-center gap-2">
+              <Activity className="w-5 h-5 text-prmx-cyan" />
+              Active Monitors
+            </h2>
+            <Badge variant="cyan">{monitors.filter(m => m.state === 'monitoring').length} Monitoring</Badge>
           </div>
         </CardHeader>
         <CardContent>
@@ -258,17 +261,17 @@ export default function OracleV2Page() {
                 The V2 Oracle service is not running. Start it with: <code className="px-2 py-1 bg-background-tertiary rounded">npm start</code> in oracle-v2/
               </p>
             </div>
-          ) : monitors.length === 0 ? (
+          ) : monitors.filter(m => m.state === 'monitoring').length === 0 ? (
             <div className="py-12 text-center">
               <Activity className="w-12 h-12 mx-auto mb-3 text-text-tertiary" />
-              <h3 className="font-semibold mb-1">No V2 Monitors</h3>
+              <h3 className="font-semibold mb-1">No Active Monitors</h3>
               <p className="text-text-secondary text-sm">
-                Create a V2 policy to start monitoring cumulative rainfall
+                No policies are currently being monitored
               </p>
             </div>
           ) : (
             <div className="space-y-4">
-              {monitors.map((monitor) => {
+              {monitors.filter(m => m.state === 'monitoring').map((monitor) => {
                 const progressPercent = Math.min(100, (monitor.cumulative_mm / monitor.strike_mm) * 100);
                 const isNearThreshold = progressPercent >= 75;
                 const isTriggered = monitor.cumulative_mm >= monitor.strike_mm;
@@ -495,6 +498,250 @@ export default function OracleV2Page() {
           )}
         </CardContent>
       </Card>
+
+      {/* Settled Monitors (Triggered or Matured) */}
+      {!loading && serviceHealthy && monitors.filter(m => m.state !== 'monitoring').length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-success" />
+                Settled Monitors
+              </h2>
+              <div className="flex items-center gap-2">
+                <Badge variant="success">{monitors.filter(m => m.state === 'triggered').length} Triggered</Badge>
+                <Badge variant="default">{monitors.filter(m => m.state === 'matured' || m.state === 'reported').length} Matured</Badge>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {monitors.filter(m => m.state !== 'monitoring').map((monitor) => {
+                const progressPercent = Math.min(100, (monitor.cumulative_mm / monitor.strike_mm) * 100);
+                const isTriggered = monitor.state === 'triggered';
+                const policy = policies.get(monitor.policy_id);
+                const policyLabel = policy?.label || `policy-${monitor.policy_id}`;
+                
+                return (
+                  <div 
+                    key={monitor._id}
+                    className={cn(
+                      "p-4 rounded-xl border transition-all",
+                      isTriggered 
+                        ? "border-success/30 bg-success/5" 
+                        : "border-text-tertiary/30 bg-background-tertiary/20"
+                    )}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-10 h-10 rounded-lg flex items-center justify-center",
+                          isTriggered ? "bg-success/20" : "bg-text-tertiary/20"
+                        )}>
+                          {isTriggered ? (
+                            <Zap className="w-5 h-5 text-success" />
+                          ) : (
+                            <CheckCircle2 className="w-5 h-5 text-text-tertiary" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold">{policyLabel}</h3>
+                            {getStateBadge(monitor.state)}
+                          </div>
+                          <p className="text-xs text-text-tertiary">
+                            Policy ID: #{monitor.policy_id} • Monitor: {monitor._id}
+                          </p>
+                        </div>
+                      </div>
+                      <Link href={`/policies/${monitor.policy_id}`}>
+                        <Button variant="ghost" size="sm" icon={<ExternalLink className="w-4 h-4" />}>
+                          View Policy
+                        </Button>
+                      </Link>
+                    </div>
+
+                    {/* Final Result */}
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-text-secondary">Final Cumulative Rainfall</span>
+                        <span className={cn(
+                          "font-mono font-semibold",
+                          isTriggered ? "text-success" : "text-text-secondary"
+                        )}>
+                          {(monitor.cumulative_mm / 10).toFixed(1)} / {(monitor.strike_mm / 10).toFixed(1)} mm
+                        </span>
+                      </div>
+                      <div className="h-3 bg-background-secondary rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all duration-500",
+                            isTriggered ? "bg-success" : "bg-text-tertiary"
+                          )}
+                          style={{ width: `${progressPercent}%` }}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-text-tertiary mt-1">
+                        <span>0 mm</span>
+                        <span className={isTriggered ? "text-success font-medium" : ""}>
+                          {isTriggered ? '✓ Threshold Exceeded' : `${progressPercent.toFixed(0)}% (No Event)`}
+                        </span>
+                        <span>{(monitor.strike_mm / 10).toFixed(1)} mm</span>
+                      </div>
+                    </div>
+
+                    {/* Details Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-text-tertiary">Coverage Start</span>
+                        <p className="font-medium">{formatDate(monitor.coverage_start)}</p>
+                      </div>
+                      <div>
+                        <span className="text-text-tertiary">Coverage End</span>
+                        <p className="font-medium">{formatDate(monitor.coverage_end)}</p>
+                      </div>
+                      <div>
+                        <span className="text-text-tertiary">Trigger Time</span>
+                        <p className="font-medium">
+                          {monitor.trigger_time 
+                            ? new Date(monitor.trigger_time * 1000).toLocaleString()
+                            : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-text-tertiary">Location Key</span>
+                        <p className="font-mono text-xs">{monitor.location_key}</p>
+                      </div>
+                    </div>
+
+                    {/* Report Info */}
+                    {monitor.report_tx_hash && (
+                      <div className="mt-4 pt-4 border-t border-border-secondary">
+                        <div className="flex items-center gap-2 text-xs">
+                          <CheckCircle2 className="w-4 h-4 text-success" />
+                          <span className="text-text-secondary">Report submitted:</span>
+                          <code className="text-prmx-cyan truncate">{monitor.report_tx_hash}</code>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Show Hourly Readings Button */}
+                    <button
+                      onClick={() => toggleMonitorExpanded(monitor._id)}
+                      className="w-full flex items-center justify-center gap-2 py-3 mt-4 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-secondary"
+                    >
+                      <List className="w-4 h-4" />
+                      {loadingBuckets.has(monitor._id) ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          Loading...
+                        </>
+                      ) : expandedMonitors.has(monitor._id) ? (
+                        <>
+                          Hide Hourly Readings
+                          <ChevronUp className="w-4 h-4" />
+                        </>
+                      ) : (
+                        <>
+                          Show Hourly Readings
+                          {bucketData.get(monitor._id)?.length !== undefined && (
+                            <span className="text-text-tertiary">({bucketData.get(monitor._id)?.length})</span>
+                          )}
+                          <ChevronDown className="w-4 h-4" />
+                        </>
+                      )}
+                    </button>
+                    
+                    {/* Expanded Hourly Readings */}
+                    {expandedMonitors.has(monitor._id) && (
+                      <div className="pt-4 mt-2 border-t border-border-secondary">
+                        <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                          <Droplets className="w-4 h-4 text-prmx-cyan" />
+                          Raw Bucket Data (Hourly Readings)
+                        </h4>
+                        
+                        {loadingBuckets.has(monitor._id) ? (
+                          <div className="flex items-center justify-center py-8">
+                            <RefreshCw className="w-5 h-5 animate-spin text-prmx-cyan" />
+                          </div>
+                        ) : (bucketData.get(monitor._id)?.length || 0) > 0 ? (
+                          <>
+                            <div className="max-h-64 overflow-y-auto space-y-2">
+                              {bucketData.get(monitor._id)?.map((bucket, idx) => {
+                                const hourDate = new Date(bucket.hour_utc);
+                                const rainfallMm = bucket.mm / 10;
+                                const hasRawData = !!bucket.raw_data;
+                                
+                                return (
+                                  <div 
+                                    key={bucket._id}
+                                    onClick={() => {
+                                      setSelectedBucket(bucket);
+                                      setShowRawDataModal(true);
+                                    }}
+                                    className={cn(
+                                      'flex items-center justify-between p-2 rounded-lg text-sm cursor-pointer transition-all hover:ring-1 hover:ring-prmx-cyan/50',
+                                      idx === 0 
+                                        ? 'bg-prmx-cyan/10 border border-prmx-cyan/30' 
+                                        : 'bg-background-tertiary/30 hover:bg-background-tertiary/50'
+                                    )}
+                                    title="Click to view raw AccuWeather data"
+                                  >
+                                    <div className="flex items-center gap-2">
+                                      <Clock className="w-3 h-3 text-text-tertiary" />
+                                      <span className="text-text-secondary">
+                                        {hourDate.toLocaleTimeString([], { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit',
+                                          hour12: true 
+                                        })}
+                                      </span>
+                                      <span className="text-text-tertiary text-xs">
+                                        {hourDate.toLocaleDateString([], { 
+                                          month: 'short', 
+                                          day: 'numeric' 
+                                        })}
+                                      </span>
+                                      {idx === 0 && (
+                                        <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
+                                      )}
+                                      {hasRawData && (
+                                        <Code className="w-3 h-3 text-text-tertiary ml-1" />
+                                      )}
+                                    </div>
+                                    <div className={cn(
+                                      'font-mono font-semibold',
+                                      rainfallMm > 0 ? 'text-prmx-cyan' : 'text-text-tertiary'
+                                    )}>
+                                      {rainfallMm.toFixed(1)} mm
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            
+                            {/* Summary */}
+                            <div className="mt-3 pt-3 border-t border-border-secondary flex items-center justify-between text-sm">
+                              <span className="text-text-secondary">Total (Sum of readings)</span>
+                              <span className="font-semibold text-prmx-cyan">
+                                {(bucketData.get(monitor._id)?.reduce((sum, b) => sum + b.mm, 0) || 0) / 10} mm
+                              </span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center text-text-tertiary text-sm py-4">
+                            No hourly readings available
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Raw Data Modal */}
       <Modal

@@ -161,9 +161,18 @@ export default function OracleV2Page() {
     }
   };
 
-  const formatDate = (timestamp: number) => {
+  // Helper to get UTC offset string (e.g., "UTC+9" for Tokyo)
+  const getUtcOffsetString = () => {
+    const offsetMinutes = new Date().getTimezoneOffset();
+    const offsetHours = -offsetMinutes / 60; // Negate because getTimezoneOffset returns opposite sign
+    const sign = offsetHours >= 0 ? '+' : '';
+    return `UTC${sign}${offsetHours}`;
+  };
+
+  const formatDate = (timestamp: number, includeTimezone = true) => {
     if (!timestamp || timestamp === 0) return 'N/A';
-    return new Date(timestamp * 1000).toLocaleString();
+    const dateStr = new Date(timestamp * 1000).toLocaleString();
+    return includeTimezone ? `${dateStr} (${getUtcOffsetString()})` : dateStr;
   };
 
   return (
@@ -391,7 +400,7 @@ export default function OracleV2Page() {
                         <span className="text-text-tertiary">Last Fetch</span>
                         <p className="font-medium">
                           {monitor.last_fetch_at > 0 
-                            ? new Date(monitor.last_fetch_at * 1000).toLocaleTimeString()
+                            ? `${new Date(monitor.last_fetch_at * 1000).toLocaleTimeString()} (${getUtcOffsetString()})`
                             : 'Never'}
                         </p>
                       </div>
@@ -511,6 +520,9 @@ export default function OracleV2Page() {
                                           month: 'short', 
                                           day: 'numeric' 
                                         })}
+                                      </span>
+                                      <span className="text-prmx-cyan text-xs font-medium">
+                                        ({getUtcOffsetString()})
                                       </span>
                                       {idx === 0 && (
                                         <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
@@ -661,7 +673,7 @@ export default function OracleV2Page() {
                         <span className="text-text-tertiary">Trigger Time</span>
                         <p className="font-medium">
                           {monitor.trigger_time 
-                            ? new Date(monitor.trigger_time * 1000).toLocaleString()
+                            ? `${new Date(monitor.trigger_time * 1000).toLocaleString()} (${getUtcOffsetString()})`
                             : 'N/A'}
                         </p>
                       </div>
@@ -782,6 +794,9 @@ export default function OracleV2Page() {
                                           day: 'numeric' 
                                         })}
                                       </span>
+                                      <span className="text-prmx-cyan text-xs font-medium">
+                                        ({getUtcOffsetString()})
+                                      </span>
                                       {idx === 0 && (
                                         <Badge variant="cyan" className="text-xs ml-1">Latest</Badge>
                                       )}
@@ -855,12 +870,12 @@ export default function OracleV2Page() {
                 </div>
                 <div>
                   <span className="text-sm text-text-secondary">Local Time</span>
-                  <p className="font-mono text-sm">{new Date(selectedBucket.hour_utc).toLocaleString()}</p>
+                  <p className="font-mono text-sm">{new Date(selectedBucket.hour_utc).toLocaleString()} <span className="text-prmx-cyan">({getUtcOffsetString()})</span></p>
                 </div>
                 {selectedBucket.fetched_at && (
                   <div className="col-span-2">
                     <span className="text-sm text-text-secondary">Fetched At</span>
-                    <p className="font-mono text-sm">{new Date(selectedBucket.fetched_at).toLocaleString()}</p>
+                    <p className="font-mono text-sm">{new Date(selectedBucket.fetched_at).toLocaleString()} <span className="text-prmx-cyan">({getUtcOffsetString()})</span></p>
                   </div>
                 )}
               </div>

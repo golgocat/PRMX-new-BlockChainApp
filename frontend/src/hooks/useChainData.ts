@@ -472,10 +472,42 @@ export function useQuoteRequests() {
 }
 
 // ============================================================================
-// Trade History (localStorage-based)
+// Trade History (localStorage-based with chain reset detection)
 // ============================================================================
 
 const TRADE_HISTORY_KEY = 'prmx_lp_trade_history';
+const TRADE_HISTORY_GENESIS_KEY = 'prmx_lp_trade_history_genesis';
+
+// Store for current genesis hash (set by validateTradeHistoryGenesis)
+let cachedGenesisHash: string | null = null;
+
+/**
+ * Validate trade history against current chain genesis hash
+ * Clears history if chain was reset (genesis hash changed)
+ */
+export async function validateTradeHistoryGenesis(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  
+  try {
+    const api = await getApi();
+    const currentGenesis = api.genesisHash.toHex();
+    cachedGenesisHash = currentGenesis;
+    
+    const storedGenesis = localStorage.getItem(TRADE_HISTORY_GENESIS_KEY);
+    
+    if (storedGenesis && storedGenesis !== currentGenesis) {
+      console.log('[TradeHistory] Chain reset detected - clearing old trade history');
+      console.log(`  Previous genesis: ${storedGenesis.slice(0, 18)}...`);
+      console.log(`  Current genesis:  ${currentGenesis.slice(0, 18)}...`);
+      localStorage.removeItem(TRADE_HISTORY_KEY);
+    }
+    
+    // Store current genesis
+    localStorage.setItem(TRADE_HISTORY_GENESIS_KEY, currentGenesis);
+  } catch (error) {
+    console.warn('[TradeHistory] Failed to validate genesis:', error);
+  }
+}
 
 /**
  * Get all trade history from localStorage (unfiltered)
@@ -529,15 +561,30 @@ export function addTradeToHistory(trade: Omit<LpTradeRecord, 'id'>): void {
   const trimmed = trades.slice(0, 100);
   
   localStorage.setItem(TRADE_HISTORY_KEY, JSON.stringify(trimmed));
+  
+  // Also ensure genesis is stored
+  if (cachedGenesisHash) {
+    localStorage.setItem(TRADE_HISTORY_GENESIS_KEY, cachedGenesisHash);
+  }
 }
 
 /**
  * Hook to manage trade history for the current signed-in account
  */
 export function useTradeHistory() {
-  const { selectedAccount } = useWalletStore();
+  const { selectedAccount, isChainConnected } = useWalletStore();
   const [trades, setTrades] = useState<LpTradeRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [genesisValidated, setGenesisValidated] = useState(false);
+
+  // Validate genesis hash on chain connection
+  useEffect(() => {
+    if (isChainConnected && !genesisValidated) {
+      validateTradeHistoryGenesis().then(() => {
+        setGenesisValidated(true);
+      });
+    }
+  }, [isChainConnected, genesisValidated]);
 
   const refresh = useCallback(() => {
     setLoading(true);
@@ -548,8 +595,11 @@ export function useTradeHistory() {
   }, [selectedAccount?.address]);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    // Only refresh after genesis is validated
+    if (genesisValidated) {
+      refresh();
+    }
+  }, [refresh, genesisValidated]);
 
   const addTrade = useCallback((trade: Omit<LpTradeRecord, 'id' | 'trader'>) => {
     if (!selectedAccount?.address) {

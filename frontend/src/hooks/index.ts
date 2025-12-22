@@ -6,4 +6,5 @@ export {
   addTradeToHistory,
   getTradeHistory,
   getAllTradeHistory,
+  validateTradeHistoryGenesis,
 } from './useChainData';

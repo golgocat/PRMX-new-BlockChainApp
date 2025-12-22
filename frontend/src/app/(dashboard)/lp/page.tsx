@@ -661,7 +661,7 @@ export default function LpTradingPage() {
                         {/* Details Grid */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
                           <div className="p-2 rounded-lg bg-background-tertiary/50">
-                            <div className="text-xs text-text-tertiary mb-1">Available</div>
+                            <div className="text-xs text-text-tertiary mb-1">For Sale</div>
                             <div className="font-medium">{order.remaining.toString()} shares</div>
                           </div>
                           <div className="p-2 rounded-lg bg-background-tertiary/50">
@@ -2240,7 +2240,7 @@ export default function LpTradingPage() {
               {/* Order Details Grid */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Available Shares</p>
+                  <p className="text-xs text-text-tertiary">Shares For Sale</p>
                   <p className="text-lg font-semibold mt-1">{order.remaining.toString()}</p>
                 </div>
                 <div className="p-3 rounded-xl bg-background-tertiary/50">

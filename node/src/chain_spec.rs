@@ -246,6 +246,78 @@ fn testnet_genesis(
                     "maxDurationSecs": 604_800u32,
                     "minLeadTimeSecs": 0u32,
                 }),
+                serde_json::json!({
+                    // Singapore - Rainfall Insurance Market (market_id = 3)
+                    // No R actuarial model yet - uses fixed 1% probability benchmark
+                    "name": "Singapore".as_bytes(),
+                    // Center coordinates: 1.3521° N, 103.8198° E
+                    // Scaled by 1e6 for precision
+                    "centerLatitude": 1_352_100i32,
+                    "centerLongitude": 103_819_800i32,
+                    // Timezone: UTC+8 (Singapore Standard Time)
+                    "timezoneOffsetHours": 8i8,
+                    // Strike value: 50mm rainfall in 24h triggers payout
+                    // Oracle stores rainfall scaled by 10, so 50mm = 500
+                    "strikeValue": 500u32,
+                    // Payout per share: 100 USDT (in smallest units)
+                    "payoutPerShare": PAYOUT_PER_SHARE,
+                    // Base asset: USDT
+                    "baseAsset": USDT_ASSET_ID,
+                    // DAO margin: 20% = 2000 basis points
+                    "daoMarginBp": 2000u32,
+                    // Coverage window rules (relaxed for testing)
+                    "minDurationSecs": 60u32,
+                    "maxDurationSecs": 604_800u32,
+                    "minLeadTimeSecs": 0u32,
+                }),
+                serde_json::json!({
+                    // Jakarta, Indonesia - Rainfall Insurance Market (market_id = 4)
+                    // No R actuarial model yet - uses fixed 1% probability benchmark
+                    "name": "Jakarta".as_bytes(),
+                    // Center coordinates: 6.2088° S, 106.8456° E
+                    // Scaled by 1e6 for precision (negative for southern hemisphere)
+                    "centerLatitude": -6_208_800i32,
+                    "centerLongitude": 106_845_600i32,
+                    // Timezone: UTC+7 (Western Indonesia Time)
+                    "timezoneOffsetHours": 7i8,
+                    // Strike value: 50mm rainfall in 24h triggers payout
+                    // Oracle stores rainfall scaled by 10, so 50mm = 500
+                    "strikeValue": 500u32,
+                    // Payout per share: 100 USDT (in smallest units)
+                    "payoutPerShare": PAYOUT_PER_SHARE,
+                    // Base asset: USDT
+                    "baseAsset": USDT_ASSET_ID,
+                    // DAO margin: 20% = 2000 basis points
+                    "daoMarginBp": 2000u32,
+                    // Coverage window rules (relaxed for testing)
+                    "minDurationSecs": 60u32,
+                    "maxDurationSecs": 604_800u32,
+                    "minLeadTimeSecs": 0u32,
+                }),
+                serde_json::json!({
+                    // Dubai, UAE - Rainfall Insurance Market (market_id = 5)
+                    // No R actuarial model yet - uses fixed 1% probability benchmark
+                    "name": "Dubai".as_bytes(),
+                    // Center coordinates: 25.2048° N, 55.2708° E
+                    // Scaled by 1e6 for precision
+                    "centerLatitude": 25_204_800i32,
+                    "centerLongitude": 55_270_800i32,
+                    // Timezone: UTC+4 (Gulf Standard Time)
+                    "timezoneOffsetHours": 4i8,
+                    // Strike value: 50mm rainfall in 24h triggers payout
+                    // Oracle stores rainfall scaled by 10, so 50mm = 500
+                    "strikeValue": 500u32,
+                    // Payout per share: 100 USDT (in smallest units)
+                    "payoutPerShare": PAYOUT_PER_SHARE,
+                    // Base asset: USDT
+                    "baseAsset": USDT_ASSET_ID,
+                    // DAO margin: 20% = 2000 basis points
+                    "daoMarginBp": 2000u32,
+                    // Coverage window rules (relaxed for testing)
+                    "minDurationSecs": 60u32,
+                    "maxDurationSecs": 604_800u32,
+                    "minLeadTimeSecs": 0u32,
+                }),
             ],
         },
         // PRMX Oracle - Oracle Configuration

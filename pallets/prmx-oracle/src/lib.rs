@@ -587,9 +587,19 @@ pub mod pallet {
                 );
             }
             
-            // Store AccuWeather API key in offchain index
+            // Store AccuWeather API key in both offchain index AND PendingApiKey
+            // The OCW will copy from PendingApiKey to local storage on first run
             if !self.accuweather_api_key.is_empty() {
+                // Set in offchain index for block import
                 sp_io::offchain_index::set(ACCUWEATHER_API_KEY_STORAGE, &self.accuweather_api_key);
+                
+                // Also set in PendingApiKey for OCW to pick up during startup
+                let bounded_key: BoundedVec<u8, ConstU32<256>> = self.accuweather_api_key.clone()
+                    .try_into()
+                    .unwrap_or_default();
+                PendingApiKey::<T>::put(bounded_key);
+                ApiKeyConfiguredAt::<T>::put(BlockNumberFor::<T>::zero());
+                
                 log::info!(
                     target: "prmx-oracle",
                     "🔑 Genesis: AccuWeather API key configured (length: {} bytes)",
@@ -1840,11 +1850,13 @@ pub mod pallet {
             let mut weight = Weight::zero();
             
             // =========================================================================
-            // Clear API key configured flag after a few blocks (offchain worker should have run)
+            // Clear API key configured flag after enough blocks for OCW to pick it up
+            // The OCW runs during startup (blocks 0-9) and every BLOCKS_PER_HOUR (600).
+            // We keep the pending key for 100 blocks to ensure the OCW has a chance to copy it.
             // =========================================================================
             if let Some(configured_at) = ApiKeyConfiguredAt::<T>::get() {
-                // Clear the flag and pending key after 3 blocks (OCW should have copied it)
-                if block_number > configured_at + 3u32.into() {
+                // Clear the flag and pending key after 100 blocks (ensure OCW has time to copy)
+                if block_number > configured_at + 100u32.into() {
                     ApiKeyConfiguredAt::<T>::kill();
                     PendingApiKey::<T>::kill(); // Clear the temporary on-chain key
                     weight = weight.saturating_add(Weight::from_parts(10_000, 0));
@@ -1884,13 +1896,17 @@ pub mod pallet {
             // Check if API key was just configured and immediate fetch is needed
             let api_key_just_configured = ApiKeyConfiguredAt::<T>::get().is_some();
             
+            // Check if there's a pending API key that needs to be copied to local storage
+            // We check this on every block to ensure quick pickup after extrinsic submission
+            let has_pending_api_key = PendingApiKey::<T>::get().map_or(false, |k| !k.is_empty());
+            
             // Determine what operations to run based on block number
             // - Rainfall ingestion: once per hour (every 600 blocks), or first 10 blocks for quick startup
             // - Location binding: every ~10 minutes (every 100 blocks) for new markets
-            // - Immediate fetch: when API key is newly configured
+            // - Immediate fetch: when API key is newly configured or pending
             let is_startup_window = block_num < 10; // Run more frequently during startup
-            let should_fetch_rainfall = is_startup_window || block_num % BLOCKS_PER_HOUR == 0 || api_key_just_configured;
-            let should_check_bindings = is_startup_window || block_num % BLOCKS_PER_BINDING_CHECK == 0 || api_key_just_configured;
+            let should_fetch_rainfall = is_startup_window || block_num % BLOCKS_PER_HOUR == 0 || api_key_just_configured || has_pending_api_key;
+            let should_check_bindings = is_startup_window || block_num % BLOCKS_PER_BINDING_CHECK == 0 || api_key_just_configured || has_pending_api_key;
 
             // Early return if nothing to do this block (and no pending requests processed)
             if !should_fetch_rainfall && !should_check_bindings && !has_pending_requests {
@@ -1898,24 +1914,25 @@ pub mod pallet {
             }
             
             // Log if this is an immediate fetch triggered by API key configuration
-            if api_key_just_configured {
+            if api_key_just_configured || has_pending_api_key {
                 log::info!(
                     target: "prmx-oracle",
-                    "🚀 API key configured - triggering immediate rainfall fetch for all markets"
+                    "🚀 API key pending - triggering immediate rainfall fetch for all markets"
                 );
             }
 
             // Log occasionally to show worker is alive
-            if should_check_bindings || is_startup_window || has_pending_requests {
-            log::info!(
-                target: "prmx-oracle",
-                    "Offchain worker at block {} (startup: {}, rainfall: {}, bindings: {}, pending: {})",
+            if should_check_bindings || is_startup_window || has_pending_requests || has_pending_api_key {
+                log::info!(
+                    target: "prmx-oracle",
+                    "Offchain worker at block {} (startup: {}, rainfall: {}, bindings: {}, pending: {}, api_key_pending: {})",
                     block_num,
                     is_startup_window,
                     should_fetch_rainfall,
                     should_check_bindings,
-                    has_pending_requests
-            );
+                    has_pending_requests,
+                    has_pending_api_key
+                );
             }
 
             // Try to get API key from offchain local storage
@@ -1959,32 +1976,57 @@ pub mod pallet {
     // See .env.example for configuration template.
 
     impl<T: Config> Pallet<T> {
-        /// Get AccuWeather API key from offchain local storage.
+        /// Get AccuWeather API key from offchain storage.
         /// 
         /// The key can be injected via:
-        /// 1. CLI: `prmx-node inject-api-key --key "prmx-oracle::accuweather-api-key" --value "YOUR_KEY"`
-        /// 2. Extrinsic: `prmxOracle.setAccuweatherApiKey`
+        /// 1. Genesis config with environment variable ACCUWEATHER_API_KEY
+        /// 2. CLI: `prmx-node inject-api-key --key "prmx-oracle::accuweather-api-key" --value "YOUR_KEY"`
+        /// 3. Extrinsic: `prmxOracle.setAccuweatherApiKey`
         /// 
         /// Based on the offchain-utils pattern from polkadot-confidential-offchain-worker.
         fn get_accuweather_api_key() -> Option<Vec<u8>> {
-            // Try to read from local storage (PERSISTENT kind)
-            let storage = sp_io::offchain::local_storage_get(
+            // Priority 1: Check local storage (PERSISTENT kind) - fastest access
+            let local_storage = sp_io::offchain::local_storage_get(
                 sp_core::offchain::StorageKind::PERSISTENT,
                 ACCUWEATHER_API_KEY_STORAGE,
             );
 
-            if let Some(ref key) = storage {
+            if let Some(ref key) = local_storage {
                 if !key.is_empty() {
-                    log::info!(
+                    log::debug!(
                         target: "prmx-oracle",
-                        "✅ Using AccuWeather API key from offchain storage (length: {} bytes)",
+                        "Using AccuWeather API key from local storage (length: {} bytes)",
                         key.len()
                     );
-                    return storage;
+                    return local_storage;
                 }
             }
             
-            // Check if there's a pending API key from on-chain storage
+            // Priority 2: Check offchain index (set by genesis)
+            // This is populated during block import from genesis data
+            if let Some(key) = sp_io::offchain::local_storage_get(
+                sp_core::offchain::StorageKind::PERSISTENT,
+                // Try the indexed storage key that genesis might have populated
+                b"prmx-oracle::api-key-indexed",
+            ) {
+                if !key.is_empty() {
+                    // Copy to local storage for faster future access
+                    sp_io::offchain::local_storage_set(
+                        sp_core::offchain::StorageKind::PERSISTENT,
+                        ACCUWEATHER_API_KEY_STORAGE,
+                        &key,
+                    );
+                    
+                    log::info!(
+                        target: "prmx-oracle",
+                        "✅ Found AccuWeather API key from offchain index (length: {} bytes)",
+                        key.len()
+                    );
+                    return Some(key);
+                }
+            }
+            
+            // Priority 3: Check if there's a pending API key from on-chain storage
             // This is set by the set_accuweather_api_key extrinsic
             if let Some(pending_key) = PendingApiKey::<T>::get() {
                 if !pending_key.is_empty() {
@@ -2258,7 +2300,7 @@ pub mod pallet {
             use pallet_prmx_markets::Markets;
 
             let mut processed = 0u32;
-            const MAX_MARKETS_PER_BLOCK: u32 = 3;
+            const MAX_MARKETS_PER_BLOCK: u32 = 10; // Support up to 10 markets
 
             let next_id = pallet_prmx_markets::NextMarketId::<T>::get();
             
@@ -2944,8 +2986,9 @@ pub mod pallet {
                 }
                 
                 // Look for PastHour rainfall near this observation
-                // Search within the next ~500 chars for the PastHour value
-                let search_window_end = core::cmp::min(abs_epoch_pos + 500, json_str.len());
+                // Search within the next ~3000 chars for the PastHour value
+                // (with details=true, PrecipitationSummary can be ~2500 chars after EpochTime)
+                let search_window_end = core::cmp::min(abs_epoch_pos + 3000, json_str.len());
                 let search_window = &json_str[abs_epoch_pos..search_window_end];
                 
                 let mut rainfall_mm: Millimeters = 0;

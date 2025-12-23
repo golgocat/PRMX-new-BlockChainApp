@@ -382,4 +382,42 @@ export function setupRoutes(app) {
             });
         }
     });
+    // Admin endpoint to reset a monitor state (for retrying failed submissions)
+    app.post('/v2/admin/monitors/:id/reset', async (req, res) => {
+        try {
+            const { id } = req.params;
+            const monitors = getMonitors();
+            const monitor = await monitors.findOne({ _id: id });
+            if (!monitor) {
+                return res.status(404).json({
+                    success: false,
+                    error: `Monitor ${id} not found`,
+                });
+            }
+            console.log(`🔄 Admin request: Resetting monitor ${id} to monitoring state`);
+            await monitors.updateOne({ _id: id }, {
+                $set: {
+                    state: 'monitoring',
+                    updated_at: new Date(),
+                },
+                $unset: {
+                    trigger_time: 1,
+                }
+            });
+            const updatedMonitor = await monitors.findOne({ _id: id });
+            res.json({
+                success: true,
+                message: `Monitor ${id} reset to monitoring state`,
+                monitor: updatedMonitor,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            console.error('Error resetting monitor:', error);
+            res.status(500).json({
+                success: false,
+                error: 'Failed to reset monitor',
+            });
+        }
+    });
 }

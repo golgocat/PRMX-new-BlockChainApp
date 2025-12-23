@@ -1536,7 +1536,13 @@ pub mod pallet {
         /// This is called from on_initialize every BLOCKS_PER_SETTLEMENT_CHECK blocks
         pub fn check_and_settle_triggered_policies(block_number: BlockNumberFor<T>) -> Weight {
             use sp_runtime::traits::UniqueSaturatedInto;
-            let _block_num: u32 = block_number.unique_saturated_into();
+            let block_num: u32 = block_number.unique_saturated_into();
+            
+            log::debug!(
+                target: "prmx-oracle",
+                "🔍 Settlement check running at block {}",
+                block_num
+            );
             
             // Get current timestamp from the policy pallet (which has access to pallet_timestamp)
             let current_time = T::PolicySettlement::current_time();
@@ -1551,16 +1557,39 @@ pub mod pallet {
                 // Get rolling state for this market
                 let rolling_state = match RollingState::<T>::get(market_id) {
                     Some(state) => state,
-                    None => continue, // No rainfall data for this market
+                    None => {
+                        log::debug!(
+                            target: "prmx-oracle",
+                            "  Market {}: No rolling state data",
+                            market_id
+                        );
+                        continue; // No rainfall data for this market
+                    }
                 };
                 
                 // Get strike threshold for this market
                 let strike_threshold = match T::MarketsApi::strike_value(market_id) {
                     Ok(strike) => strike,
-                    Err(_) => continue, // Market not found
+                    Err(_) => {
+                        log::debug!(
+                            target: "prmx-oracle",
+                            "  Market {}: Market not found",
+                            market_id
+                        );
+                        continue; // Market not found
+                    }
                 };
                 
                 let current_rolling_sum = rolling_state.rolling_sum_mm;
+                
+                log::debug!(
+                    target: "prmx-oracle",
+                    "  Market {}: rainfall={:.1}mm, strike={:.1}mm, threshold_breached={}",
+                    market_id,
+                    current_rolling_sum as f64 / 10.0,
+                    strike_threshold as f64 / 10.0,
+                    current_rolling_sum >= strike_threshold
+                );
                 
                 // Check if current rainfall exceeds threshold
                 if current_rolling_sum >= strike_threshold {

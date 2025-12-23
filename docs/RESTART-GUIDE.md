@@ -2,6 +2,12 @@
 
 This guide explains the restart process for the PRMX development environment, including what happens at each stage and how API keys are securely managed.
 
+> **⚠️ IMPORTANT: Before Starting**
+> 
+> - **Temporary Mode (`--tmp`)**: You **MUST** set the `ACCUWEATHER_API_KEY` environment variable, otherwise the V1 Oracle will not fetch rainfall data
+> - **Persistent Mode (`--persistent`)**: API keys are injected via secure CLI (no environment variable needed)
+> - See [Environment Variables Reference](#environment-variables-reference) for details
+
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
@@ -15,14 +21,22 @@ This guide explains the restart process for the PRMX development environment, in
 
 ## Quick Start
 
+> **⚠️ IMPORTANT: API Key Required**
+> 
+> **For temporary mode (`--tmp`), you MUST set the `ACCUWEATHER_API_KEY` environment variable** for the V1 Oracle to fetch rainfall data. Without it, all markets will show 0.0mm rainfall.
+
 ```bash
-# Temporary mode (fresh start each time)
+# Temporary mode (fresh start each time) - REQUIRES API KEY
+ACCUWEATHER_API_KEY="your_accuweather_key" ./scripts/restart-dev-environment.sh
+
+# Or set it in your shell session first
+export ACCUWEATHER_API_KEY="your_accuweather_key"
 ./scripts/restart-dev-environment.sh
 
-# Persistent mode (data survives restarts)
+# Persistent mode (data survives restarts) - API key injected via CLI
 ./scripts/restart-dev-environment.sh --persistent
 
-# With custom API keys
+# With both API keys
 ACCUWEATHER_API_KEY="your_key" R_PRICING_API_KEY="your_key" ./scripts/restart-dev-environment.sh
 ```
 
@@ -33,8 +47,15 @@ ACCUWEATHER_API_KEY="your_key" R_PRICING_API_KEY="your_key" ./scripts/restart-de
 ### Temporary Mode (`--tmp`) - Default
 
 ```bash
-./scripts/restart-dev-environment.sh --tmp
+# ⚠️ REQUIRED: Set ACCUWEATHER_API_KEY environment variable
+ACCUWEATHER_API_KEY="your_accuweather_key" ./scripts/restart-dev-environment.sh --tmp
 ```
+
+**⚠️ API Key Requirement:**
+- **MUST set `ACCUWEATHER_API_KEY` environment variable** before running
+- The API key is read at genesis and stored in `PendingApiKey` (on-chain for ~100 blocks)
+- Without the API key, the OCW cannot fetch rainfall data (all markets will show 0.0mm)
+- The key is then copied to offchain local storage by the OCW
 
 **Characteristics:**
 - Fresh blockchain genesis each restart
@@ -54,6 +75,12 @@ ACCUWEATHER_API_KEY="your_key" R_PRICING_API_KEY="your_key" ./scripts/restart-de
 │                    TEMPORARY MODE FLOW                          │
 └─────────────────────────────────────────────────────────────────┘
 
+0. ⚠️ SET ENVIRONMENT VARIABLE (REQUIRED)
+         │
+         ├──▶ export ACCUWEATHER_API_KEY="your_key"
+         │    (Without this, OCW cannot fetch rainfall data!)
+         │
+         ▼
 1. Stop all processes
          │
          ▼
@@ -63,7 +90,8 @@ ACCUWEATHER_API_KEY="your_key" R_PRICING_API_KEY="your_key" ./scripts/restart-de
          │
          ├──▶ Genesis block created with:
          │      • 6 markets (Manila, Amsterdam, Tokyo, Singapore, Jakarta, Dubai)
-         │      • ACCUWEATHER_API_KEY → PendingApiKey storage (on-chain)
+         │      • ACCUWEATHER_API_KEY env var → PendingApiKey storage (on-chain)
+         │      • ⚠️ If env var not set: PendingApiKey is empty, OCW fails
          │      • Block 0 starts
          │
          ▼
@@ -364,6 +392,27 @@ tail -f /tmp/prmx-node.log
 ```
 
 #### API keys not working (0.0mm rainfall)
+
+**Symptom:** All markets show 0.0mm rainfall, OCW logs show "AccuWeather API key not configured"
+
+**Cause:** `ACCUWEATHER_API_KEY` environment variable not set when starting in temporary mode
+
+**Solution:**
+```bash
+# 1. Stop the node
+pkill -f prmx-node
+
+# 2. Restart WITH the API key set
+ACCUWEATHER_API_KEY="your_accuweather_key" ./scripts/restart-dev-environment.sh
+
+# 3. Verify API key is detected (should see "api_key_pending: true")
+grep "api_key_pending" /tmp/prmx-node.log
+
+# 4. Check for rainfall data (should see rolling sums > 0.0mm)
+grep "rolling sum" /tmp/prmx-node.log
+```
+
+**Verification:**
 ```bash
 # Check OCW logs for API key detection
 grep "AccuWeather API key" /tmp/prmx-node.log
@@ -371,6 +420,9 @@ grep "AccuWeather API key" /tmp/prmx-node.log
 # Verify PendingApiKey was set
 # (Should see "api_key_pending: true" during blocks 1-9)
 grep "api_key_pending" /tmp/prmx-node.log
+
+# Check if rainfall is being fetched
+grep "Fetched.*hourly rainfall records" /tmp/prmx-node.log
 ```
 
 #### Markets not fetching data
@@ -423,12 +475,35 @@ grep -i "error\|failed\|warning" /tmp/prmx-node.log
 
 ## Environment Variables Reference
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ACCUWEATHER_API_KEY` | Standard tier key | AccuWeather API key for V1 Oracle |
-| `R_PRICING_API_KEY` | `test_api_key` | R Pricing API key for quote pricing |
-| `NODE_PATH` | `/tmp/node-v18.20.8-darwin-arm64/bin` | Path to Node.js binaries |
-| `PRMX_DATA_DIR` | `/tmp/prmx-data` | Data directory for persistent mode |
+> **⚠️ CRITICAL: `ACCUWEATHER_API_KEY` is REQUIRED for temporary mode**
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ACCUWEATHER_API_KEY` | **YES** (tmp mode) | None | AccuWeather API key for V1 Oracle. **Must be set** when using `--tmp` mode, otherwise all markets will show 0.0mm rainfall. |
+| `R_PRICING_API_KEY` | Optional | `test_api_key` | R Pricing API key for quote pricing |
+| `NODE_PATH` | Optional | `/tmp/node-v18.20.8-darwin-arm64/bin` | Path to Node.js binaries |
+| `PRMX_DATA_DIR` | Optional | `/tmp/prmx-data` | Data directory for persistent mode |
+
+### Setting Environment Variables
+
+**Option 1: Inline (recommended for one-time use)**
+```bash
+ACCUWEATHER_API_KEY="your_key" ./scripts/restart-dev-environment.sh
+```
+
+**Option 2: Export in shell session**
+```bash
+export ACCUWEATHER_API_KEY="your_key"
+export R_PRICING_API_KEY="your_key"
+./scripts/restart-dev-environment.sh
+```
+
+**Option 3: Add to shell profile (persistent)**
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+export ACCUWEATHER_API_KEY="your_key"
+export R_PRICING_API_KEY="your_key"
+```
 
 ---
 

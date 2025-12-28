@@ -19,7 +19,7 @@ use alloc::vec::Vec;
 use frame_support::pallet_prelude::*;
 use frame_support::traits::fungibles::{Inspect, Mutate};
 use frame_support::traits::tokens::Preservation;
-use frame_support::traits::Get;
+use frame_support::traits::{Get, Time};
 use frame_system::pallet_prelude::*;
 use prmx_primitives::{
     EventSpecV3, PolicyId, RequestStatusV3, V3_MIN_SHARES_PER_ACCEPT, V3_PAYOUT_PER_SHARE,
@@ -162,7 +162,7 @@ pub mod pallet {
     // =========================================================================
 
     #[pallet::config]
-    pub trait Config: frame_system::Config {
+    pub trait Config: frame_system::Config + pallet_timestamp::Config {
         /// Runtime event type
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -702,22 +702,14 @@ pub mod pallet {
             PALLET_ID.into_sub_account_truncating(("escrow",))
         }
 
-        /// Get current timestamp using offchain timestamp if available
+        /// Get current timestamp from pallet_timestamp
+        /// Returns Unix timestamp in seconds
         fn current_timestamp() -> u64 {
-            // Try to get timestamp from offchain context, otherwise return 0
-            // In production, this should use pallet_timestamp
-            #[cfg(feature = "std")]
-            {
-                use std::time::{SystemTime, UNIX_EPOCH};
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0)
-            }
-            #[cfg(not(feature = "std"))]
-            {
-                0
-            }
+            // pallet_timestamp returns milliseconds, convert to seconds
+            let moment = <pallet_timestamp::Pallet<T>>::now();
+            // Convert Moment to u64 (Moment is typically u64 in milliseconds)
+            let millis: u64 = moment.try_into().unwrap_or(0);
+            millis / 1000
         }
 
         /// Internal implementation of request expiry

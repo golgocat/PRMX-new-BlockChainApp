@@ -1547,7 +1547,7 @@ POLL_INTERVAL_SECS=1800
 
 ### 23.2 Oracle V2 Monitoring Page
 
-Route: `/oracle-v2`
+Route: `/oracle-service`
 
 Features:
 - Live monitor status from REST API

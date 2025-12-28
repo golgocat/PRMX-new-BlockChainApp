@@ -298,7 +298,7 @@ export default function OracleV2Page() {
               <WifiOff className="w-12 h-12 mx-auto mb-3 text-error" />
               <h3 className="font-semibold mb-1 text-error">Oracle Service Unavailable</h3>
               <p className="text-text-secondary text-sm">
-                The V2 Oracle service is not running. Start it with: <code className="px-2 py-1 bg-background-tertiary rounded">npm start</code> in oracle-v2/
+                The Oracle service is not running. Start it with: <code className="px-2 py-1 bg-background-tertiary rounded">npm start</code> in offchain-oracle-service/
               </p>
             </div>
           ) : monitors.filter(m => m.state === 'monitoring').length === 0 ? (

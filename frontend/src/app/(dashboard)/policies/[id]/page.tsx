@@ -296,7 +296,7 @@ export default function PolicyDetailPage() {
                     )}
                   </div>
                 </div>
-                <Link href={policy.policyVersion === 'V2' ? '/oracle-v2' : `/oracle?marketId=${policy.marketId}`}>
+                <Link href={policy.policyVersion === 'V2' ? '/oracle-service' : `/oracle?marketId=${policy.marketId}`}>
                   <Button variant="secondary" size="sm" icon={policy.policyVersion === 'V2' ? <Activity className="w-4 h-4" /> : <Droplets className="w-4 h-4" />}>
                     {policy.policyVersion === 'V2' ? 'View V2 Oracle' : 'View Rainfall'}
                   </Button>
@@ -898,8 +898,8 @@ export default function PolicyDetailPage() {
                   </div>
                 )}
 
-                {/* Link to Oracle V2 page */}
-                <Link href="/oracle-v2">
+                {/* Link to Oracle Service page */}
+                <Link href="/oracle-service">
                   <Button 
                     variant="secondary" 
                     className="w-full" 

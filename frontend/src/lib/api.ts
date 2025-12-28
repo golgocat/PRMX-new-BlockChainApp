@@ -1796,17 +1796,18 @@ export async function getAllLpPositions(): Promise<LpPosition[]> {
 }
 
 // ============================================================================
-// V2 Oracle Service REST API
+// Oracle Service REST API (offchain-oracle-service)
+// Supports V2 monitoring endpoints and V3 Ingest API
 // ============================================================================
 
-const V2_ORACLE_API_URL = process.env.NEXT_PUBLIC_ORACLE_V2_API_URL || 'http://localhost:3001';
+const ORACLE_SERVICE_URL = process.env.NEXT_PUBLIC_ORACLE_SERVICE_URL || 'http://localhost:3001';
 
 /**
  * Get all V2 monitors from the oracle service
  */
 export async function getV2Monitors(): Promise<V2Monitor[]> {
   try {
-    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1825,7 +1826,7 @@ export async function getV2Monitors(): Promise<V2Monitor[]> {
  */
 export async function getV2Monitor(id: string): Promise<V2Monitor | null> {
   try {
-    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors/${id}`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors/${id}`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1844,7 +1845,7 @@ export async function getV2Monitor(id: string): Promise<V2Monitor | null> {
  */
 export async function getV2MonitorByPolicy(policyId: number): Promise<V2Monitor | null> {
   try {
-    const response = await fetch(`${V2_ORACLE_API_URL}/v2/policies/${policyId}/monitor`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/policies/${policyId}/monitor`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1863,7 +1864,7 @@ export async function getV2MonitorByPolicy(policyId: number): Promise<V2Monitor 
  */
 export async function getV2MonitorStats(): Promise<V2MonitorStats> {
   try {
-    const response = await fetch(`${V2_ORACLE_API_URL}/v2/stats`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/stats`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1902,7 +1903,7 @@ export interface V2Bucket {
  */
 export async function getV2MonitorBuckets(monitorId: string): Promise<V2Bucket[]> {
   try {
-    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors/${monitorId}/buckets`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors/${monitorId}/buckets`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1927,7 +1928,7 @@ export async function backfillV2MonitorBuckets(monitorId: string): Promise<{
   total_buckets: number;
 }> {
   try {
-    const response = await fetch(`${V2_ORACLE_API_URL}/v2/monitors/${monitorId}/backfill`, {
+    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors/${monitorId}/backfill`, {
       method: 'POST',
     });
     const json = await response.json();
@@ -1954,15 +1955,18 @@ export async function backfillV2MonitorBuckets(monitorId: string): Promise<{
 }
 
 /**
- * Check if V2 oracle service is healthy
+ * Check if oracle service is healthy
  */
-export async function checkV2OracleHealth(): Promise<boolean> {
+export async function checkOracleServiceHealth(): Promise<boolean> {
   try {
-    const response = await fetch(`${V2_ORACLE_API_URL}/health`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/health`);
     const json = await response.json();
     return json.status === 'ok';
   } catch (err) {
-    console.error('V2 Oracle service health check failed:', err);
+    console.error('Oracle service health check failed:', err);
     return false;
   }
 }
+
+// Alias for backward compatibility
+export const checkV2OracleHealth = checkOracleServiceHealth;

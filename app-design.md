@@ -1524,7 +1524,7 @@ prmx-chain/
     src/
       app/
         (dashboard)/
-          oracle-v2/page.tsx    # V2 Oracle monitoring page
+          oracle-service/page.tsx # Oracle Service dashboard
           policies/new/page.tsx # Get Coverage (V1/V2 selector)
           markets/[id]/page.tsx # Market detail (V1/V2 badges)
       components/

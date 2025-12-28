@@ -30,7 +30,7 @@ const mainNavItems: NavItem[] = [
   { href: '/policies', label: 'My Policies', labelByRole: { dao: 'All Policies' }, icon: Shield, roles: ['dao', 'customer'] },
   { href: '/lp', label: 'LP Trading', icon: Wallet, roles: ['dao', 'lp'] },
   { href: '/oracle', label: 'Oracle (V1)', icon: Cloud },
-  { href: '/oracle-v2', label: 'Oracle Service', icon: Activity },
+  { href: '/oracle-service', label: 'Oracle Service', icon: Activity },
 ];
 
 const secondaryNavItems: NavItem[] = [

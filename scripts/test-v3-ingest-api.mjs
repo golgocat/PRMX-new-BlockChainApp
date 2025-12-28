@@ -94,8 +94,8 @@ async function runTests() {
     }
   } catch (err) {
     console.log(`   ❌ FAILED: ${err.message}`);
-    console.log('   💡 Make sure the oracle-v2 service is running:');
-    console.log('      cd oracle-v2 && V3_DEV_MODE=true node dist/index.js');
+    console.log('   💡 Make sure the oracle service is running:');
+    console.log('      cd offchain-oracle-service && V3_DEV_MODE=true node dist/index.js');
     failed++;
     return { passed, failed };
   }

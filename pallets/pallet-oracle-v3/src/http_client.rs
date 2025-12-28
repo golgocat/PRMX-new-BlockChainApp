@@ -232,7 +232,7 @@ pub fn send_observations_batch(
     let url_str = core::str::from_utf8(ingest_url)
         .map_err(|_| "Invalid Ingest URL encoding")?;
     
-    let full_url = format!("{}/v1/observations/batch", url_str);
+    let full_url = format!("{}/ingest/observations/batch", url_str);
     
     // Build JSON payload
     let payload = build_observations_json(
@@ -318,7 +318,7 @@ pub fn send_snapshot(
     let url_str = core::str::from_utf8(ingest_url)
         .map_err(|_| "Invalid Ingest URL encoding")?;
     
-    let full_url = format!("{}/v1/snapshots", url_str);
+    let full_url = format!("{}/ingest/snapshots", url_str);
     
     // Build JSON payload
     let payload = build_snapshot_json(

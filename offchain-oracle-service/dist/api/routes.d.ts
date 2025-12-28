@@ -1,6 +1,10 @@
 /**
  * REST API routes for PRMX Off-chain Oracle Service
- * Includes V2 monitoring endpoints and V3 Ingest API endpoints
+ *
+ * API Structure:
+ *   /monitoring/* - V2 cumulative rainfall monitoring
+ *   /ingest/*     - V3 OCW data ingestion
+ *   /health       - Service health check
  */
 import { Application } from 'express';
 /**

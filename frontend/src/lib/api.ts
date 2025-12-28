@@ -1807,7 +1807,7 @@ const ORACLE_SERVICE_URL = process.env.NEXT_PUBLIC_ORACLE_SERVICE_URL || 'http:/
  */
 export async function getV2Monitors(): Promise<V2Monitor[]> {
   try {
-    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/monitoring/monitors`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1845,7 +1845,7 @@ export async function getV2Monitor(id: string): Promise<V2Monitor | null> {
  */
 export async function getV2MonitorByPolicy(policyId: number): Promise<V2Monitor | null> {
   try {
-    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/policies/${policyId}/monitor`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/monitoring/policies/${policyId}/monitor`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1864,7 +1864,7 @@ export async function getV2MonitorByPolicy(policyId: number): Promise<V2Monitor 
  */
 export async function getV2MonitorStats(): Promise<V2MonitorStats> {
   try {
-    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/stats`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/monitoring/stats`);
     const json = await response.json();
     
     if (!json.success) {

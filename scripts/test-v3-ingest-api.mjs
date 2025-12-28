@@ -129,7 +129,7 @@ async function runTests() {
       commitment_after: crypto.randomBytes(32).toString('hex'),
     };
     
-    const { status, data } = await makeRequest('POST', '/v1/observations/batch', observations);
+    const { status, data } = await makeRequest('POST', '/ingest/observations/batch', observations);
     if (status === 200 && data.success) {
       console.log(`   ✅ PASSED: Inserted ${data.inserted} observations`);
       passed++;
@@ -163,7 +163,7 @@ async function runTests() {
       commitment_after: crypto.randomBytes(32).toString('hex'),
     };
     
-    const { status, data } = await makeRequest('POST', '/v1/observations/batch', observations);
+    const { status, data } = await makeRequest('POST', '/ingest/observations/batch', observations);
     if (status === 200 && data.already_present >= 1) {
       console.log(`   ✅ PASSED: Detected ${data.already_present} duplicates`);
       passed++;
@@ -188,7 +188,7 @@ async function runTests() {
       commitment: crypto.randomBytes(32).toString('hex'),
     };
     
-    const { status, data } = await makeRequest('POST', '/v1/snapshots', snapshot);
+    const { status, data } = await makeRequest('POST', '/ingest/snapshots', snapshot);
     if (status === 200 && data.success) {
       console.log(`   ✅ PASSED: Snapshot inserted, is_new=${data.is_new}`);
       passed++;
@@ -205,7 +205,7 @@ async function runTests() {
   console.log('');
   console.log('📋 Test 5: Get observations for policy');
   try {
-    const { status, data } = await makeRequest('GET', `/v1/observations/${TEST_POLICY_ID}`);
+    const { status, data } = await makeRequest('GET', `/ingest/observations/${TEST_POLICY_ID}`);
     if (status === 200 && data.success && data.count >= 2) {
       console.log(`   ✅ PASSED: Retrieved ${data.count} observations`);
       passed++;
@@ -222,7 +222,7 @@ async function runTests() {
   console.log('');
   console.log('📋 Test 6: Get snapshots for policy');
   try {
-    const { status, data } = await makeRequest('GET', `/v1/snapshots/${TEST_POLICY_ID}`);
+    const { status, data } = await makeRequest('GET', `/ingest/snapshots/${TEST_POLICY_ID}`);
     if (status === 200 && data.success && data.count >= 1) {
       console.log(`   ✅ PASSED: Retrieved ${data.count} snapshots`);
       passed++;
@@ -239,7 +239,7 @@ async function runTests() {
   console.log('');
   console.log('📋 Test 7: Get V3 stats');
   try {
-    const { status, data } = await makeRequest('GET', '/v1/stats');
+    const { status, data } = await makeRequest('GET', '/ingest/stats');
     if (status === 200 && data.success) {
       console.log(`   ✅ PASSED: Stats - observations: ${data.data.observations_count}, snapshots: ${data.data.snapshots_count}`);
       passed++;
@@ -256,7 +256,7 @@ async function runTests() {
   console.log('');
   console.log('📋 Test 8: Validation - missing required fields');
   try {
-    const { status, data } = await makeRequest('POST', '/v1/observations/batch', { samples: [] });
+    const { status, data } = await makeRequest('POST', '/ingest/observations/batch', { samples: [] });
     if (status === 400) {
       console.log('   ✅ PASSED: Correctly rejected invalid request');
       passed++;

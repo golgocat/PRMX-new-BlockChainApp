@@ -1,6 +1,10 @@
 /**
  * REST API routes for PRMX Off-chain Oracle Service
- * Includes V2 monitoring endpoints and V3 Ingest API endpoints
+ * 
+ * API Structure:
+ *   /monitoring/* - V2 cumulative rainfall monitoring
+ *   /ingest/*     - V3 OCW data ingestion
+ *   /health       - Service health check
  */
 
 import { Application, Request, Response } from 'express';
@@ -24,8 +28,12 @@ export function setupRoutes(app: Application): void {
     });
   });
 
-  // Get all V2 monitors
-  app.get('/v2/monitors', async (req: Request, res: Response) => {
+  // =========================================================================
+  // Monitoring API (/monitoring/*) - V2 cumulative rainfall monitoring
+  // =========================================================================
+
+  // Get all monitors
+  app.get('/monitoring/monitors', async (req: Request, res: Response) => {
     try {
       const monitors = getMonitors();
       const docs = await monitors.find({}).sort({ created_at: -1 }).toArray();
@@ -45,7 +53,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Get single monitor by composite ID (market_id:policy_id)
-  app.get('/v2/monitors/:id', async (req: Request, res: Response) => {
+  app.get('/monitoring/monitors/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const monitors = getMonitors();
@@ -72,7 +80,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Get monitor by policy_id (convenience endpoint)
-  app.get('/v2/policies/:policyId/monitor', async (req: Request, res: Response) => {
+  app.get('/monitoring/policies/:policyId/monitor', async (req: Request, res: Response) => {
     try {
       const policyId = parseInt(req.params.policyId, 10);
       if (isNaN(policyId)) {
@@ -106,7 +114,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Get hourly buckets for a monitor
-  app.get('/v2/monitors/:id/buckets', async (req: Request, res: Response) => {
+  app.get('/monitoring/monitors/:id/buckets', async (req: Request, res: Response) => {
     try {
       const { id } = req.params; // Format: "market_id:policy_id"
       const buckets = getBuckets();
@@ -136,7 +144,7 @@ export function setupRoutes(app: Application): void {
   // Backfill missing hourly buckets for a monitor
   // Uses real historical data from AccuWeather (Starter tier) for the past 24 hours
   // Hours beyond 24h window are filled with 0mm
-  app.post('/v2/monitors/:id/backfill', async (req: Request, res: Response) => {
+  app.post('/monitoring/monitors/:id/backfill', async (req: Request, res: Response) => {
     try {
       const { id } = req.params; // Format: "market_id:policy_id"
       const monitors = getMonitors();
@@ -287,7 +295,7 @@ export function setupRoutes(app: Application): void {
   }
 
   // Get stats summary
-  app.get('/v2/stats', async (req: Request, res: Response) => {
+  app.get('/monitoring/stats', async (req: Request, res: Response) => {
     try {
       const monitors = getMonitors();
       
@@ -320,7 +328,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Trigger immediate evaluation for all active monitors
-  app.post('/v2/monitors/trigger-all', async (req: Request, res: Response) => {
+  app.post('/monitoring/monitors/trigger-all', async (req: Request, res: Response) => {
     try {
       console.log('🔔 Manual trigger: Evaluating all active monitors');
       await runEvaluationCycle();
@@ -340,7 +348,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Trigger immediate evaluation for a specific monitor
-  app.post('/v2/monitors/:id/trigger', async (req: Request, res: Response) => {
+  app.post('/monitoring/monitors/:id/trigger', async (req: Request, res: Response) => {
     try {
       const { id } = req.params; // Format: "market_id:policy_id"
       const monitors = getMonitors();
@@ -376,7 +384,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Admin endpoint to clear all database data (for debugging/testing)
-  app.post('/v2/admin/clear-database', async (req: Request, res: Response) => {
+  app.post('/monitoring/admin/clear-database', async (req: Request, res: Response) => {
     try {
       console.log('🗑️ Admin request: Clearing all Oracle V2 database data');
       await clearAllData();
@@ -396,7 +404,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Test endpoint to check AccuWeather API response
-  app.get('/v2/test/accuweather/:locationKey', async (req: Request, res: Response) => {
+  app.get('/monitoring/test/accuweather/:locationKey', async (req: Request, res: Response) => {
     try {
       const { locationKey } = req.params;
       
@@ -436,7 +444,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // Admin endpoint to reset a monitor state (for retrying failed submissions)
-  app.post('/v2/admin/monitors/:id/reset', async (req: Request, res: Response) => {
+  app.post('/monitoring/admin/monitors/:id/reset', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       const monitors = getMonitors();
@@ -482,7 +490,7 @@ export function setupRoutes(app: Application): void {
   });
 
   // =========================================================================
-  // V3 Ingest API Endpoints
+  // Ingest API (/ingest/*) - V3 OCW data ingestion
   // =========================================================================
 
   // HMAC secret for V3 ingest authentication (from config)
@@ -587,7 +595,7 @@ export function setupRoutes(app: Application): void {
    * - precip_type_mask: number
    * - sample_hash: string (hex)
    */
-  app.post('/v1/observations/batch', async (req: Request, res: Response) => {
+  app.post('/ingest/observations/batch', async (req: Request, res: Response) => {
     try {
       // Validate HMAC signature
       const authResult = validateV3Signature(req);
@@ -686,7 +694,7 @@ export function setupRoutes(app: Application): void {
    * - agg_state: string (hex-encoded SCALE bytes)
    * - commitment: string (hex)
    */
-  app.post('/v1/snapshots', async (req: Request, res: Response) => {
+  app.post('/ingest/snapshots', async (req: Request, res: Response) => {
     try {
       // Validate HMAC signature
       const authResult = validateV3Signature(req);
@@ -756,7 +764,7 @@ export function setupRoutes(app: Application): void {
    * GET /v1/observations/:policyId
    * Retrieve observations for a policy
    */
-  app.get('/v1/observations/:policyId', async (req: Request, res: Response) => {
+  app.get('/ingest/observations/:policyId', async (req: Request, res: Response) => {
     try {
       const policyId = parseInt(req.params.policyId, 10);
       if (isNaN(policyId)) {
@@ -790,7 +798,7 @@ export function setupRoutes(app: Application): void {
    * GET /v1/snapshots/:policyId
    * Retrieve snapshots for a policy
    */
-  app.get('/v1/snapshots/:policyId', async (req: Request, res: Response) => {
+  app.get('/ingest/snapshots/:policyId', async (req: Request, res: Response) => {
     try {
       const policyId = parseInt(req.params.policyId, 10);
       if (isNaN(policyId)) {
@@ -824,7 +832,7 @@ export function setupRoutes(app: Application): void {
    * GET /v1/stats
    * Get V3 ingest statistics
    */
-  app.get('/v1/stats', async (req: Request, res: Response) => {
+  app.get('/ingest/stats', async (req: Request, res: Response) => {
     try {
       const observations = getObservationsV3();
       const snapshots = getSnapshotsV3();

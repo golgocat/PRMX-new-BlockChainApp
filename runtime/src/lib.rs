@@ -574,6 +574,10 @@ impl pallet_oracle_v3::RequestExpiryApiV3 for RequestExpiryApiV3Adapter {
     fn is_request_expired(request_id: prmx_primitives::PolicyId, current_time: u64) -> bool {
         pallet_market_v3::Pallet::<Runtime>::is_request_expired_internal(request_id, current_time)
     }
+    
+    fn expire_request(request_id: prmx_primitives::PolicyId) -> frame_support::dispatch::DispatchResult {
+        pallet_market_v3::Pallet::<Runtime>::do_expire_request(request_id)
+    }
 }
 
 /// V3 Oracle Pallet Configuration

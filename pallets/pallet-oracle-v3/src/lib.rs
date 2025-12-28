@@ -78,6 +78,10 @@ pub trait RequestExpiryApiV3 {
     
     /// Check if a specific request is expired
     fn is_request_expired(request_id: PolicyId, current_time: u64) -> bool;
+    
+    /// Execute request expiry - returns unfilled premium to requester
+    /// Called by oracle-v3's unsigned transaction handler
+    fn expire_request(request_id: PolicyId) -> DispatchResult;
 }
 
 /// No-op implementation for testing
@@ -88,6 +92,10 @@ impl RequestExpiryApiV3 for () {
     
     fn is_request_expired(_request_id: PolicyId, _current_time: u64) -> bool {
         false
+    }
+    
+    fn expire_request(_request_id: PolicyId) -> DispatchResult {
+        Ok(())
     }
 }
 
@@ -192,6 +200,26 @@ pub mod pallet {
                         .priority(200) // Higher priority for final reports
                         .and_provides((policy_id, "final"))
                         .longevity(5)
+                        .propagate(true)
+                        .build()
+                }
+                Call::expire_request_unsigned {
+                    request_id,
+                } => {
+                    // Validate request is expired via trait
+                    // Note: We use a fixed timestamp check here since we can't
+                    // reliably get current time in validate_unsigned
+                    // The actual expiry check happens in the extrinsic
+                    let now = sp_io::offchain::timestamp().unix_millis() / 1000;
+                    
+                    if !T::RequestExpiryApi::is_request_expired(*request_id, now) {
+                        return Err(InvalidTransaction::Custom(4).into());
+                    }
+
+                    ValidTransaction::with_tag_prefix("OracleV3RequestExpiry")
+                        .priority(50) // Lower priority than final reports
+                        .and_provides((request_id, "expiry"))
+                        .longevity(10)
                         .propagate(true)
                         .build()
                 }
@@ -311,6 +339,10 @@ pub mod pallet {
             policy_id: PolicyId,
             event_spec: EventSpecV3,
             commitment: H256,
+        },
+        /// Request expired by OCW
+        RequestExpiredByOcw {
+            request_id: PolicyId,
         },
     }
 
@@ -634,6 +666,25 @@ pub mod pallet {
             ensure_none(origin)?;
 
             Self::do_submit_final_report(policy_id, kind, observed_until, agg_state, commitment)
+        }
+
+        /// Expire an underwrite request via unsigned transaction from OCW.
+        /// This allows the OCW to trigger request expiry without a signed origin.
+        /// The actual expiry logic is delegated to the market-v3 pallet via trait.
+        #[pallet::call_index(8)]
+        #[pallet::weight(Weight::from_parts(50_000, 0))]
+        pub fn expire_request_unsigned(
+            origin: OriginFor<T>,
+            request_id: PolicyId,
+        ) -> DispatchResult {
+            ensure_none(origin)?;
+
+            // Delegate to market-v3 via trait
+            T::RequestExpiryApi::expire_request(request_id)?;
+
+            Self::deposit_event(Event::RequestExpiredByOcw { request_id });
+
+            Ok(())
         }
     }
 
@@ -1253,23 +1304,24 @@ pub mod pallet {
         
         /// Submit a request expiry to the chain via unsigned transaction
         /// Note: This calls into the market-v3 pallet
+        /// Submit a request expiry to the chain via unsigned transaction
         fn submit_request_expiry_on_chain(request_id: PolicyId) -> Result<(), &'static str> {
-            // We need to submit to market-v3's expire_request_unsigned
-            // This is done via the runtime's extrinsic routing
-            // For now, we'll log that this would be submitted
-            // The actual implementation requires cross-pallet unsigned tx submission
+            use frame_system::offchain::SubmitTransaction;
             
             log::info!(
                 target: "prmx-oracle-v3",
-                "📤 Request {} expiry ready for submission (cross-pallet)",
+                "📤 Submitting request {} expiry via unsigned transaction",
                 request_id
             );
             
-            // In a full implementation, this would submit an unsigned extrinsic
-            // to pallet_market_v3::Call::expire_request_unsigned
-            // For now, we mark as successful - the actual expiry happens when
-            // the market-v3 pallet's unsigned tx is submitted
-            Ok(())
+            // Create the call to our own pallet's expire_request_unsigned
+            // which will then delegate to market-v3 via trait
+            let call = Call::<T>::expire_request_unsigned { request_id };
+            
+            // Create a bare (unsigned) extrinsic and submit it
+            let xt = T::create_bare(call.into());
+            SubmitTransaction::<T, Call<T>>::submit_transaction(xt)
+                .map_err(|_| "Failed to submit unsigned expiry transaction")
         }
         
         /// Get the location ID for a policy

@@ -9,6 +9,7 @@
 //! - OracleStates: Per-policy aggregation state and commitment tracking
 //! - Snapshots: Periodic recovery checkpoints
 //! - Final Reports: Trigger or maturity settlement reports
+//! - Offchain Worker: Polls policies, fetches AccuWeather data, sends to Ingest API
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
@@ -21,15 +22,17 @@ pub mod expiry;
 pub mod fetcher;
 pub mod aggregator;
 pub mod commitment;
+pub mod http_client;
 
 use alloc::vec::Vec;
 use frame_support::pallet_prelude::*;
 use frame_system::pallet_prelude::*;
 use prmx_primitives::{
     AggStateV3, EventSpecV3, EventTypeV3, OracleReportKindV3, PolicyId, PolicyOracleStateV3,
-    PolicyStatusV3, ThresholdV3, V3_MIN_SNAPSHOT_BLOCKS,
+    PolicyStatusV3, V3_MIN_SNAPSHOT_BLOCKS,
 };
 use sp_core::H256;
+use sp_runtime::traits::UniqueSaturatedInto;
 
 // ============================================================================
 // Type Aliases
@@ -186,6 +189,12 @@ pub mod pallet {
     #[pallet::getter(fn snapshot_rate_limit)]
     pub type SnapshotRateLimit<T: Config> =
         StorageMap<_, Blake2_128Concat, PolicyId, BlockNumberFor<T>, ValueQuery>;
+
+    /// Policy metadata for OCW lookup (policy_id -> (location_id, event_spec, coverage_start, coverage_end))
+    #[pallet::storage]
+    #[pallet::getter(fn policy_metadata)]
+    pub type PolicyMetadata<T: Config> =
+        StorageMap<_, Blake2_128Concat, PolicyId, (LocationId, EventSpecV3, u64, u64), OptionQuery>;
 
     // =========================================================================
     //                                  Events
@@ -567,6 +576,12 @@ pub mod pallet {
             };
 
             OracleStates::<T>::insert(policy_id, oracle_state);
+            
+            // Store policy metadata for OCW lookup
+            PolicyMetadata::<T>::insert(
+                policy_id,
+                (location_id, event_spec.clone(), coverage_start, coverage_end)
+            );
 
             Self::deposit_event(Event::OracleStateInitialized {
                 policy_id,
@@ -652,6 +667,254 @@ pub mod pallet {
                 state.status = PolicyStatusV3::Settled;
                 Ok(())
             })
+        }
+        
+        /// Get all active policies for OCW processing
+        pub fn get_active_policies() -> Vec<(PolicyId, PolicyOracleStateV3)> {
+            OracleStates::<T>::iter()
+                .filter(|(_, state)| state.status == PolicyStatusV3::Active)
+                .collect()
+        }
+    }
+    
+    // =========================================================================
+    //                           Offchain Worker Hooks
+    // =========================================================================
+    
+    #[pallet::hooks]
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+        /// Offchain worker runs after each block is imported
+        fn offchain_worker(block_number: BlockNumberFor<T>) {
+            let block_num: u32 = block_number.unique_saturated_into();
+            
+            // Run OCW logic every 10 blocks (~1 minute at 6s block time)
+            // During startup (first 5 blocks), run every block
+            let is_startup = block_num < 5;
+            let should_run = is_startup || block_num % 10 == 0;
+            
+            if !should_run {
+                return;
+            }
+            
+            log::info!(
+                target: "prmx-oracle-v3",
+                "🔄 OCW V3 running at block {} (startup: {})",
+                block_num,
+                is_startup
+            );
+            
+            // Check if secrets are provisioned
+            if ocw::get_accuweather_api_key().is_none() {
+                log::warn!(
+                    target: "prmx-oracle-v3",
+                    "⚠️ AccuWeather API key not provisioned - skipping OCW"
+                );
+                return;
+            }
+            
+            if ocw::get_hmac_secret().is_none() {
+                log::warn!(
+                    target: "prmx-oracle-v3",
+                    "⚠️ HMAC secret not provisioned - skipping OCW"
+                );
+                return;
+            }
+            
+            // Get current timestamp
+            let now = sp_io::offchain::timestamp().unix_millis() / 1000;
+            
+            // Process all active policies
+            let active_policies = Self::get_active_policies();
+            
+            if active_policies.is_empty() {
+                log::debug!(
+                    target: "prmx-oracle-v3",
+                    "No active V3 policies to process"
+                );
+                return;
+            }
+            
+            log::info!(
+                target: "prmx-oracle-v3",
+                "📊 Processing {} active V3 policies",
+                active_policies.len()
+            );
+            
+            for (policy_id, on_chain_state) in active_policies {
+                if let Err(e) = Self::process_policy_ocw(policy_id, &on_chain_state, now) {
+                    log::warn!(
+                        target: "prmx-oracle-v3",
+                        "❌ Failed to process policy {}: {:?}",
+                        policy_id,
+                        e
+                    );
+                }
+            }
+        }
+    }
+    
+    // =========================================================================
+    //                           OCW Processing Logic
+    // =========================================================================
+    
+    impl<T: Config> Pallet<T> {
+        /// Process a single policy in the offchain worker
+        fn process_policy_ocw(
+            policy_id: PolicyId,
+            on_chain_state: &PolicyOracleStateV3,
+            now_epoch: u64,
+        ) -> Result<(), &'static str> {
+            // Load or initialize local OCW state
+            let mut local_state = ocw::OcwPolicyState::load(policy_id)
+                .unwrap_or_else(|| ocw::OcwPolicyState::from_on_chain_state(on_chain_state));
+            
+            // Skip if in backoff
+            if local_state.is_in_backoff(now_epoch) {
+                log::debug!(
+                    target: "prmx-oracle-v3",
+                    "Policy {} in backoff until {}",
+                    policy_id,
+                    local_state.backoff.retry_after
+                );
+                return Ok(());
+            }
+            
+            // Skip if already finalized locally
+            if local_state.finalized {
+                return Ok(());
+            }
+            
+            // Get location info for this policy
+            // Note: We need to get the location_id from somewhere - for now use a lookup
+            // In production, this would be stored in the policy or oracle state
+            let location_id = Self::get_policy_location_id(policy_id)?;
+            let location = LocationRegistry::<T>::get(location_id)
+                .ok_or("Location not found")?;
+            
+            // Fetch new observations from AccuWeather
+            let api_key = ocw::get_accuweather_api_key().ok_or("No API key")?;
+            let location_key = &location.accuweather_key;
+            
+            log::info!(
+                target: "prmx-oracle-v3",
+                "🌐 Fetching weather for policy {} from AccuWeather",
+                policy_id
+            );
+            
+            // Fetch and process observations
+            match http_client::fetch_accuweather_historical(location_key.as_slice(), &api_key) {
+                Ok(observations) => {
+                    if observations.is_empty() {
+                        log::debug!(
+                            target: "prmx-oracle-v3",
+                            "No new observations for policy {}",
+                            policy_id
+                        );
+                        local_state.save(policy_id);
+                        return Ok(());
+                    }
+                    
+                    // Filter observations to those we haven't seen
+                    let new_obs: Vec<_> = observations
+                        .into_iter()
+                        .filter(|obs| obs.epoch_time > local_state.last_seen_epoch)
+                        .collect();
+                    
+                    if new_obs.is_empty() {
+                        log::debug!(
+                            target: "prmx-oracle-v3",
+                            "All observations already processed for policy {}",
+                            policy_id
+                        );
+                        local_state.save(policy_id);
+                        return Ok(());
+                    }
+                    
+                    log::info!(
+                        target: "prmx-oracle-v3",
+                        "📊 Processing {} new observations for policy {}",
+                        new_obs.len(),
+                        policy_id
+                    );
+                    
+                    // Get event type from on-chain state
+                    let event_type = Self::get_policy_event_type(policy_id)?;
+                    
+                    // Update commitment chain and aggregation
+                    let (new_commitment, sample_hashes) = 
+                        commitment::process_commitment_batch(local_state.commitment, &new_obs);
+                    
+                    // Aggregate observations
+                    let (new_agg_state, last_epoch) = aggregator::process_observation_batch(
+                        event_type,
+                        local_state.agg_state.clone(),
+                        new_obs.clone(),
+                    );
+                    
+                    // Update local state
+                    local_state.agg_state = new_agg_state;
+                    local_state.commitment = new_commitment;
+                    local_state.last_seen_epoch = last_epoch;
+                    
+                    // Send observations to Ingest API
+                    if let Some(ingest_url) = ocw::get_ingest_api_url() {
+                        if let Some(hmac_secret) = ocw::get_hmac_secret() {
+                            if let Err(e) = http_client::send_observations_batch(
+                                &ingest_url,
+                                &hmac_secret,
+                                policy_id,
+                                location_key.as_slice(),
+                                &new_obs,
+                                &sample_hashes,
+                                new_commitment,
+                            ) {
+                                log::warn!(
+                                    target: "prmx-oracle-v3",
+                                    "Failed to send observations to Ingest API: {}",
+                                    e
+                                );
+                                local_state.record_error(ocw::OcwError::IngestApi, now_epoch);
+                            } else {
+                                local_state.last_observation_sent_epoch = last_epoch;
+                                local_state.clear_error();
+                            }
+                        }
+                    }
+                    
+                    local_state.save(policy_id);
+                }
+                Err(e) => {
+                    log::warn!(
+                        target: "prmx-oracle-v3",
+                        "Failed to fetch AccuWeather data for policy {}: {}",
+                        policy_id,
+                        e
+                    );
+                    local_state.record_error(ocw::OcwError::AccuWeatherFetch, now_epoch);
+                    local_state.save(policy_id);
+                }
+            }
+            
+            Ok(())
+        }
+        
+        /// Get the location ID for a policy
+        fn get_policy_location_id(policy_id: PolicyId) -> Result<LocationId, &'static str> {
+            PolicyMetadata::<T>::get(policy_id)
+                .map(|(location_id, _, _, _)| location_id)
+                .ok_or("Policy metadata not found")
+        }
+        
+        /// Get the event type for a policy
+        fn get_policy_event_type(policy_id: PolicyId) -> Result<EventTypeV3, &'static str> {
+            PolicyMetadata::<T>::get(policy_id)
+                .map(|(_, event_spec, _, _)| event_spec.event_type)
+                .ok_or("Policy metadata not found")
+        }
+        
+        /// Get full policy metadata (location_id, event_spec, coverage_start, coverage_end)
+        pub fn get_policy_metadata(policy_id: PolicyId) -> Option<(LocationId, EventSpecV3, u64, u64)> {
+            PolicyMetadata::<T>::get(policy_id)
         }
     }
 }

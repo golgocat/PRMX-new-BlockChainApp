@@ -3,7 +3,6 @@
 //! Handles fetching precipitation and weather data from AccuWeather API.
 //! Uses the historical/24 endpoint for hourly observations.
 
-use alloc::string::String;
 use alloc::vec::Vec;
 use codec::{Decode, Encode};
 use prmx_primitives::{AggStateV3, EventTypeV3};

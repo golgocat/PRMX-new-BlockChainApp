@@ -18,7 +18,6 @@ use prmx_primitives::{
     AggStateV3, EventSpecV3, PolicyId, PolicyOracleStateV3, PolicyStatusV3,
     V3_SNAPSHOT_INTERVAL_FINAL_SECS, V3_SNAPSHOT_INTERVAL_SECS,
 };
-use sp_core::H256;
 
 // ============================================================================
 // OCW Local State Storage Keys

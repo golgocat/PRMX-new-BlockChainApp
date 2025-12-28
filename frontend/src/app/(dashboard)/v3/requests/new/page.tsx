@@ -10,7 +10,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Info,
-  Clock
+  Clock,
+  Search,
+  ChevronRight,
+  Sparkles
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -55,6 +58,7 @@ export default function NewV3RequestPage() {
   // Early trigger is always enabled for V3 - payout immediately when threshold is met
   const earlyTrigger = true;
   const [locationId, setLocationId] = useState<number | null>(null);
+  const [locationSearch, setLocationSearch] = useState<string>('');
   const [coverageStart, setCoverageStart] = useState<string>('');
   const [coverageEnd, setCoverageEnd] = useState<string>('');
   const [expiresAt, setExpiresAt] = useState<string>('');
@@ -62,6 +66,56 @@ export default function NewV3RequestPage() {
   const [premiumPerShare, setPremiumPerShare] = useState<number>(5); // $5 default
   
   const eventInfo = useMemo(() => getEventTypeInfo(eventType), [eventType]);
+  
+  // Filter locations by search
+  const filteredLocations = useMemo(() => {
+    if (!locationSearch.trim()) return locations;
+    const searchLower = locationSearch.toLowerCase();
+    return locations.filter(loc => 
+      loc.name.toLowerCase().includes(searchLower)
+    );
+  }, [locations, locationSearch]);
+  
+  // Helper to format datetime-local value
+  const formatDatetimeLocal = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+  
+  // Quick date suggestions
+  const getQuickDateOptions = () => {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+    
+    const nextWeek = new Date(now);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    nextWeek.setHours(9, 0, 0, 0);
+    
+    const nextMonth = new Date(now);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    nextMonth.setHours(9, 0, 0, 0);
+    
+    return {
+      tomorrow: formatDatetimeLocal(tomorrow),
+      nextWeek: formatDatetimeLocal(nextWeek),
+      nextMonth: formatDatetimeLocal(nextMonth),
+    };
+  };
+  
+  // Get suggested end date (7 days after start)
+  const getSuggestedEndDate = (startDate: string): string => {
+    if (!startDate) return '';
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    return formatDatetimeLocal(end);
+  };
   
   // Calculate totals
   const totalPremium = useMemo(() => {
@@ -326,58 +380,216 @@ export default function NewV3RequestPage() {
           
           {/* Step 2: Coverage Details */}
           {step === 'coverage' && (
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div>
                 <h3 className="text-xl font-semibold mb-2">Coverage Details</h3>
-                <p className="text-text-secondary">Select location and coverage period</p>
+                <p className="text-text-secondary">Select location and coverage period for your weather protection</p>
               </div>
               
-              <div>
-                <label className="block text-sm font-medium mb-2">
+              {/* Location Picker */}
+              <div className="space-y-3">
+                <label className="block text-sm font-medium">
                   <MapPin className="w-4 h-4 inline mr-1" /> Location
                 </label>
+                
                 {locationsLoading ? (
                   <div className="h-12 bg-background-tertiary/50 rounded-xl animate-pulse" />
+                ) : locations.length === 0 ? (
+                  <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
+                    <p className="text-sm text-warning flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" /> No locations available. Please check your connection.
+                    </p>
+                  </div>
                 ) : (
-                  <select
-                    value={locationId ?? ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setLocationId(val ? parseInt(val, 10) : null);
-                    }}
-                    className="select-field w-full"
-                  >
-                    <option value="">Select a location...</option>
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-3">
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" />
+                      <Input
+                        type="text"
+                        placeholder="Search locations..."
+                        value={locationSearch}
+                        onChange={(e) => setLocationSearch(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    
+                    {/* Location Cards Grid */}
+                    {filteredLocations.length === 0 ? (
+                      <div className="p-4 rounded-lg bg-background-tertiary/50 text-center">
+                        <p className="text-sm text-text-secondary">No locations found matching "{locationSearch}"</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 max-h-64 overflow-y-auto p-1">
+                        {filteredLocations.map((loc) => (
+                          <button
+                            key={loc.id}
+                            onClick={() => {
+                              setLocationId(loc.id);
+                              setLocationSearch('');
+                            }}
+                            className={cn(
+                              "p-4 rounded-xl border-2 transition-all text-left relative group",
+                              locationId === loc.id
+                                ? "border-prmx-cyan bg-prmx-cyan/10 shadow-lg shadow-prmx-cyan/20"
+                                : "border-border-primary hover:border-prmx-cyan/50 hover:bg-background-tertiary/50"
+                            )}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex items-center gap-3 flex-1">
+                                <div className={cn(
+                                  "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                                  locationId === loc.id
+                                    ? "bg-prmx-gradient"
+                                    : "bg-background-secondary group-hover:bg-prmx-cyan/20"
+                                )}>
+                                  <MapPin className={cn(
+                                    "w-5 h-5",
+                                    locationId === loc.id ? "text-white" : "text-text-secondary group-hover:text-prmx-cyan"
+                                  )} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className={cn(
+                                    "font-medium truncate",
+                                    locationId === loc.id ? "text-prmx-cyan" : "text-text-primary"
+                                  )}>
+                                    {loc.name}
+                                  </p>
+                                  <p className="text-xs text-text-tertiary mt-0.5">
+                                    {(loc.latitude / 1e6).toFixed(2)}°, {(loc.longitude / 1e6).toFixed(2)}°
+                                  </p>
+                                </div>
+                              </div>
+                              {locationId === loc.id && (
+                                <CheckCircle2 className="w-5 h-5 text-prmx-cyan shrink-0" />
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                {selectedLocation && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30">
+                    <CheckCircle2 className="w-4 h-4 text-prmx-cyan" />
+                    <span className="text-sm text-text-primary">
+                      Selected: <strong className="text-prmx-cyan">{selectedLocation.name}</strong>
+                    </span>
+                  </div>
                 )}
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              {/* Date Pickers */}
+              <div className="space-y-6">
                 <div>
-                  <label className="block text-sm font-medium mb-2">
-                    <Calendar className="w-4 h-4 inline mr-1" /> Coverage Start
-                  </label>
-                  <Input
-                    type="datetime-local"
-                    value={coverageStart}
-                    onChange={(e) => setCoverageStart(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">
-                    <Calendar className="w-4 h-4 inline mr-1" /> Coverage End
-                  </label>
-                  <Input
-                    type="datetime-local"
-                    value={coverageEnd}
-                    onChange={(e) => setCoverageEnd(e.target.value)}
-                    min={coverageStart}
-                  />
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="block text-sm font-medium">
+                      <Calendar className="w-4 h-4 inline mr-1" /> Coverage Period
+                    </label>
+                    {!coverageStart && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-text-tertiary">Quick select:</span>
+                        <div className="flex gap-1.5">
+                          {(() => {
+                            const options = getQuickDateOptions();
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCoverageStart(options.tomorrow);
+                                    setCoverageEnd(getSuggestedEndDate(options.tomorrow));
+                                  }}
+                                  className="px-2.5 py-1 text-xs rounded-lg bg-background-tertiary/50 hover:bg-background-tertiary border border-border-primary hover:border-prmx-cyan/50 transition-colors text-text-secondary hover:text-prmx-cyan"
+                                >
+                                  Tomorrow
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setCoverageStart(options.nextWeek);
+                                    setCoverageEnd(getSuggestedEndDate(options.nextWeek));
+                                  }}
+                                  className="px-2.5 py-1 text-xs rounded-lg bg-background-tertiary/50 hover:bg-background-tertiary border border-border-primary hover:border-prmx-cyan/50 transition-colors text-text-secondary hover:text-prmx-cyan"
+                                >
+                                  Next Week
+                                </button>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-text-secondary">
+                        Start Date & Time
+                      </label>
+                      <Input
+                        type="datetime-local"
+                        value={coverageStart}
+                        onChange={(e) => {
+                          setCoverageStart(e.target.value);
+                          // Auto-suggest end date (7 days later) if end is not set or is before new start
+                          if (e.target.value) {
+                            const suggested = getSuggestedEndDate(e.target.value);
+                            if (!coverageEnd || new Date(coverageEnd) <= new Date(e.target.value)) {
+                              setCoverageEnd(suggested);
+                            }
+                          }
+                        }}
+                        min={formatDatetimeLocal(new Date(Date.now() + 86400000))} // Tomorrow
+                        className="w-full"
+                      />
+                      {coverageStart && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const start = new Date(coverageStart);
+                            const end = new Date(start);
+                            end.setDate(end.getDate() + 7);
+                            setCoverageEnd(formatDatetimeLocal(end));
+                          }}
+                          className="flex items-center gap-1 text-xs text-prmx-cyan hover:text-prmx-cyan/80 transition-colors"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          Set end to +7 days
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="block text-xs font-medium text-text-secondary">
+                        End Date & Time
+                      </label>
+                      <Input
+                        type="datetime-local"
+                        value={coverageEnd}
+                        onChange={(e) => setCoverageEnd(e.target.value)}
+                        min={coverageStart || formatDatetimeLocal(new Date(Date.now() + 86400000))}
+                        className="w-full"
+                      />
+                      {coverageStart && coverageEnd && (
+                        <p className="text-xs text-text-tertiary">
+                          Duration: {Math.round((new Date(coverageEnd).getTime() - new Date(coverageStart).getTime()) / (1000 * 60 * 60 * 24))} days
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 rounded-lg bg-background-tertiary/50 border border-border-primary">
+                    <div className="flex items-start gap-2">
+                      <Info className="w-4 h-4 text-prmx-cyan mt-0.5 shrink-0" />
+                      <div className="text-xs text-text-secondary space-y-1">
+                        <p>• Coverage must start at least 24 hours from now</p>
+                        <p>• Maximum coverage period is 30 days</p>
+                        <p>• Coverage period cannot be in the past</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               

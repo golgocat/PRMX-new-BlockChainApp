@@ -271,8 +271,12 @@ export default function V3RequestsPage() {
                   const remainingShares = getRemainingShares(request);
                   const isOwner = request.requester === selectedAccount?.address;
                   const canAccept = isRequestAcceptable(request) && !isOwner && remainingShares > 0;
-                  const collateralPerShare = calculateCollateral(1);
-                  const totalCollateralNeeded = calculateCollateral(remainingShares);
+                  
+                  // For filled requests, show total collateral locked
+                  // For open requests, show collateral needed for remaining shares
+                  const collateralToShow = request.status === 'FullyFilled' 
+                    ? calculateCollateral(request.totalShares)
+                    : calculateCollateral(remainingShares);
                   
                   return (
                     <TableRow key={request.id} className={cn(isRefreshing && 'opacity-50')}>
@@ -324,7 +328,10 @@ export default function V3RequestsPage() {
                         <span className="text-success font-medium">{formatUSDT(request.premiumPerShare, false)}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium">{formatUSDT(totalCollateralNeeded, false)}</span>
+                        <span className="font-medium">{formatUSDT(collateralToShow, false)}</span>
+                        {request.status === 'FullyFilled' && (
+                          <span className="text-xs text-text-tertiary block">locked</span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">

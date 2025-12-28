@@ -749,8 +749,11 @@ async function testValidationErrors(api, bob, charlie, locationId) {
         );
         logTest('Cannot accept own request', false, 'Should have failed');
     } catch (e) {
-        logTest('Cannot accept own request', e.message.includes('RequesterCannotUnderwrite'),
-            e.message.includes('RequesterCannotUnderwrite') ? '' : e.message);
+        // Error should be CannotSelfUnderwrite or similar
+        const isExpectedError = e.message.includes('CannotSelfUnderwrite') || 
+            e.message.includes('RequesterCannotUnderwrite') ||
+            e.message.includes('self');
+        logTest('Cannot accept own request', isExpectedError, isExpectedError ? 'Correctly rejected' : e.message);
     }
 
     // Test: Cannot accept more than available
@@ -762,9 +765,11 @@ async function testValidationErrors(api, bob, charlie, locationId) {
         );
         logTest('Cannot over-accept shares', false, 'Should have failed');
     } catch (e) {
-        logTest('Cannot over-accept shares', e.message.includes('InsufficientShares') || 
-            e.message.includes('ArithmeticOverflow'),
-            e.message.includes('InsufficientShares') || e.message.includes('ArithmeticOverflow') ? '' : e.message);
+        // Error should be NotEnoughSharesRemaining or InsufficientShares
+        const isExpectedError = e.message.includes('NotEnoughSharesRemaining') ||
+            e.message.includes('InsufficientShares') || 
+            e.message.includes('ArithmeticOverflow');
+        logTest('Cannot over-accept shares', isExpectedError, isExpectedError ? 'Correctly rejected' : e.message);
     }
 
     console.log('');

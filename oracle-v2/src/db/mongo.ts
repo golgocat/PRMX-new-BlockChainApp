@@ -194,6 +194,9 @@ async function ensureIndexes(): Promise<void> {
   await monitors.createIndex({ state: 1 });
   await monitors.createIndex({ market_id: 1 });
   await buckets.createIndex({ monitor_id: 1 });
+  
+  // Also create V3 indexes
+  await ensureV3Indexes();
 }
 
 /**
@@ -225,6 +228,79 @@ export function getEvidence(): Collection<Evidence> {
  */
 export function makeMonitorId(marketId: number, policyId: number): string {
   return `${marketId}:${policyId}`;
+}
+
+// ============================================================================
+// V3 Collections
+// ============================================================================
+
+/**
+ * V3 Observation document structure
+ */
+export interface ObservationV3 {
+  _id: string;             // policy_id:epoch_time
+  policy_id: number;
+  epoch_time: number;
+  location_key: string;
+  event_type: string;
+  fields: Record<string, number>;
+  sample_hash: string;
+  commitment_after: string;
+  inserted_at: Date;       // TTL index: 30 days
+}
+
+/**
+ * V3 Snapshot document structure
+ */
+export interface SnapshotV3 {
+  _id: string;             // policy_id:observed_until
+  policy_id: number;
+  observed_until: number;
+  agg_state: object;
+  commitment: string;
+  inserted_at: Date;       // TTL index: 90 days
+}
+
+/**
+ * Get V3 observations collection
+ */
+export function getObservationsV3(): Collection<ObservationV3> {
+  if (!db) throw new Error('Database not connected');
+  return db.collection<ObservationV3>('observations_v3');
+}
+
+/**
+ * Get V3 snapshots collection
+ */
+export function getSnapshotsV3(): Collection<SnapshotV3> {
+  if (!db) throw new Error('Database not connected');
+  return db.collection<SnapshotV3>('snapshots_v3');
+}
+
+/**
+ * Ensure V3 indexes with TTL
+ */
+export async function ensureV3Indexes(): Promise<void> {
+  if (!db) throw new Error('Database not connected');
+  
+  const observations = db.collection<ObservationV3>('observations_v3');
+  const snapshots = db.collection<SnapshotV3>('snapshots_v3');
+  
+  // Observations: unique compound index + TTL (30 days)
+  await observations.createIndex({ policy_id: 1, epoch_time: 1 });
+  await observations.createIndex(
+    { inserted_at: 1 },
+    { expireAfterSeconds: 30 * 24 * 3600 } // 30 days
+  );
+  
+  // Snapshots: unique compound index + TTL (90 days)
+  await snapshots.createIndex({ policy_id: 1, observed_until: 1 });
+  await snapshots.createIndex(
+    { inserted_at: 1 },
+    { expireAfterSeconds: 90 * 24 * 3600 } // 90 days
+  );
+  
+  console.log('✅ V3 indexes created with TTL');
 }
 
 /**

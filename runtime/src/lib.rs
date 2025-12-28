@@ -40,6 +40,9 @@ use frame_support::{
     weights::{constants::WEIGHT_REF_TIME_PER_SECOND, Weight},
 };
 use frame_system::EnsureRoot;
+use prmx_primitives::{EventSpecV3, PolicyId};
+use pallet_prmx_holdings::HoldingsApi;
+use pallet_prmx_xcm_capital::CapitalApi;
 
 // Re-export pallets for easy access
 pub use frame_system::Call as SystemCall;
@@ -539,6 +542,200 @@ impl pallet_prmx_xcm_capital::Config for Runtime {
     type PolicyPoolAccount = PrmxPolicy;
 }
 
+// =============================================================================
+//                          PRMX V3 Pallets (P2P Climate Risk Market)
+// =============================================================================
+
+parameter_types! {
+    /// Maximum length of AccuWeather location key for V3
+    pub const MaxLocationKeyLengthV3: u32 = 64;
+    /// Maximum LP holders per V3 policy
+    pub const MaxLpHoldersPerPolicyV3: u32 = 200;
+}
+
+/// V3 Oracle Pallet Configuration
+impl pallet_oracle_v3::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    /// Governance origin for adding/removing locations and oracle members
+    type GovernanceOrigin = EnsureRoot<AccountId>;
+    /// Oracle origin for submitting snapshots and reports
+    type OracleOrigin = EnsureRoot<AccountId>;
+    /// Settlement handler in policy pallet
+    type PolicySettlement = PrmxPolicyV3;
+    type MaxLocationKeyLength = MaxLocationKeyLengthV3;
+    type WeightInfo = ();
+}
+
+/// V3 Holdings API implementation using existing holdings pallet
+pub struct HoldingsApiV3Adapter;
+
+impl pallet_policy_v3::HoldingsApiV3<AccountId> for HoldingsApiV3Adapter {
+    type Balance = Balance;
+
+    fn mint_lp_tokens(
+        policy_id: prmx_primitives::PolicyId,
+        to: &AccountId,
+        amount: u128,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_holdings::Pallet::<Runtime>::mint_lp_tokens(policy_id, to, amount)
+    }
+
+    fn register_lp_holder(
+        policy_id: prmx_primitives::PolicyId,
+        holder: &AccountId,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_holdings::Pallet::<Runtime>::register_lp_holder(policy_id, holder)
+    }
+
+    fn total_lp_supply(policy_id: prmx_primitives::PolicyId) -> u128 {
+        pallet_prmx_holdings::Pallet::<Runtime>::total_lp_shares(policy_id)
+    }
+
+    fn lp_balance(policy_id: prmx_primitives::PolicyId, account: &AccountId) -> u128 {
+        pallet_prmx_holdings::Pallet::<Runtime>::lp_balance(policy_id, account)
+    }
+
+    fn distribute_to_lp_holders(
+        policy_id: prmx_primitives::PolicyId,
+        from_account: &AccountId,
+        amount: Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_holdings::Pallet::<Runtime>::distribute_to_lp_holders(policy_id, from_account, amount)
+    }
+
+    fn cleanup_policy_lp_tokens(
+        policy_id: prmx_primitives::PolicyId,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_holdings::Pallet::<Runtime>::cleanup_policy_lp_tokens(policy_id)
+    }
+}
+
+/// V3 Capital API implementation using existing XCM capital pallet
+pub struct CapitalApiV3Adapter;
+
+impl pallet_policy_v3::CapitalApiV3<AccountId> for CapitalApiV3Adapter {
+    type Balance = Balance;
+
+    fn auto_allocate_policy_capital(
+        policy_id: prmx_primitives::PolicyId,
+        pool_balance: Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_xcm_capital::Pallet::<Runtime>::auto_allocate_policy_capital(policy_id, pool_balance)
+    }
+
+    fn ensure_local_liquidity(
+        policy_id: prmx_primitives::PolicyId,
+        required_local: Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_xcm_capital::Pallet::<Runtime>::ensure_local_liquidity(policy_id, required_local)
+    }
+
+    fn on_policy_settled(
+        policy_id: prmx_primitives::PolicyId,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_xcm_capital::Pallet::<Runtime>::on_policy_settled(policy_id)
+    }
+}
+
+/// V3 Policy Pallet Configuration
+impl pallet_policy_v3::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Balance = Balance;
+    type AssetId = AssetId;
+    type Assets = Assets;
+    type UsdtAssetId = ConstU32<USDT_ASSET_ID>;
+    type HoldingsApi = HoldingsApiV3Adapter;
+    type CapitalApi = CapitalApiV3Adapter;
+    type MaxLpHoldersPerPolicy = MaxLpHoldersPerPolicyV3;
+    type WeightInfo = ();
+}
+
+/// V3 Location Registry Adapter
+pub struct LocationRegistryV3Adapter;
+
+impl pallet_market_v3::LocationRegistryApiV3 for LocationRegistryV3Adapter {
+    fn is_location_active(location_id: pallet_market_v3::LocationId) -> bool {
+        pallet_oracle_v3::Pallet::<Runtime>::is_location_active(location_id)
+    }
+}
+
+/// V3 Policy API Adapter
+pub struct PolicyApiV3Adapter;
+
+impl pallet_market_v3::PolicyApiV3<AccountId, Balance> for PolicyApiV3Adapter {
+    fn create_policy(
+        policy_id: PolicyId,
+        holder: AccountId,
+        location_id: pallet_market_v3::LocationId,
+        event_spec: EventSpecV3,
+        initial_shares: u128,
+        premium_per_share: Balance,
+        coverage_start: u64,
+        coverage_end: u64,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_policy_v3::Pallet::<Runtime>::create_policy(
+            policy_id,
+            holder,
+            location_id,
+            event_spec,
+            initial_shares,
+            premium_per_share,
+            coverage_start,
+            coverage_end,
+        )
+    }
+
+    fn add_shares_to_policy(
+        policy_id: PolicyId,
+        underwriter: AccountId,
+        shares: u128,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_policy_v3::Pallet::<Runtime>::add_shares_to_policy(policy_id, underwriter, shares)
+    }
+
+    fn trigger_defi_allocation(policy_id: PolicyId) -> Result<(), sp_runtime::DispatchError> {
+        pallet_policy_v3::Pallet::<Runtime>::trigger_defi_allocation(policy_id)
+    }
+
+    fn policy_pool_account(policy_id: PolicyId) -> AccountId {
+        pallet_policy_v3::Pallet::<Runtime>::policy_pool_account(policy_id)
+    }
+}
+
+/// V3 Holdings API Adapter for Market Pallet
+pub struct HoldingsApiV3MarketAdapter;
+
+impl pallet_market_v3::HoldingsApiV3<AccountId> for HoldingsApiV3MarketAdapter {
+    fn mint_lp_tokens(
+        policy_id: PolicyId,
+        to: &AccountId,
+        amount: u128,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_holdings::Pallet::<Runtime>::mint_lp_tokens(policy_id, to, amount)
+    }
+
+    fn register_lp_holder(
+        policy_id: PolicyId,
+        holder: &AccountId,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        pallet_prmx_holdings::Pallet::<Runtime>::register_lp_holder(policy_id, holder)
+    }
+}
+
+/// V3 Market Pallet Configuration
+impl pallet_market_v3::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Balance = Balance;
+    type AssetId = AssetId;
+    type Assets = Assets;
+    type UsdtAssetId = ConstU32<USDT_ASSET_ID>;
+    type LocationRegistry = LocationRegistryV3Adapter;
+    type PolicyApi = PolicyApiV3Adapter;
+    type HoldingsApi = HoldingsApiV3MarketAdapter;
+    /// Only root/oracle can trigger request expiry
+    type ExpiryOrigin = EnsureRoot<AccountId>;
+    type WeightInfo = ();
+}
 
 // =============================================================================
 //                          Helper Types
@@ -568,7 +765,7 @@ construct_runtime!(
         // Governance
         Sudo: pallet_sudo,
         
-        // PRMX Pallets
+        // PRMX Pallets (v1/v2)
         PrmxMarkets: pallet_prmx_markets,
         PrmxHoldings: pallet_prmx_holdings,
         PrmxQuote: pallet_prmx_quote,
@@ -576,6 +773,11 @@ construct_runtime!(
         PrmxOrderbookLp: pallet_prmx_orderbook_lp,
         PrmxOracle: pallet_prmx_oracle,
         PrmxXcmCapital: pallet_prmx_xcm_capital,
+        
+        // PRMX Pallets (v3 - P2P Climate Risk Market)
+        PrmxOracleV3: pallet_oracle_v3,
+        PrmxPolicyV3: pallet_policy_v3,
+        PrmxMarketV3: pallet_market_v3,
     }
 );
 

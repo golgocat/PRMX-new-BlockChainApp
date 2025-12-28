@@ -1,0 +1,57 @@
+[package]
+name = "pallet-policy-v3"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "V3 Policy pallet for P2P climate risk market with settlement logic"
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+codec = { features = ["derive"], package = "parity-scale-codec", version = "3.6.1", default-features = false }
+scale-info = { version = "2.10.0", default-features = false, features = ["derive"] }
+log = { version = "0.4.21", default-features = false }
+
+# Substrate
+frame-support = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
+frame-system = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
+sp-runtime = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false }
+frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2", default-features = false, optional = true }
+
+# Local dependencies
+prmx-primitives = { path = "../../primitives", default-features = false }
+pallet-oracle-v3 = { path = "../pallet-oracle-v3", default-features = false }
+
+[dev-dependencies]
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
+sp-io = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
+
+[features]
+default = ["std"]
+std = [
+    "codec/std",
+    "scale-info/std",
+    "log/std",
+    "frame-support/std",
+    "frame-system/std",
+    "sp-runtime/std",
+    "sp-std/std",
+    "sp-core/std",
+    "frame-benchmarking?/std",
+    "prmx-primitives/std",
+    "pallet-oracle-v3/std",
+]
+runtime-benchmarks = [
+    "frame-benchmarking/runtime-benchmarks",
+    "frame-support/runtime-benchmarks",
+    "frame-system/runtime-benchmarks",
+]
+try-runtime = [
+    "frame-support/try-runtime",
+    "frame-system/try-runtime",
+]
+

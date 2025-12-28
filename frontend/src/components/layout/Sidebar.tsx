@@ -10,7 +10,9 @@ import {
   Cloud,
   Activity,
   Settings,
-  HelpCircle
+  HelpCircle,
+  ShoppingCart,
+  Umbrella
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
@@ -26,8 +28,10 @@ type NavItem = {
 
 const mainNavItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/markets', label: 'Markets', icon: Globe2, roles: ['dao', 'customer'] },
-  { href: '/policies', label: 'My Policies', labelByRole: { dao: 'All Policies' }, icon: Shield, roles: ['dao', 'customer'] },
+  { href: '/v3/requests', label: 'P2P Marketplace', icon: ShoppingCart },
+  { href: '/v3/policies', label: 'V3 Policies', icon: Umbrella },
+  { href: '/markets', label: 'Markets (V1/V2)', icon: Globe2, roles: ['dao', 'customer'] },
+  { href: '/policies', label: 'Policies (V1/V2)', labelByRole: { dao: 'All Policies (V1/V2)' }, icon: Shield, roles: ['dao', 'customer'] },
   { href: '/lp', label: 'LP Trading', icon: Wallet, roles: ['dao', 'lp'] },
   { href: '/oracle', label: 'Oracle (V1)', icon: Cloud },
   { href: '/oracle-service', label: 'Oracle Service', icon: Activity },
@@ -115,13 +119,13 @@ export function Sidebar() {
             <div className="glass-card p-4 bg-gradient-to-br from-sky-500/10 to-blue-500/10 dark:from-prmx-cyan/10 dark:to-prmx-purple/10">
               <h4 className="font-semibold text-sm mb-1">Need Coverage?</h4>
               <p className="text-xs text-text-secondary mb-3">
-                Protect your assets with parametric rainfall insurance
+                Explore the P2P climate risk marketplace
               </p>
               <Link
-                href="/policies/new"
+                href="/v3/requests"
                 className="btn-primary w-full text-center text-sm py-2"
               >
-                Get Quote
+                Browse Marketplace
               </Link>
             </div>
           )}

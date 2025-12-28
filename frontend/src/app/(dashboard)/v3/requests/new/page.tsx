@@ -9,7 +9,8 @@ import {
   DollarSign,
   AlertCircle,
   CheckCircle2,
-  Info
+  Info,
+  Clock
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -502,14 +503,25 @@ export default function NewV3RequestPage() {
                   </div>
                   
                   <h4 className="font-medium text-text-secondary uppercase text-sm tracking-wide">Coverage Period</h4>
-                  <div className="p-4 rounded-lg bg-background-tertiary/50 space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">Start</span>
-                      <span>{new Date(coverageStart).toLocaleString()}</span>
+                  <div className="flex items-center justify-center gap-3 p-4 rounded-lg bg-background-tertiary/50">
+                    <div className="text-center px-4 py-2 rounded-lg bg-background-secondary">
+                      <p className="text-xs text-text-tertiary mb-1">Start</p>
+                      <p className="font-medium">
+                        {new Date(coverageStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-text-tertiary">
+                        {new Date(coverageStart).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      </p>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">End</span>
-                      <span>{new Date(coverageEnd).toLocaleString()}</span>
+                    <span className="text-text-tertiary text-lg">→</span>
+                    <div className="text-center px-4 py-2 rounded-lg bg-background-secondary">
+                      <p className="text-xs text-text-tertiary mb-1">End</p>
+                      <p className="font-medium">
+                        {new Date(coverageEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </p>
+                      <p className="text-xs text-text-tertiary">
+                        {new Date(coverageEnd).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -523,26 +535,36 @@ export default function NewV3RequestPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-secondary">Premium/Share</span>
-                      <span className="font-medium">{formatUSDT(BigInt(Math.round(premiumPerShare * 10 ** USDT_DECIMALS)))}</span>
+                      <span className="font-medium">{formatUSDT(BigInt(Math.round(premiumPerShare * 10 ** USDT_DECIMALS)), false)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-secondary">Payout/Share</span>
-                      <span className="font-medium">{formatUSDT(PAYOUT_PER_SHARE)}</span>
+                      <span className="font-medium">{formatUSDT(PAYOUT_PER_SHARE, false)}</span>
                     </div>
                     <hr className="border-border-primary" />
                     <div className="flex justify-between text-lg">
                       <span className="font-medium">Total Premium</span>
-                      <span className="font-bold text-success">{formatUSDT(totalPremium)}</span>
+                      <span className="font-bold text-success">{formatUSDT(totalPremium, false)}</span>
                     </div>
                     <div className="flex justify-between text-lg">
                       <span className="font-medium">Max Payout</span>
-                      <span className="font-bold text-prmx-cyan">{formatUSDT(maxPayout)}</span>
+                      <span className="font-bold text-prmx-cyan">{formatUSDT(maxPayout, false)}</span>
                     </div>
                   </div>
                   
                   <h4 className="font-medium text-text-secondary uppercase text-sm tracking-wide">Request Expiry</h4>
-                  <div className="p-4 rounded-lg bg-background-tertiary/50">
-                    <span>{new Date(expiresAt).toLocaleString()}</span>
+                  <div className="p-4 rounded-lg bg-background-tertiary/50 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-warning" />
+                    </div>
+                    <div>
+                      <p className="font-medium">
+                        {new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </p>
+                      <p className="text-sm text-text-tertiary">
+                        {new Date(expiresAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -553,7 +575,7 @@ export default function NewV3RequestPage() {
                   <div className="text-sm">
                     <p className="font-medium text-warning">Confirm Transaction</p>
                     <p className="text-text-secondary mt-1">
-                      By clicking &quot;Create Request&quot;, you will deposit <strong>{formatUSDT(totalPremium)}</strong> USDT into escrow.
+                      By clicking &quot;Create Request&quot;, you will deposit <strong>{formatUSDT(totalPremium, false)}</strong> USDT into escrow.
                       This amount will be transferred to underwriters when they accept your request.
                     </p>
                   </div>

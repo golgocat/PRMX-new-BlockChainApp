@@ -28,7 +28,7 @@ type NavItem = {
 
 const mainNavItems: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/v3/requests', label: 'P2P Marketplace', icon: ShoppingCart },
+  { href: '/v3/requests', label: 'V3 Marketplace', icon: ShoppingCart },
   { href: '/v3/policies', label: 'V3 Policies', icon: Umbrella },
   { href: '/markets', label: 'Markets (V1/V2)', icon: Globe2, roles: ['dao', 'customer'] },
   { href: '/policies', label: 'Policies (V1/V2)', labelByRole: { dao: 'All Policies (V1/V2)' }, icon: Shield, roles: ['dao', 'customer'] },

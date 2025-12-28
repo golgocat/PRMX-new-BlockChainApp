@@ -190,8 +190,9 @@ export interface V3Policy {
   location?: V3Location;
   eventSpec: V3EventSpec;
   totalShares: number;
-  premiumPaid: bigint;
-  maxPayout: bigint;
+  premiumPerShare: bigint;  // Premium per share from chain
+  premiumPaid: bigint;      // Calculated: totalShares * premiumPerShare
+  maxPayout: bigint;        // Calculated: totalShares * $100
   coverageStart: number;
   coverageEnd: number;
   status: V3PolicyStatus;

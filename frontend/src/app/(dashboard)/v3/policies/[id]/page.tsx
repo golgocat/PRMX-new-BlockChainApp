@@ -15,7 +15,10 @@ import {
   XCircle,
   RefreshCw,
   CloudRain,
-  Percent
+  Percent,
+  FileText,
+  ChevronRight,
+  ShoppingCart
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -124,13 +127,17 @@ export default function V3PolicyDetailPage() {
   
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await Promise.all([refreshPolicy(), refreshOracle(), refreshHolders()]);
-    setIsRefreshing(false);
+    try {
+      await Promise.all([refreshPolicy(), refreshOracle(), refreshHolders()]);
+    } finally {
+      // Ensure animation is visible for at least 500ms
+      setTimeout(() => setIsRefreshing(false), 500);
+    }
   };
   
   if (!isConnected) {
     return (
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto pt-4">
         <div className="flex items-center gap-4">
           <Link href="/v3/policies">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -165,7 +172,7 @@ export default function V3PolicyDetailPage() {
   
   if (policyLoading) {
     return (
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto pt-4">
         <div className="flex items-center gap-4">
           <Link href="/v3/policies">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -197,7 +204,7 @@ export default function V3PolicyDetailPage() {
   
   if (error || !policy) {
     return (
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto pt-4">
         <div className="flex items-center gap-4">
           <Link href="/v3/policies">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -233,7 +240,7 @@ export default function V3PolicyDetailPage() {
   ));
   
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-6xl mx-auto pt-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -423,13 +430,31 @@ export default function V3PolicyDetailPage() {
                     <p className="font-medium text-lg">{policy.location?.name || `Location #${policy.locationId}`}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-text-secondary mb-1">
+                    <p className="text-sm text-text-secondary mb-2">
                       <Calendar className="w-4 h-4 inline mr-1" />
                       Coverage Period
                     </p>
-                    <p className="font-medium">
-                      {formatDateTimeUTCCompact(policy.coverageStart)} - {formatDateTimeUTCCompact(policy.coverageEnd)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
+                        <p className="text-xs text-text-tertiary">Start</p>
+                        <p className="font-medium text-sm">
+                          {new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                        </p>
+                        <p className="text-xs text-text-tertiary">
+                          {new Date(policy.coverageStart * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                        </p>
+                      </div>
+                      <span className="text-text-tertiary">→</span>
+                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
+                        <p className="text-xs text-text-tertiary">End</p>
+                        <p className="font-medium text-sm">
+                          {new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                        </p>
+                        <p className="text-xs text-text-tertiary">
+                          {new Date(policy.coverageEnd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -513,25 +538,25 @@ export default function V3PolicyDetailPage() {
             </CardHeader>
             <CardContent className="p-6 space-y-4">
               <div className="flex justify-between">
+                <span className="text-text-secondary">Premium per Share</span>
+                <span className="font-medium">{formatUSDT(policy.premiumPerShare, false)}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-text-secondary">Total Shares</span>
                 <span className="font-medium">{policy.totalShares}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-text-secondary">Premium Paid</span>
-                <span className="font-medium text-success">{formatUSDT(policy.premiumPaid)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Max Payout</span>
-                <span className="font-medium text-prmx-cyan">{formatUSDT(policy.maxPayout)}</span>
+                <span className="font-medium text-success">{formatUSDT(policy.premiumPaid, false)}</span>
               </div>
               <hr className="border-border-primary" />
               <div className="flex justify-between">
                 <span className="text-text-secondary">Payout per Share</span>
-                <span className="font-medium">{formatUSDT(policy.maxPayout / BigInt(policy.totalShares))}</span>
+                <span className="font-medium">$100</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-text-secondary">Premium per Share</span>
-                <span className="font-medium">{formatUSDT(policy.premiumPaid / BigInt(policy.totalShares))}</span>
+                <span className="text-text-secondary">Max Payout</span>
+                <span className="font-medium text-prmx-cyan">{formatUSDT(policy.maxPayout, false)}</span>
               </div>
             </CardContent>
           </Card>
@@ -601,18 +626,31 @@ export default function V3PolicyDetailPage() {
             </CardContent>
           </Card>
           
-          {/* Related Links */}
+          {/* Quick Actions */}
           <Card>
-            <CardContent className="p-6 space-y-3">
-              <Link href={`/v3/requests/${policy.id}`}>
-                <Button variant="secondary" className="w-full" size="sm">
-                  View Original Request
-                </Button>
+            <CardContent className="p-4 space-y-3">
+              <h3 className="text-xs font-medium text-text-tertiary uppercase tracking-wide px-1">Quick Actions</h3>
+              <Link href={`/v3/requests/${policy.id}`} className="block">
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer group">
+                  <div className="w-7 h-7 rounded-md bg-prmx-purple/20 flex items-center justify-center">
+                    <FileText className="w-3.5 h-3.5 text-prmx-purple" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium group-hover:text-prmx-purple transition-colors">Original Request</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-text-tertiary group-hover:text-prmx-purple transition-colors" />
+                </div>
               </Link>
-              <Link href="/v3/requests">
-                <Button variant="ghost" className="w-full" size="sm">
-                  Browse Marketplace
-                </Button>
+              <Link href="/v3/requests" className="block">
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer group">
+                  <div className="w-7 h-7 rounded-md bg-prmx-cyan/20 flex items-center justify-center">
+                    <ShoppingCart className="w-3.5 h-3.5 text-prmx-cyan" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium group-hover:text-prmx-cyan transition-colors">Marketplace</p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-text-tertiary group-hover:text-prmx-cyan transition-colors" />
+                </div>
               </Link>
             </CardContent>
           </Card>

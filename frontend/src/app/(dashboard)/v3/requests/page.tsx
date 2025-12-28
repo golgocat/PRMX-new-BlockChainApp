@@ -8,17 +8,15 @@ import {
   Clock,
   ChevronRight,
   RefreshCw,
-  Users,
-  DollarSign,
   MapPin,
-  Calendar
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { StatCard } from '@/components/ui/StatCard';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/Tabs';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
 import { formatUSDT, formatTimeRemaining, formatDateTimeUTCCompact, formatAddress } from '@/lib/utils';
@@ -67,11 +65,13 @@ export default function V3RequestsPage() {
   
   const { requests: openRequests, loading: openLoading, refresh: refreshOpen, isRefreshing: isRefreshingOpen } = useV3OpenRequests();
   const { requests: allRequests, loading: allLoading, refresh: refreshAll, isRefreshing: isRefreshingAll } = useV3Requests();
-  const { requests: myRequests, loading: myLoading, refresh: refreshMy } = useV3MyRequests();
+  const { requests: myRequests, loading: myLoading, refresh: refreshMy, isRefreshing: isRefreshingMy } = useV3MyRequests();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabValue>('open');
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [isRefreshingButton, setIsRefreshingButton] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Determine which requests to show
   let requests: V3Request[];
@@ -87,7 +87,7 @@ export default function V3RequestsPage() {
     case 'my':
       requests = myRequests;
       loading = myLoading;
-      isRefreshing = false;
+      isRefreshing = isRefreshingMy;
       break;
     case 'all':
     default:
@@ -96,44 +96,42 @@ export default function V3RequestsPage() {
       isRefreshing = isRefreshingAll;
   }
 
-  const filteredRequests = requests.filter((request) => {
-    const eventInfo = getEventTypeInfo(request.eventSpec.eventType);
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      request.location?.name.toLowerCase().includes(searchLower) ||
-      eventInfo?.label.toLowerCase().includes(searchLower) ||
-      request.requester.toLowerCase().includes(searchLower)
-    );
-  });
-
-  // Stats
-  const totalOpenRequests = openRequests.length;
-  const totalOpenShares = openRequests.reduce((sum, r) => sum + getRemainingShares(r), 0);
-  const totalVolume = openRequests.reduce(
-    (sum, r) => sum + BigInt(r.totalShares) * r.premiumPerShare, 
-    BigInt(0)
-  );
-  const avgPremiumPerShare = openRequests.length > 0
-    ? openRequests.reduce((sum, r) => sum + Number(r.premiumPerShare), 0) / openRequests.length
-    : 0;
+  const filteredRequests = requests
+    .filter((request) => {
+      const eventInfo = getEventTypeInfo(request.eventSpec.eventType);
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        request.id.toString().includes(searchQuery) ||
+        request.location?.name.toLowerCase().includes(searchLower) ||
+        eventInfo?.label.toLowerCase().includes(searchLower) ||
+        request.requester.toLowerCase().includes(searchLower)
+      );
+    })
+    .sort((a, b) => sortOrder === 'asc' ? a.id - b.id : b.id - a.id);
 
   const handleRefresh = useCallback(async () => {
-    switch (activeTab) {
-      case 'open':
-        await refreshOpen();
-        break;
-      case 'my':
-        await refreshMy();
-        break;
-      case 'all':
-        await refreshAll();
-        break;
+    setIsRefreshingButton(true);
+    try {
+      switch (activeTab) {
+        case 'open':
+          await refreshOpen();
+          break;
+        case 'my':
+          await refreshMy();
+          break;
+        case 'all':
+          await refreshAll();
+          break;
+      }
+    } finally {
+      // Ensure animation is visible for at least 500ms
+      setTimeout(() => setIsRefreshingButton(false), 500);
     }
   }, [activeTab, refreshOpen, refreshMy, refreshAll]);
 
   if (!isConnected) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 pt-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="purple" className="text-xs">V3 P2P</Badge>
@@ -163,7 +161,7 @@ export default function V3RequestsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pt-4">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -176,7 +174,7 @@ export default function V3RequestsPage() {
         <div className="flex items-center gap-3">
           <Button
             variant="secondary"
-            icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
+            icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshingButton && 'animate-spin')} />}
             onClick={handleRefresh}
           >
             Refresh
@@ -187,33 +185,6 @@ export default function V3RequestsPage() {
             </Button>
           </Link>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard
-          title="Open Requests"
-          value={openLoading ? '...' : totalOpenRequests}
-          icon={<ShoppingCart className="w-5 h-5" />}
-        />
-        <StatCard
-          title="Available Shares"
-          value={openLoading ? '...' : totalOpenShares}
-          icon={<Users className="w-5 h-5" />}
-          iconColor="bg-prmx-purple/10 text-prmx-purple"
-        />
-        <StatCard
-          title="Total Premium Volume"
-          value={openLoading ? '...' : formatUSDT(totalVolume)}
-          icon={<DollarSign className="w-5 h-5" />}
-          iconColor="bg-success/10 text-success"
-        />
-        <StatCard
-          title="Avg Premium/Share"
-          value={openLoading ? '...' : formatUSDT(BigInt(Math.round(avgPremiumPerShare)))}
-          icon={<DollarSign className="w-5 h-5" />}
-          iconColor="bg-prmx-cyan/10 text-prmx-cyan"
-        />
       </div>
 
       {/* Request List */}
@@ -229,7 +200,7 @@ export default function V3RequestsPage() {
             </Tabs>
             <div className="flex-1">
               <Input
-                placeholder="Search by location, event type, or requester..."
+                placeholder="Search by #, location, event type..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 icon={<Search className="w-5 h-5" />}
@@ -242,12 +213,25 @@ export default function V3RequestsPage() {
           <Table>
             <TableHead>
               <TableRow>
+                <TableHeaderCell>
+                  <button 
+                    onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')}
+                    className="flex items-center gap-1 hover:text-prmx-cyan transition-colors"
+                  >
+                    #
+                    {sortOrder === 'asc' ? (
+                      <ArrowUp className="w-3 h-3" />
+                    ) : (
+                      <ArrowDown className="w-3 h-3" />
+                    )}
+                  </button>
+                </TableHeaderCell>
                 <TableHeaderCell>Event Type</TableHeaderCell>
                 <TableHeaderCell>Location</TableHeaderCell>
-                <TableHeaderCell>Coverage Period</TableHeaderCell>
+                <TableHeaderCell>Coverage</TableHeaderCell>
                 <TableHeaderCell>Shares</TableHeaderCell>
-                <TableHeaderCell>Premium/Share</TableHeaderCell>
-                <TableHeaderCell>Collateral Needed</TableHeaderCell>
+                <TableHeaderCell>Premium<br />/Share</TableHeaderCell>
+                <TableHeaderCell>Collateral</TableHeaderCell>
                 <TableHeaderCell>Status</TableHeaderCell>
                 <TableHeaderCell></TableHeaderCell>
               </TableRow>
@@ -257,12 +241,13 @@ export default function V3RequestsPage() {
                 <>
                   {[1, 2, 3, 4, 5].map((i) => (
                     <TableRow key={i} className="animate-pulse">
+                      <TableCell><div className="h-4 w-8 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-24 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-28 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-32 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-12 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-12 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-6 w-16 bg-background-tertiary/50 rounded-full" /></TableCell>
                       <TableCell><div className="h-8 w-8 bg-background-tertiary/50 rounded" /></TableCell>
                     </TableRow>
@@ -279,15 +264,6 @@ export default function V3RequestsPage() {
                         ? "No open requests at the moment"
                         : "No requests match your search"
                   }
-                  action={
-                    activeTab === 'my' ? (
-                      <Link href="/v3/requests/new">
-                        <Button size="sm" icon={<Plus className="w-4 h-4" />}>
-                          Create Request
-                        </Button>
-                      </Link>
-                    ) : undefined
-                  }
                 />
               ) : (
                 filteredRequests.map((request) => {
@@ -301,18 +277,18 @@ export default function V3RequestsPage() {
                   return (
                     <TableRow key={request.id} className={cn(isRefreshing && 'opacity-50')}>
                       <TableCell>
+                        <span className="font-mono text-sm font-medium text-prmx-cyan">#{request.id}</span>
+                      </TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                            <span className="text-lg">{eventInfo?.icon || '🌡️'}</span>
-                          </div>
+                          <span className="text-lg">{eventInfo?.icon || '🌡️'}</span>
                           <div>
-                            <p className="font-medium">{eventInfo?.label || request.eventSpec.eventType}</p>
+                            <p className="font-medium text-sm">{eventInfo?.label || request.eventSpec.eventType}</p>
                             <p className="text-xs text-text-tertiary">
-                              {formatThresholdValue(
+                              ≥ {formatThresholdValue(
                                 request.eventSpec.threshold.value, 
                                 request.eventSpec.threshold.unit
                               )}
-                              {request.eventSpec.earlyTrigger && ' (early trigger)'}
                             </p>
                           </div>
                         </div>
@@ -324,35 +300,31 @@ export default function V3RequestsPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="text-sm flex items-center gap-1">
-                            <Calendar className="w-3 h-3 text-text-tertiary" />
-                            {formatDateTimeUTCCompact(request.coverageStart)} - {formatDateTimeUTCCompact(request.coverageEnd)}
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">
+                            {new Date(request.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                            {' → '}
+                            {new Date(request.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
                           </p>
                           {isRequestAcceptable(request) && (
-                            <p className="text-xs text-text-secondary flex items-center gap-1 mt-1">
+                            <p className="text-xs text-warning flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              Expires in {formatTimeRemaining(request.expiresAt)}
+                              {formatTimeRemaining(request.expiresAt)}
                             </p>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div>
-                          <span className="font-medium">{remainingShares}</span>
-                          <span className="text-text-tertiary"> / {request.totalShares}</span>
+                          <span className="font-medium">{request.totalShares - remainingShares}</span>
+                          <span className="text-text-tertiary"> / {request.totalShares} filled</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-success font-medium">{formatUSDT(request.premiumPerShare)}</span>
+                        <span className="text-success font-medium">{formatUSDT(request.premiumPerShare, false)}</span>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="font-medium">{formatUSDT(collateralPerShare)}/share</p>
-                          <p className="text-xs text-text-tertiary">
-                            Total: {formatUSDT(totalCollateralNeeded)}
-                          </p>
-                        </div>
+                        <span className="font-medium">{formatUSDT(totalCollateralNeeded, false)}</span>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">

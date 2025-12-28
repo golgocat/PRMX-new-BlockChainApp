@@ -11,7 +11,9 @@ import {
   CloudRain,
   DollarSign,
   MapPin,
-  AlertTriangle
+  AlertTriangle,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -72,6 +74,7 @@ export default function V3PoliciesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<TabValue>(isDao ? 'all' : 'my');
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
   // Get policies for current tab
   let policies: V3Policy[];
@@ -94,15 +97,18 @@ export default function V3PoliciesPage() {
       loading = allLoading;
   }
 
-  const filteredPolicies = policies.filter((policy) => {
-    const eventInfo = getEventTypeInfo(policy.eventSpec.eventType);
-    const searchLower = searchQuery.toLowerCase();
-    return (
-      policy.location?.name.toLowerCase().includes(searchLower) ||
-      eventInfo?.label.toLowerCase().includes(searchLower) ||
-      policy.holder.toLowerCase().includes(searchLower)
-    );
-  });
+  const filteredPolicies = policies
+    .filter((policy) => {
+      const eventInfo = getEventTypeInfo(policy.eventSpec.eventType);
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        policy.id.toString().includes(searchQuery) ||
+        policy.location?.name.toLowerCase().includes(searchLower) ||
+        eventInfo?.label.toLowerCase().includes(searchLower) ||
+        policy.holder.toLowerCase().includes(searchLower)
+      );
+    })
+    .sort((a, b) => sortOrder === 'asc' ? a.id - b.id : b.id - a.id);
 
   // Stats
   const now = Math.floor(Date.now() / 1000);
@@ -117,7 +123,7 @@ export default function V3PoliciesPage() {
 
   if (!isConnected) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 pt-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="purple" className="text-xs">V3 P2P</Badge>
@@ -147,7 +153,7 @@ export default function V3PoliciesPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pt-4">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -234,7 +240,19 @@ export default function V3PoliciesPage() {
           <Table>
             <TableHead>
               <TableRow>
-                <TableHeaderCell>Policy</TableHeaderCell>
+                <TableHeaderCell>
+                  <button 
+                    onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')}
+                    className="flex items-center gap-1 hover:text-prmx-cyan transition-colors"
+                  >
+                    Policy
+                    {sortOrder === 'asc' ? (
+                      <ArrowUp className="w-3 h-3" />
+                    ) : (
+                      <ArrowDown className="w-3 h-3" />
+                    )}
+                  </button>
+                </TableHeaderCell>
                 <TableHeaderCell>Location</TableHeaderCell>
                 <TableHeaderCell>Coverage Period</TableHeaderCell>
                 <TableHeaderCell>Shares</TableHeaderCell>
@@ -281,11 +299,9 @@ export default function V3PoliciesPage() {
                     <TableRow key={policy.id} className={cn(isRefreshing && 'opacity-50')}>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                            <span className="text-lg">{eventInfo?.icon || '🌡️'}</span>
-                          </div>
+                          <span className="text-lg">{eventInfo?.icon || '🌡️'}</span>
                           <div>
-                            <p className="font-medium">Policy #{policy.id}</p>
+                            <p className="font-medium text-sm">Policy #{policy.id}</p>
                             <p className="text-xs text-text-tertiary">
                               {eventInfo?.label} ≥ {formatThresholdValue(
                                 policy.eventSpec.threshold.value, 
@@ -302,15 +318,20 @@ export default function V3PoliciesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <div>
-                          <p className="text-sm">
-                            {formatDateTimeUTCCompact(policy.coverageStart)} - {formatDateTimeUTCCompact(policy.coverageEnd)}
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium">
+                            {new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                            {' → '}
+                            {new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
                           </p>
                           {!isExpired && policy.status === 'Active' && (
-                            <p className="text-xs text-text-secondary flex items-center gap-1 mt-1">
+                            <p className="text-xs text-prmx-cyan flex items-center gap-1">
                               <Clock className="w-3 h-3" />
-                              {formatTimeRemaining(policy.coverageEnd)} remaining
+                              {formatTimeRemaining(policy.coverageEnd)}
                             </p>
+                          )}
+                          {isExpired && policy.status === 'Active' && (
+                            <p className="text-xs text-warning">Coverage ended</p>
                           )}
                         </div>
                       </TableCell>
@@ -325,7 +346,7 @@ export default function V3PoliciesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-medium text-prmx-cyan">{formatUSDT(policy.maxPayout)}</span>
+                        <span className="font-medium text-prmx-cyan">{formatUSDT(policy.maxPayout, false)}</span>
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">

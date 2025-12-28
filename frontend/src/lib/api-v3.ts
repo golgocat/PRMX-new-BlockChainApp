@@ -556,6 +556,16 @@ function parsePolicy(policy: any, locationMap: Map<number, V3Location>): V3Polic
     : (policy.locationId || policy.location_id).toNumber();
   
   const eventSpecHuman = human.eventSpec || human.event_spec;
+  const totalShares = parseInt((human.totalShares || human.total_shares || '0').toString().replace(/,/g, ''));
+  
+  // The chain stores premium_per_share and payout_per_share, we calculate totals
+  const premiumPerShareRaw = human.premiumPerShare || human.premium_per_share || '0';
+  const premiumPerShare = BigInt(premiumPerShareRaw.toString().replace(/,/g, ''));
+  const premiumPaid = BigInt(totalShares) * premiumPerShare;
+  
+  // maxPayout is calculated: totalShares * payoutPerShare ($100 = 100_000_000 with 6 decimals)
+  const payoutPerShare = V3_PAYOUT_PER_SHARE; // $100
+  const maxPayout = BigInt(totalShares) * payoutPerShare;
   
   return {
     id: human.policyId 
@@ -565,9 +575,10 @@ function parsePolicy(policy: any, locationMap: Map<number, V3Location>): V3Polic
     locationId,
     location: locationMap.get(locationId),
     eventSpec: parseEventSpecHuman(eventSpecHuman),
-    totalShares: parseInt((human.totalShares || human.total_shares || '0').toString().replace(/,/g, '')),
-    premiumPaid: BigInt((human.premiumPaid || human.premium_paid || '0').toString().replace(/,/g, '')),
-    maxPayout: BigInt((human.maxPayout || human.max_payout || '0').toString().replace(/,/g, '')),
+    totalShares,
+    premiumPerShare,
+    premiumPaid,
+    maxPayout,
     coverageStart: parseInt((human.coverageStart || human.coverage_start || '0').toString().replace(/,/g, '')),
     coverageEnd: parseInt((human.coverageEnd || human.coverage_end || '0').toString().replace(/,/g, '')),
     status: parseStatusString(human.status) as V3PolicyStatus,

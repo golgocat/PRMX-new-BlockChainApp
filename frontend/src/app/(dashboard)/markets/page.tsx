@@ -255,9 +255,11 @@ export default function MarketsPage() {
                               <Badge variant="default" className="text-xs px-1.5 py-0.5">V1</Badge>
                             )}
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-text-secondary">
+                          <div className="flex items-center gap-1 text-xs text-text-tertiary">
                             <MapPin className="w-3 h-3" />
-                            {formatCoordinates(market.centerLatitude, market.centerLongitude)}
+                            <span className="font-mono">
+                              {(market.centerLatitude / 1_000_000).toFixed(2)}°, {(market.centerLongitude / 1_000_000).toFixed(2)}°
+                            </span>
                           </div>
                         </div>
                       </div>

@@ -252,21 +252,27 @@ export function useV3MyRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) {
   const { isChainConnected, selectedAccount } = useWalletStore();
   const [requests, setRequests] = useState<V3Request[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
 
   const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || !selectedAccount) return;
     
     if (!silent) setLoading(true);
+    setIsRefreshing(true);
     setError(null);
     
     try {
       const data = await apiV3.getV3RequestsByRequester(selectedAccount.address);
-      setRequests(data);
+      startTransition(() => {
+        setRequests(data);
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch my requests');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, [isChainConnected, selectedAccount]);
 
@@ -282,7 +288,13 @@ export function useV3MyRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     return () => clearInterval(interval);
   }, [isChainConnected, selectedAccount, pollInterval, refresh]);
 
-  return { requests, loading, error, refresh: () => refresh(false) };
+  return { 
+    requests, 
+    loading, 
+    isRefreshing: isRefreshing || isPending, 
+    error, 
+    refresh: () => refresh(false) 
+  };
 }
 
 // =============================================================================

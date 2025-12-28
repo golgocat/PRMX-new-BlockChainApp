@@ -10,16 +10,19 @@ export function formatAddress(address: string, chars = 6): string {
   return `${address.slice(0, chars)}...${address.slice(-chars)}`;
 }
 
-export function formatBalance(balance: bigint, decimals = 6): string {
+export function formatBalance(balance: bigint, decimals = 6, showDecimals = true): string {
   const divisor = BigInt(10 ** decimals);
   const whole = balance / divisor;
+  if (!showDecimals) {
+    return whole.toLocaleString();
+  }
   const fraction = balance % divisor;
   const fractionStr = fraction.toString().padStart(decimals, '0').slice(0, 2);
   return `${whole.toLocaleString()}.${fractionStr}`;
 }
 
-export function formatUSDT(amount: bigint): string {
-  return `$${formatBalance(amount, 6)}`;
+export function formatUSDT(amount: bigint, showDecimals = true): string {
+  return `$${formatBalance(amount, 6, showDecimals)}`;
 }
 
 export function formatPRMX(amount: bigint): string {

@@ -23,7 +23,7 @@ interface TableHeadProps {
 
 export function TableHead({ children, className }: TableHeadProps) {
   return (
-    <thead className={cn('bg-background-tertiary/50', className)}>
+    <thead className={cn('border-b border-border-secondary', className)}>
       {children}
     </thead>
   );

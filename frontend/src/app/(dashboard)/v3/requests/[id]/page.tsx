@@ -167,7 +167,7 @@ export default function V3RequestDetailPage() {
   
   if (!isConnected) {
     return (
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto pt-4">
         <div className="flex items-center gap-4">
           <Link href="/v3/requests">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -202,7 +202,7 @@ export default function V3RequestDetailPage() {
   
   if (loading) {
     return (
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto pt-4">
         <div className="flex items-center gap-4">
           <Link href="/v3/requests">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -234,7 +234,7 @@ export default function V3RequestDetailPage() {
   
   if (error || !request) {
     return (
-      <div className="space-y-8 max-w-6xl mx-auto">
+      <div className="space-y-8 max-w-6xl mx-auto pt-4">
         <div className="flex items-center gap-4">
           <Link href="/v3/requests">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -267,7 +267,7 @@ export default function V3RequestDetailPage() {
   const isExpired = request.expiresAt <= now;
   
   return (
-    <div className="space-y-8 max-w-6xl mx-auto">
+    <div className="space-y-8 max-w-6xl mx-auto pt-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -371,17 +371,31 @@ export default function V3RequestDetailPage() {
                     <p className="font-medium text-lg">{request.location?.name || `Location #${request.locationId}`}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-text-secondary mb-1">
+                    <p className="text-sm text-text-secondary mb-2">
                       <Calendar className="w-4 h-4 inline mr-1" />
                       Coverage Period
                     </p>
-                    <p className="font-medium">
-                      {formatDateTimeUTCCompact(request.coverageStart)}
-                    </p>
-                    <p className="text-text-secondary">to</p>
-                    <p className="font-medium">
-                      {formatDateTimeUTCCompact(request.coverageEnd)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
+                        <p className="text-xs text-text-tertiary">Start</p>
+                        <p className="font-medium text-sm">
+                          {new Date(request.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                        </p>
+                        <p className="text-xs text-text-tertiary">
+                          {new Date(request.coverageStart * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                        </p>
+                      </div>
+                      <span className="text-text-tertiary">→</span>
+                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
+                        <p className="text-xs text-text-tertiary">End</p>
+                        <p className="font-medium text-sm">
+                          {new Date(request.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                        </p>
+                        <p className="text-xs text-text-tertiary">
+                          {new Date(request.coverageEnd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -401,15 +415,15 @@ export default function V3RequestDetailPage() {
                   <div className="space-y-3">
                     <div className="flex items-center justify-between py-2 border-b border-border-secondary">
                       <span className="text-text-secondary">Premium</span>
-                      <span className="font-semibold text-success">{formatUSDT(request.premiumPerShare)}</span>
+                      <span className="font-semibold text-success">{formatUSDT(request.premiumPerShare, false)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2 border-b border-border-secondary">
                       <span className="text-text-secondary">Payout</span>
-                      <span className="font-semibold">{formatUSDT(request.payoutPerShare)}</span>
+                      <span className="font-semibold">{formatUSDT(request.payoutPerShare, false)}</span>
                     </div>
                     <div className="flex items-center justify-between py-2">
                       <span className="text-text-secondary">Collateral</span>
-                      <span className="font-semibold">{formatUSDT(calculateCollateral(1))}</span>
+                      <span className="font-semibold">{formatUSDT(calculateCollateral(1), false)}</span>
                     </div>
                   </div>
                 </div>
@@ -425,13 +439,13 @@ export default function V3RequestDetailPage() {
                     <div className="flex items-center justify-between py-2 border-b border-border-secondary">
                       <span className="text-text-secondary">Total Premium</span>
                       <span className="font-semibold text-success">
-                        {formatUSDT(BigInt(request.totalShares) * request.premiumPerShare)}
+                        {formatUSDT(BigInt(request.totalShares) * request.premiumPerShare, false)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between py-2">
                       <span className="text-text-secondary">Max Payout</span>
                       <span className="font-semibold text-prmx-cyan text-lg">
-                        {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare)}
+                        {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare, false)}
                       </span>
                     </div>
                   </div>
@@ -489,16 +503,16 @@ export default function V3RequestDetailPage() {
                     <div className="p-4 rounded-lg bg-background-tertiary/50 space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-text-secondary">Collateral Required</span>
-                        <span className="font-medium">{formatUSDT(collateralNeeded)}</span>
+                        <span className="font-medium">{formatUSDT(collateralNeeded, false)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-text-secondary">Premium Earned</span>
-                        <span className="font-medium text-success">+{formatUSDT(premiumToEarn)}</span>
+                        <span className="font-medium text-success">+{formatUSDT(premiumToEarn, false)}</span>
                       </div>
                       <hr className="border-border-primary" />
                       <div className="flex justify-between">
                         <span className="font-medium">Net Cost</span>
-                        <span className="font-bold">{formatUSDT(collateralNeeded - premiumToEarn)}</span>
+                        <span className="font-bold">{formatUSDT(collateralNeeded - premiumToEarn, false)}</span>
                       </div>
                     </div>
                     

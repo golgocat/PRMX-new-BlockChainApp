@@ -1,6 +1,6 @@
 /**
- * Configuration for V2 Oracle Service
- * Extended with V3 Ingest API settings
+ * Configuration for PRMX Off-chain Oracle Service
+ * Supports V2 monitoring and V3 Ingest API
  */
 export declare const config: {
     mongodbUri: string;

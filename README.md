@@ -125,8 +125,8 @@ Or start components individually:
 # Terminal 1: Start the blockchain
 ./target/release/prmx-node --dev --tmp
 
-# Terminal 2: Start Oracle V2 (optional, for V2 policies)
-cd oracle-v2 && npm install && npm start
+# Terminal 2: Start Oracle Service (handles V2 monitoring + V3 Ingest API)
+cd offchain-oracle-service && npm install && npm start
 
 # Terminal 3: Start the frontend
 cd frontend && npm install && npm run dev
@@ -159,7 +159,7 @@ PRMX/
 ├── runtime/                    # Substrate runtime configuration
 ├── node/                       # Substrate node binary
 │
-├── oracle-v2/                  # V2 off-chain oracle service
+├── offchain-oracle-service/    # Off-chain oracle service (V2 + V3)
 │   ├── src/
 │   │   ├── chain/              # Blockchain event listener & reporter
 │   │   ├── db/                 # MongoDB integration
@@ -246,8 +246,8 @@ For frontend details, see [frontend/README.md](frontend/README.md).
 # Blockchain
 NEXT_PUBLIC_RPC_URL=ws://localhost:9944
 
-# Oracle V2
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/prmx-oracle-v2
+# Oracle Service
+MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/prmx-oracle
 WS_ENDPOINT=ws://127.0.0.1:9944
 ACCUWEATHER_API_KEY=your-api-key
 MANILA_LOCATION_KEY=264885

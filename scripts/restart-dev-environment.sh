@@ -30,9 +30,9 @@
 #   ACCUWEATHER_API_KEY="your_key" ./scripts/restart-dev-environment.sh
 #
 # SERVICES:
-#   - Blockchain Node:  ws://localhost:9944
-#   - Oracle V2:        http://localhost:3001
-#   - Frontend:         http://localhost:3000
+#   - Blockchain Node:       ws://localhost:9944
+#   - Oracle Service:        http://localhost:3001
+#   - Frontend:              http://localhost:3000
 #
 # See docs/RESTART-GUIDE.md for detailed documentation.
 #
@@ -114,7 +114,7 @@ kill_processes() {
     
     # Kill by process name
     pkill -f "prmx-node" 2>/dev/null || true
-    pkill -f "oracle-v2" 2>/dev/null || true
+    pkill -f "offchain-oracle-service" 2>/dev/null || true
     pkill -f "next-server" 2>/dev/null || true
     
     # Kill by port (fallback)
@@ -234,17 +234,17 @@ wait_for_node() {
 }
 
 # =============================================================================
-# Oracle V2 Service
+# Off-chain Oracle Service
 # =============================================================================
-start_oracle_v2() {
-    log_step "Starting Oracle V2 service..."
+start_oracle_service() {
+    log_step "Starting off-chain oracle service..."
     
-    cd "$PROJECT_ROOT/oracle-v2"
+    cd "$PROJECT_ROOT/offchain-oracle-service"
     export PATH="$NODE_PATH:$PATH"
     
-    nohup npm start > /tmp/oracle-v2.log 2>&1 &
+    nohup npm start > /tmp/oracle-service.log 2>&1 &
     ORACLE_PID=$!
-    log_success "Oracle V2 started (PID: $ORACLE_PID)"
+    log_success "Oracle service started (PID: $ORACLE_PID)"
     
     sleep 3
 }
@@ -313,11 +313,11 @@ verify_services() {
         log_error "Node: ❌ Not responding"
     fi
     
-    # Check Oracle V2
+    # Check Oracle Service
     if curl -s http://localhost:3001/health 2>/dev/null | grep -q "ok"; then
-        log_success "Oracle V2: ✅ Running (http://localhost:3001)"
+        log_success "Oracle Service: ✅ Running (http://localhost:3001)"
     else
-        log_warning "Oracle V2: ⚠️ Starting... (may take a moment)"
+        log_warning "Oracle Service: ⚠️ Starting... (may take a moment)"
     fi
     
     # Check Frontend
@@ -353,7 +353,7 @@ else
 fi
 
 # Start services
-start_oracle_v2
+start_oracle_service
 start_frontend
 
 # Wait for services to initialize
@@ -370,15 +370,15 @@ echo "============================================="
 echo "  Environment Ready!"
 echo "============================================="
 echo ""
-echo "  Mode:       $MODE"
-echo "  Frontend:   http://localhost:3000"
-echo "  Node:       ws://localhost:9944"
-echo "  Oracle V2:  http://localhost:3001"
+echo "  Mode:           $MODE"
+echo "  Frontend:       http://localhost:3000"
+echo "  Node:           ws://localhost:9944"
+echo "  Oracle Service: http://localhost:3001"
 echo ""
 echo "  Logs:"
-echo "    Node:      tail -f /tmp/prmx-node.log"
-echo "    Oracle V2: tail -f /tmp/oracle-v2.log"
-echo "    Frontend:  tail -f /tmp/frontend.log"
+echo "    Node:           tail -f /tmp/prmx-node.log"
+echo "    Oracle Service: tail -f /tmp/oracle-service.log"
+echo "    Frontend:       tail -f /tmp/frontend.log"
 echo ""
 if [ "$MODE" = "tmp" ]; then
     echo "  Note: Using temporary mode - all data will be lost on restart."

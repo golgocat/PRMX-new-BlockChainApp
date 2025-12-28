@@ -85,7 +85,7 @@ frontend/
 │   │   │   ├── policies/      # Policies list + detail + new
 │   │   │   ├── lp/            # LP trading orderbook
 │   │   │   ├── oracle/        # V1 Oracle (24h rolling)
-│   │   │   ├── oracle-v2/     # V2 Oracle (cumulative)
+│   │   │   ├── oracle-v2/     # Oracle Service Dashboard (V2 + V3)
 │   │   │   ├── help/          # Help & FAQ
 │   │   │   ├── settings/      # User settings
 │   │   │   └── layout.tsx     # Dashboard layout
@@ -198,7 +198,7 @@ On-chain oracle monitoring:
 - Hourly bucket breakdown with Historical/Live badges
 - Market-by-market rainfall comparison
 
-### Oracle V2 (`/oracle-v2`)
+### Oracle Service Dashboard (`/oracle-v2`)
 
 Off-chain oracle monitoring:
 - V2 policy monitors with cumulative rainfall

@@ -90,7 +90,7 @@ When ready to deploy as a Polkadot parachain via Tanssi:
 
 | Service | Purpose |
 |---------|---------|
-| `oracle-v2/` | Node.js + MongoDB Atlas service for V2 cumulative rainfall monitoring |
+| `offchain-oracle-service/` | Node.js + MongoDB Atlas service for V2 monitoring and V3 Ingest API |
 
 ---
 
@@ -1084,7 +1084,7 @@ pub trait RainfallOracle {
 
 **Key points:**
 
-- V2 policies use a dedicated Node.js service (`oracle-v2/`) with MongoDB Atlas
+- V2 policies use a dedicated Node.js service (`offchain-oracle-service/`) with MongoDB Atlas
 - The service listens for `V2PolicyCreated` events and creates monitor documents
 - Monitors track cumulative rainfall over the coverage window
 - **Early trigger**: Settlement occurs immediately when cumulative ≥ strike
@@ -1492,7 +1492,7 @@ prmx-chain/
     src/chain_spec.rs
     src/service.rs
   
-  oracle-v2/                    # V2 off-chain oracle service
+  offchain-oracle-service/      # Off-chain oracle service (V2 + V3)
     package.json
     tsconfig.json
     src/

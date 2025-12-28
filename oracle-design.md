@@ -1525,8 +1525,8 @@ async function runEvaluationCycle() {
 ### 22.6 Environment Configuration
 
 ```bash
-# oracle-v2/.env
-MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/prmx-oracle-v2
+# offchain-oracle-service/.env
+MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/prmx-oracle
 WS_ENDPOINT=ws://127.0.0.1:9944
 ACCUWEATHER_API_KEY=<your-key>
 MANILA_LOCATION_KEY=264885

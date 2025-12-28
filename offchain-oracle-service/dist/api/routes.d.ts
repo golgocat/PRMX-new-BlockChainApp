@@ -1,6 +1,6 @@
 /**
- * REST API routes for V2 Oracle Service
- * Extended with V3 Ingest API endpoints
+ * REST API routes for PRMX Off-chain Oracle Service
+ * Includes V2 monitoring endpoints and V3 Ingest API endpoints
  */
 import { Application } from 'express';
 /**

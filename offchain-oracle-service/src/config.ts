@@ -1,6 +1,6 @@
 /**
- * Configuration for V2 Oracle Service
- * Extended with V3 Ingest API settings
+ * Configuration for PRMX Off-chain Oracle Service
+ * Supports V2 monitoring and V3 Ingest API
  */
 
 import dotenv from 'dotenv';
@@ -8,7 +8,7 @@ dotenv.config();
 
 export const config = {
   // MongoDB connection
-  mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/prmx-oracle-v2',
+  mongodbUri: process.env.MONGODB_URI || 'mongodb://localhost:27017/prmx-oracle',
   
   // PRMX Node WebSocket URL
   wsUrl: process.env.WS_URL || 'ws://127.0.0.1:9944',

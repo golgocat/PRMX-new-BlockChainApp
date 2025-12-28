@@ -183,7 +183,7 @@ ACCUWEATHER_API_KEY="your_accuweather_key" ./scripts/restart-dev-environment.sh 
 
 Killed Processes:
   • prmx-node (blockchain)
-  • oracle-v2 (V2 oracle service)
+  • offchain-oracle-service (oracle service)
   • next-server (frontend)
 
 Freed Ports:
@@ -353,10 +353,10 @@ Write DIRECTLY to RocksDB (offchain storage)
   - Offchain Worker execution (V1 Oracle)
   - State management
 
-### 2. Oracle V2 Service (`oracle-v2`)
+### 2. Oracle Service (`offchain-oracle-service`)
 
 - **Port:** 3001 (HTTP API)
-- **Log:** `/tmp/oracle-v2.log`
+- **Log:** `/tmp/oracle-service.log`
 - **Responsibilities:**
   - Monitor V2 policies for coverage periods
   - Fetch AccuWeather data for V2 evaluations
@@ -449,7 +449,7 @@ cd frontend && npm run dev
 | Service | Log File | Watch Command |
 |---------|----------|---------------|
 | Node | `/tmp/prmx-node.log` | `tail -f /tmp/prmx-node.log` |
-| Oracle V2 | `/tmp/oracle-v2.log` | `tail -f /tmp/oracle-v2.log` |
+| Oracle Service | `/tmp/oracle-service.log` | `tail -f /tmp/oracle-service.log` |
 | Frontend | `/tmp/frontend.log` | `tail -f /tmp/frontend.log` |
 
 ### Useful Grep Patterns

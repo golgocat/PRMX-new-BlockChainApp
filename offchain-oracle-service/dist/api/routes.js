@@ -1,6 +1,6 @@
 /**
- * REST API routes for V2 Oracle Service
- * Extended with V3 Ingest API endpoints
+ * REST API routes for PRMX Off-chain Oracle Service
+ * Includes V2 monitoring endpoints and V3 Ingest API endpoints
  */
 import { getMonitors, getBuckets, clearAllData, getObservationsV3, getSnapshotsV3 } from '../db/mongo.js';
 import { runEvaluationCycle } from '../scheduler/monitor.js';
@@ -16,7 +16,7 @@ export function setupRoutes(app) {
     app.get('/health', (req, res) => {
         res.json({
             status: 'ok',
-            service: 'prmx-oracle-v2',
+            service: 'prmx-offchain-oracle-service',
             timestamp: new Date().toISOString(),
         });
     });

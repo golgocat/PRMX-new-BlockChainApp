@@ -497,10 +497,55 @@ export function setupRoutes(app: Application): void {
   const V3_INGEST_HMAC_SECRET = config.v3IngestHmacSecret;
   const V3_NONCE_WINDOW_MS = config.v3NonceWindowMs;
   const V3_DEV_MODE = config.v3DevMode;
+  const V3_RATE_LIMIT = config.v3RateLimitPerMinute;
+  const V3_REQUEST_LOGGING = config.v3RequestLogging;
   const usedNonces = new Map<string, number>(); // In production, use Redis
+  const requestCounts = new Map<string, { count: number; resetAt: number }>(); // Rate limiting
   
-  if (V3_DEV_MODE) {
+  if (config.isProduction) {
+    console.log('🔒 V3 Ingest API running in PRODUCTION mode');
+    console.log(`   Rate limit: ${V3_RATE_LIMIT} requests/minute per IP`);
+    console.log(`   Nonce window: ${V3_NONCE_WINDOW_MS}ms`);
+  } else if (V3_DEV_MODE) {
     console.log('⚠️  V3 Ingest API running in DEV MODE - auth validation disabled');
+  }
+
+  /**
+   * Rate limiting for V3 endpoints
+   */
+  function checkRateLimit(req: Request): { allowed: boolean; error?: string } {
+    if (V3_DEV_MODE) return { allowed: true };
+    
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const entry = requestCounts.get(ip);
+    
+    if (!entry || now > entry.resetAt) {
+      // New window
+      requestCounts.set(ip, { count: 1, resetAt: now + 60000 });
+      return { allowed: true };
+    }
+    
+    if (entry.count >= V3_RATE_LIMIT) {
+      return { 
+        allowed: false, 
+        error: `Rate limit exceeded. Limit: ${V3_RATE_LIMIT}/minute. Retry after: ${Math.ceil((entry.resetAt - now) / 1000)}s`
+      };
+    }
+    
+    entry.count++;
+    return { allowed: true };
+  }
+
+  /**
+   * Log V3 request (if enabled)
+   */
+  function logV3Request(req: Request, endpoint: string, success: boolean): void {
+    if (!V3_REQUEST_LOGGING) return;
+    
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const timestamp = new Date().toISOString();
+    console.log(`[V3] ${timestamp} ${success ? '✓' : '✗'} ${endpoint} from ${ip}`);
   }
 
   /**
@@ -584,7 +629,7 @@ export function setupRoutes(app: Application): void {
   }
 
   /**
-   * POST /v1/observations/batch
+   * POST /ingest/observations/batch
    * Receive observation batch from OCW
    * 
    * OCW sends samples with fields:
@@ -597,9 +642,20 @@ export function setupRoutes(app: Application): void {
    */
   app.post('/ingest/observations/batch', async (req: Request, res: Response) => {
     try {
+      // Rate limiting
+      const rateLimitResult = checkRateLimit(req);
+      if (!rateLimitResult.allowed) {
+        logV3Request(req, '/ingest/observations/batch', false);
+        return res.status(429).json({
+          success: false,
+          error: rateLimitResult.error,
+        });
+      }
+
       // Validate HMAC signature
       const authResult = validateV3Signature(req);
       if (!authResult.valid) {
+        logV3Request(req, '/ingest/observations/batch', false);
         return res.status(401).json({
           success: false,
           error: authResult.error,
@@ -667,6 +723,7 @@ export function setupRoutes(app: Application): void {
       }
 
       console.log(`📥 V3 Observations batch: policy=${policy_id}, inserted=${inserted}, dupe=${alreadyPresent}, rejected=${rejectedInvalid}`);
+      logV3Request(req, '/ingest/observations/batch', true);
 
       res.json({
         success: true,
@@ -677,6 +734,7 @@ export function setupRoutes(app: Application): void {
       });
     } catch (error) {
       console.error('Error processing observations batch:', error);
+      logV3Request(req, '/ingest/observations/batch', false);
       res.status(500).json({
         success: false,
         error: 'Failed to process observations batch',
@@ -696,9 +754,20 @@ export function setupRoutes(app: Application): void {
    */
   app.post('/ingest/snapshots', async (req: Request, res: Response) => {
     try {
+      // Rate limiting
+      const rateLimitResult = checkRateLimit(req);
+      if (!rateLimitResult.allowed) {
+        logV3Request(req, '/ingest/snapshots', false);
+        return res.status(429).json({
+          success: false,
+          error: rateLimitResult.error,
+        });
+      }
+
       // Validate HMAC signature
       const authResult = validateV3Signature(req);
       if (!authResult.valid) {
+        logV3Request(req, '/ingest/snapshots', false);
         return res.status(401).json({
           success: false,
           error: authResult.error,

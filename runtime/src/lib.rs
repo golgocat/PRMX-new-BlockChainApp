@@ -563,6 +563,19 @@ where
     }
 }
 
+/// V3 Request Expiry API Adapter
+pub struct RequestExpiryApiV3Adapter;
+
+impl pallet_oracle_v3::RequestExpiryApiV3 for RequestExpiryApiV3Adapter {
+    fn get_expired_requests(current_time: u64) -> Vec<prmx_primitives::PolicyId> {
+        pallet_market_v3::Pallet::<Runtime>::get_expired_requests_internal(current_time)
+    }
+    
+    fn is_request_expired(request_id: prmx_primitives::PolicyId, current_time: u64) -> bool {
+        pallet_market_v3::Pallet::<Runtime>::is_request_expired_internal(request_id, current_time)
+    }
+}
+
 /// V3 Oracle Pallet Configuration
 impl pallet_oracle_v3::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
@@ -572,6 +585,8 @@ impl pallet_oracle_v3::Config for Runtime {
     type OracleOrigin = EnsureRoot<AccountId>;
     /// Settlement handler in policy pallet
     type PolicySettlement = PrmxPolicyV3;
+    /// Request expiry API for detecting expired requests
+    type RequestExpiryApi = RequestExpiryApiV3Adapter;
     type MaxLocationKeyLength = MaxLocationKeyLengthV3;
     type WeightInfo = ();
 }

@@ -25,6 +25,7 @@ pub mod commitment;
 pub mod http_client;
 
 use alloc::vec::Vec;
+use codec::Encode;
 use frame_support::pallet_prelude::*;
 use frame_system::pallet_prelude::*;
 use prmx_primitives::{
@@ -101,7 +102,10 @@ pub mod pallet {
     // =========================================================================
 
     #[pallet::config]
-    pub trait Config: frame_system::Config {
+    pub trait Config: frame_system::Config 
+        + frame_system::offchain::CreateTransactionBase<Call<Self>>
+        + frame_system::offchain::CreateBare<Call<Self>>
+    {
         /// Runtime event type
         type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
@@ -120,6 +124,57 @@ pub mod pallet {
 
         /// Weight info
         type WeightInfo: WeightInfo;
+    }
+
+    /// Validate unsigned transactions from OCW
+    #[pallet::validate_unsigned]
+    impl<T: Config> ValidateUnsigned for Pallet<T> {
+        type Call = Call<T>;
+
+        fn validate_unsigned(_source: TransactionSource, call: &Self::Call) -> TransactionValidity {
+            match call {
+                Call::submit_snapshot_unsigned {
+                    policy_id,
+                    observed_until,
+                    ..
+                } => {
+                    // Basic validation - ensure policy exists and is active
+                    let state = OracleStates::<T>::get(policy_id)
+                        .ok_or(InvalidTransaction::Custom(1))?;
+                    
+                    if state.status != PolicyStatusV3::Active {
+                        return Err(InvalidTransaction::Custom(2).into());
+                    }
+
+                    ValidTransaction::with_tag_prefix("OracleV3Snapshot")
+                        .priority(100)
+                        .and_provides((policy_id, observed_until))
+                        .longevity(5)
+                        .propagate(true)
+                        .build()
+                }
+                Call::submit_final_report_unsigned {
+                    policy_id,
+                    ..
+                } => {
+                    // Basic validation - ensure policy exists and is active
+                    let state = OracleStates::<T>::get(policy_id)
+                        .ok_or(InvalidTransaction::Custom(1))?;
+                    
+                    if state.status != PolicyStatusV3::Active {
+                        return Err(InvalidTransaction::Custom(3).into());
+                    }
+
+                    ValidTransaction::with_tag_prefix("OracleV3FinalReport")
+                        .priority(200) // Higher priority for final reports
+                        .and_provides((policy_id, "final"))
+                        .longevity(5)
+                        .propagate(true)
+                        .build()
+                }
+                _ => InvalidTransaction::Call.into(),
+            }
+        }
     }
 
     /// Weight info trait
@@ -472,6 +527,111 @@ pub mod pallet {
                 Error::<T>::NotOracleMember
             );
 
+            Self::do_submit_final_report(policy_id, kind, observed_until, agg_state, commitment)
+        }
+
+        /// Submit a snapshot via unsigned transaction from OCW.
+        /// This allows the OCW to submit snapshots without a signed origin.
+        #[pallet::call_index(6)]
+        #[pallet::weight(T::WeightInfo::submit_snapshot())]
+        pub fn submit_snapshot_unsigned(
+            origin: OriginFor<T>,
+            policy_id: PolicyId,
+            observed_until: u64,
+            agg_state: AggStateV3,
+            commitment: [u8; 32],
+        ) -> DispatchResult {
+            ensure_none(origin)?;
+
+            let current_block = frame_system::Pallet::<T>::block_number();
+
+            // Check rate limit
+            let last_snapshot_block = SnapshotRateLimit::<T>::get(policy_id);
+            let min_blocks: BlockNumberFor<T> = V3_MIN_SNAPSHOT_BLOCKS.into();
+            ensure!(
+                current_block >= last_snapshot_block + min_blocks,
+                Error::<T>::SnapshotRateLimited
+            );
+
+            // Update oracle state
+            OracleStates::<T>::try_mutate(policy_id, |maybe_state| -> DispatchResult {
+                let state = maybe_state.as_mut().ok_or(Error::<T>::PolicyStateNotFound)?;
+
+                // Validate monotonic observed_until
+                ensure!(
+                    observed_until > state.observed_until,
+                    Error::<T>::ObservedUntilNotMonotonic
+                );
+
+                // Validate agg_state type matches
+                ensure!(
+                    Self::validate_agg_state_type(&state.agg_state, &agg_state),
+                    Error::<T>::AggStateMismatch
+                );
+
+                // Validate policy is active
+                ensure!(
+                    state.status == PolicyStatusV3::Active,
+                    Error::<T>::PolicyNotActive
+                );
+
+                // Update state
+                state.observed_until = observed_until;
+                state.agg_state = agg_state;
+                state.commitment = commitment;
+                state.last_snapshot_block = current_block.try_into().unwrap_or(0);
+
+                Ok(())
+            })?;
+
+            // Update rate limit
+            SnapshotRateLimit::<T>::insert(policy_id, current_block);
+
+            Self::deposit_event(Event::SnapshotSubmitted {
+                policy_id,
+                observed_until,
+                commitment: H256::from(commitment),
+            });
+
+            Ok(())
+        }
+
+        /// Submit a final report via unsigned transaction from OCW.
+        /// This triggers settlement in the policy pallet.
+        #[pallet::call_index(7)]
+        #[pallet::weight(T::WeightInfo::submit_final_report())]
+        pub fn submit_final_report_unsigned(
+            origin: OriginFor<T>,
+            policy_id: PolicyId,
+            kind: OracleReportKindV3,
+            observed_until: u64,
+            agg_state: AggStateV3,
+            commitment: [u8; 32],
+        ) -> DispatchResult {
+            ensure_none(origin)?;
+
+            Self::do_submit_final_report(policy_id, kind, observed_until, agg_state, commitment)
+        }
+    }
+
+    // =========================================================================
+    //                           Helper Functions
+    // =========================================================================
+
+    impl<T: Config> Pallet<T> {
+        /// Validate that two AggState values are of the same variant type
+        fn validate_agg_state_type(existing: &AggStateV3, new: &AggStateV3) -> bool {
+            core::mem::discriminant(existing) == core::mem::discriminant(new)
+        }
+
+        /// Internal implementation of final report submission
+        fn do_submit_final_report(
+            policy_id: PolicyId,
+            kind: OracleReportKindV3,
+            observed_until: u64,
+            agg_state: AggStateV3,
+            commitment: [u8; 32],
+        ) -> DispatchResult {
             // Get and validate oracle state
             let mut state =
                 OracleStates::<T>::get(policy_id).ok_or(Error::<T>::PolicyStateNotFound)?;
@@ -527,17 +687,6 @@ pub mod pallet {
             });
 
             Ok(())
-        }
-    }
-
-    // =========================================================================
-    //                           Helper Functions
-    // =========================================================================
-
-    impl<T: Config> Pallet<T> {
-        /// Validate that two AggState values are of the same variant type
-        fn validate_agg_state_type(existing: &AggStateV3, new: &AggStateV3) -> bool {
-            core::mem::discriminant(existing) == core::mem::discriminant(new)
         }
 
         /// Initialize oracle state for a new policy.
@@ -852,7 +1001,7 @@ pub mod pallet {
                     );
                     
                     // Update local state
-                    local_state.agg_state = new_agg_state;
+                    local_state.agg_state = new_agg_state.clone();
                     local_state.commitment = new_commitment;
                     local_state.last_seen_epoch = last_epoch;
                     
@@ -881,6 +1030,99 @@ pub mod pallet {
                         }
                     }
                     
+                    // Get policy metadata for coverage times
+                    if let Some((_, event_spec, coverage_start, coverage_end)) = Self::get_policy_metadata(policy_id) {
+                        // Determine what on-chain action to take
+                        let decision = ocw::decide_snapshot_action(
+                            &local_state,
+                            &event_spec,
+                            now_epoch,
+                            coverage_start,
+                            coverage_end,
+                        );
+                        
+                        match decision {
+                            ocw::SnapshotDecision::SendFinalTrigger => {
+                                log::info!(
+                                    target: "prmx-oracle-v3",
+                                    "🎯 Submitting final TRIGGER report for policy {}",
+                                    policy_id
+                                );
+                                
+                                if let Err(e) = Self::submit_final_report_on_chain(
+                                    policy_id,
+                                    OracleReportKindV3::Trigger,
+                                    last_epoch,
+                                    new_agg_state.clone(),
+                                    new_commitment,
+                                ) {
+                                    log::warn!(
+                                        target: "prmx-oracle-v3",
+                                        "Failed to submit trigger report: {:?}",
+                                        e
+                                    );
+                                    local_state.record_error(ocw::OcwError::ChainSubmission, now_epoch);
+                                } else {
+                                    local_state.finalized = true;
+                                    local_state.last_snapshot_epoch = last_epoch;
+                                }
+                            }
+                            ocw::SnapshotDecision::SendFinalMaturity => {
+                                log::info!(
+                                    target: "prmx-oracle-v3",
+                                    "✅ Submitting final MATURITY report for policy {}",
+                                    policy_id
+                                );
+                                
+                                if let Err(e) = Self::submit_final_report_on_chain(
+                                    policy_id,
+                                    OracleReportKindV3::Maturity,
+                                    last_epoch,
+                                    new_agg_state.clone(),
+                                    new_commitment,
+                                ) {
+                                    log::warn!(
+                                        target: "prmx-oracle-v3",
+                                        "Failed to submit maturity report: {:?}",
+                                        e
+                                    );
+                                    local_state.record_error(ocw::OcwError::ChainSubmission, now_epoch);
+                                } else {
+                                    local_state.finalized = true;
+                                    local_state.last_snapshot_epoch = last_epoch;
+                                }
+                            }
+                            ocw::SnapshotDecision::SendSnapshot => {
+                                log::info!(
+                                    target: "prmx-oracle-v3",
+                                    "📸 Submitting snapshot for policy {} (observed_until: {})",
+                                    policy_id,
+                                    last_epoch
+                                );
+                                
+                                if let Err(e) = Self::submit_snapshot_on_chain(
+                                    policy_id,
+                                    last_epoch,
+                                    new_agg_state.clone(),
+                                    new_commitment,
+                                ) {
+                                    log::warn!(
+                                        target: "prmx-oracle-v3",
+                                        "Failed to submit snapshot: {:?}",
+                                        e
+                                    );
+                                    local_state.record_error(ocw::OcwError::ChainSubmission, now_epoch);
+                                } else {
+                                    local_state.last_snapshot_epoch = last_epoch;
+                                    local_state.last_snapshot_sent_at = now_epoch;
+                                }
+                            }
+                            ocw::SnapshotDecision::None => {
+                                // No on-chain action needed
+                            }
+                        }
+                    }
+                    
                     local_state.save(policy_id);
                 }
                 Err(e) => {
@@ -896,6 +1138,52 @@ pub mod pallet {
             }
             
             Ok(())
+        }
+        
+        /// Submit a snapshot to the chain via unsigned transaction
+        fn submit_snapshot_on_chain(
+            policy_id: PolicyId,
+            observed_until: u64,
+            agg_state: AggStateV3,
+            commitment: [u8; 32],
+        ) -> Result<(), &'static str> {
+            use frame_system::offchain::SubmitTransaction;
+            
+            let call = Call::<T>::submit_snapshot_unsigned {
+                policy_id,
+                observed_until,
+                agg_state,
+                commitment,
+            };
+            
+            // Create a bare (unsigned) extrinsic and submit it
+            let xt = T::create_bare(call.into());
+            SubmitTransaction::<T, Call<T>>::submit_transaction(xt)
+                .map_err(|_| "Failed to submit unsigned snapshot transaction")
+        }
+        
+        /// Submit a final report to the chain via unsigned transaction
+        fn submit_final_report_on_chain(
+            policy_id: PolicyId,
+            kind: OracleReportKindV3,
+            observed_until: u64,
+            agg_state: AggStateV3,
+            commitment: [u8; 32],
+        ) -> Result<(), &'static str> {
+            use frame_system::offchain::SubmitTransaction;
+            
+            let call = Call::<T>::submit_final_report_unsigned {
+                policy_id,
+                kind,
+                observed_until,
+                agg_state,
+                commitment,
+            };
+            
+            // Create a bare (unsigned) extrinsic and submit it
+            let xt = T::create_bare(call.into());
+            SubmitTransaction::<T, Call<T>>::submit_transaction(xt)
+                .map_err(|_| "Failed to submit unsigned final report transaction")
         }
         
         /// Get the location ID for a policy

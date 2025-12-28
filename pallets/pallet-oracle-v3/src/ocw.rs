@@ -220,7 +220,7 @@ pub fn decide_snapshot_action(
 
     // Check for early trigger
     if event_spec.early_trigger {
-        if crate::pallet::Pallet::<()>::evaluate_threshold_static(event_spec, &state.agg_state) {
+        if evaluate_threshold_static(event_spec, &state.agg_state) {
             return SnapshotDecision::SendFinalTrigger;
         }
     }
@@ -231,6 +231,35 @@ pub fn decide_snapshot_action(
     }
 
     SnapshotDecision::None
+}
+
+/// Static version of evaluate_threshold for OCW (no pallet dependencies)
+pub fn evaluate_threshold_static(event_spec: &EventSpecV3, agg_state: &AggStateV3) -> bool {
+    use prmx_primitives::EventTypeV3;
+    
+    let threshold = event_spec.threshold.value;
+
+    match (event_spec.event_type, agg_state) {
+        (EventTypeV3::PrecipSumGte, AggStateV3::PrecipSum { sum_mm_x1000 }) => {
+            *sum_mm_x1000 >= threshold
+        }
+        (EventTypeV3::Precip1hGte, AggStateV3::Precip1hMax { max_1h_mm_x1000 }) => {
+            *max_1h_mm_x1000 >= threshold
+        }
+        (EventTypeV3::TempMaxGte, AggStateV3::TempMax { max_c_x1000 }) => {
+            *max_c_x1000 >= threshold
+        }
+        (EventTypeV3::TempMinLte, AggStateV3::TempMin { min_c_x1000 }) => {
+            *min_c_x1000 <= threshold
+        }
+        (EventTypeV3::WindGustMaxGte, AggStateV3::WindGustMax { max_mps_x1000 }) => {
+            *max_mps_x1000 >= threshold
+        }
+        (EventTypeV3::PrecipTypeOccurred, AggStateV3::PrecipTypeOccurred { mask }) => {
+            (*mask as i64) & threshold != 0
+        }
+        _ => false,
+    }
 }
 
 // ============================================================================
@@ -273,38 +302,4 @@ pub fn set_ingest_api_url(url: Vec<u8>) {
     storage.set(&url);
 }
 
-// ============================================================================
-// Helper trait for static evaluation
-// ============================================================================
-
-impl crate::pallet::Pallet<()> {
-    /// Static version of evaluate_threshold for OCW
-    pub fn evaluate_threshold_static(event_spec: &EventSpecV3, agg_state: &AggStateV3) -> bool {
-        use prmx_primitives::EventTypeV3;
-        
-        let threshold = event_spec.threshold.value;
-
-        match (event_spec.event_type, agg_state) {
-            (EventTypeV3::PrecipSumGte, AggStateV3::PrecipSum { sum_mm_x1000 }) => {
-                *sum_mm_x1000 >= threshold
-            }
-            (EventTypeV3::Precip1hGte, AggStateV3::Precip1hMax { max_1h_mm_x1000 }) => {
-                *max_1h_mm_x1000 >= threshold
-            }
-            (EventTypeV3::TempMaxGte, AggStateV3::TempMax { max_c_x1000 }) => {
-                *max_c_x1000 >= threshold
-            }
-            (EventTypeV3::TempMinLte, AggStateV3::TempMin { min_c_x1000 }) => {
-                *min_c_x1000 <= threshold
-            }
-            (EventTypeV3::WindGustMaxGte, AggStateV3::WindGustMax { max_mps_x1000 }) => {
-                *max_mps_x1000 >= threshold
-            }
-            (EventTypeV3::PrecipTypeOccurred, AggStateV3::PrecipTypeOccurred { mask }) => {
-                (*mask as i64) & threshold != 0
-            }
-            _ => false,
-        }
-    }
-}
 

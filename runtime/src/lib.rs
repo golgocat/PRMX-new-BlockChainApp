@@ -553,6 +553,16 @@ parameter_types! {
     pub const MaxLpHoldersPerPolicyV3: u32 = 200;
 }
 
+/// Implement CreateBare for any call type to enable unsigned transactions
+impl<LocalCall> frame_system::offchain::CreateBare<LocalCall> for Runtime
+where
+    RuntimeCall: From<LocalCall>,
+{
+    fn create_bare(call: RuntimeCall) -> UncheckedExtrinsic {
+        UncheckedExtrinsic::new_bare(call)
+    }
+}
+
 /// V3 Oracle Pallet Configuration
 impl pallet_oracle_v3::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;

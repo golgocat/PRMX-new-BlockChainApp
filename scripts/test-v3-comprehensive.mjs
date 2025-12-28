@@ -598,6 +598,178 @@ async function testMaturitySettlement(api, alice, bob, charlie, dave, policyId) 
     console.log('');
 }
 
+async function testRequestCancellation(api, bob, charlie, locationId) {
+    console.log('\n🚫 TEST 8: Request Cancellation');
+    console.log('─'.repeat(50));
+
+    const totalShares = 10n;
+    const premiumPerShare = 10_000_000n;
+    const now = Math.floor(Date.now() / 1000);
+
+    const eventSpec = {
+        event_type: { PrecipSumGte: null },
+        threshold: {
+            value: 50_000,
+            unit: { MmX1000: null },
+        },
+        early_trigger: true,
+    };
+
+    // Create request
+    const bobBalanceBefore = await getUsdtBalance(api, bob.address);
+    const { events } = await signAndSend(
+        api.tx.prmxMarketV3.createUnderwriteRequest(
+            locationId,
+            eventSpec,
+            totalShares.toString(),
+            premiumPerShare.toString(),
+            now + 60,
+            now + 86400,
+            now + 3600
+        ),
+        bob,
+        api
+    );
+
+    let requestId;
+    for (const { event } of events) {
+        if (event.section === 'prmxMarketV3' && event.method === 'RequestCreated') {
+            requestId = event.data[0].toNumber();
+            break;
+        }
+    }
+
+    console.log(`   Created request ${requestId} for cancellation test`);
+
+    // Charlie accepts 3 shares (partial)
+    await signAndSend(
+        api.tx.prmxMarketV3.acceptUnderwriteRequest(requestId, '3'),
+        charlie,
+        api
+    );
+    console.log('   Charlie accepted 3 shares (partial fill)');
+
+    // Bob cancels remaining 7 shares
+    const bobAfterAccept = await getUsdtBalance(api, bob.address);
+    const { events: cancelEvents } = await signAndSend(
+        api.tx.prmxMarketV3.cancelUnderwriteRequest(requestId),
+        bob,
+        api
+    );
+
+    let premiumReturned = 0n;
+    let cancelledEvent = false;
+    for (const { event } of cancelEvents) {
+        if (event.section === 'prmxMarketV3' && event.method === 'RequestCancelled') {
+            cancelledEvent = true;
+            premiumReturned = BigInt(event.data[2].toString());
+        }
+    }
+
+    const bobAfterCancel = await getUsdtBalance(api, bob.address);
+    const expectedRefund = 7n * premiumPerShare; // 7 unfilled shares
+
+    console.log(`   Premium returned: ${formatUsdt(premiumReturned)}`);
+    console.log(`   Bob balance change: +${formatUsdt(bobAfterCancel - bobAfterAccept)}`);
+
+    logTest('Request cancelled event emitted', cancelledEvent === true);
+    logTest('Premium refunded for unfilled shares', premiumReturned === expectedRefund,
+        `Expected ${formatUsdt(expectedRefund)}, got ${formatUsdt(premiumReturned)}`);
+    logTest('Bob received refund', bobAfterCancel - bobAfterAccept === expectedRefund);
+
+    // Verify request status
+    const request = await api.query.prmxMarketV3.underwriteRequests(requestId);
+    const requestData = request.unwrap();
+    const statusStr = requestData.status.toString().toLowerCase();
+    logTest('Request status is Cancelled', statusStr.includes('cancelled'), `Status: ${requestData.status.toString()}`);
+
+    // Verify policy still exists with partial coverage
+    const policy = await api.query.prmxPolicyV3.policies(requestId);
+    logTest('Policy exists with partial coverage', policy.isSome);
+
+    console.log('');
+    return requestId;
+}
+
+async function testOracleStateInitialization(api, alice, policyId) {
+    console.log('\n🔮 TEST 9: Oracle State Verification');
+    console.log('─'.repeat(50));
+
+    const oracleState = await api.query.prmxOracleV3.oracleStates(policyId);
+    
+    if (oracleState.isSome) {
+        const state = oracleState.unwrap();
+        console.log(`   Policy ID: ${policyId}`);
+        console.log(`   Status: ${state.status.toString()}`);
+        console.log(`   Observed until: ${state.observedUntil.toString()}`);
+        
+        logTest('Oracle state exists', true);
+        logTest('Oracle status is Active', state.status.toString().toLowerCase().includes('active'));
+    } else {
+        logTest('Oracle state exists', false, 'State not found');
+    }
+
+    console.log('');
+}
+
+async function testValidationErrors(api, bob, charlie, locationId) {
+    console.log('\n⚠️  TEST 10: Validation & Error Handling');
+    console.log('─'.repeat(50));
+
+    const now = Math.floor(Date.now() / 1000);
+    const eventSpec = {
+        event_type: { PrecipSumGte: null },
+        threshold: { value: 50_000, unit: { MmX1000: null } },
+        early_trigger: true,
+    };
+
+    // Test: Cannot accept own request
+    const { events } = await signAndSend(
+        api.tx.prmxMarketV3.createUnderwriteRequest(
+            locationId, eventSpec, '5', '10000000',
+            now + 60, now + 86400, now + 3600
+        ),
+        bob,
+        api
+    );
+
+    let requestId;
+    for (const { event } of events) {
+        if (event.section === 'prmxMarketV3' && event.method === 'RequestCreated') {
+            requestId = event.data[0].toNumber();
+            break;
+        }
+    }
+
+    try {
+        await signAndSend(
+            api.tx.prmxMarketV3.acceptUnderwriteRequest(requestId, '2'),
+            bob, // Bob trying to accept his own request
+            api
+        );
+        logTest('Cannot accept own request', false, 'Should have failed');
+    } catch (e) {
+        logTest('Cannot accept own request', e.message.includes('RequesterCannotUnderwrite'),
+            e.message.includes('RequesterCannotUnderwrite') ? '' : e.message);
+    }
+
+    // Test: Cannot accept more than available
+    try {
+        await signAndSend(
+            api.tx.prmxMarketV3.acceptUnderwriteRequest(requestId, '100'), // Only 5 shares total
+            charlie,
+            api
+        );
+        logTest('Cannot over-accept shares', false, 'Should have failed');
+    } catch (e) {
+        logTest('Cannot over-accept shares', e.message.includes('InsufficientShares') || 
+            e.message.includes('ArithmeticOverflow'),
+            e.message.includes('InsufficientShares') || e.message.includes('ArithmeticOverflow') ? '' : e.message);
+    }
+
+    console.log('');
+}
+
 // =============================================================================
 // Main Test Flow
 // =============================================================================
@@ -649,7 +821,26 @@ async function main() {
     const { requestId: requestIdB } = await testCreateRequest(api, bob, locationId);
     await testPartialAcceptance(api, charlie, requestIdB, 5n);
     await testFullAcceptance(api, dave, requestIdB, 5n);
+    await testOracleStateInitialization(api, alice, requestIdB);
     await testMaturitySettlement(api, alice, bob, charlie, dave, requestIdB);
+
+    // Wait a bit between scenarios
+    await sleep(2000);
+
+    console.log('═'.repeat(70));
+    console.log('SCENARIO C: Request Cancellation');
+    console.log('═'.repeat(70));
+
+    await testRequestCancellation(api, bob, charlie, locationId);
+
+    // Wait a bit between scenarios
+    await sleep(2000);
+
+    console.log('═'.repeat(70));
+    console.log('SCENARIO D: Validation & Error Handling');
+    console.log('═'.repeat(70));
+
+    await testValidationErrors(api, bob, charlie, locationId);
 
     // Summary
     console.log('═'.repeat(70));

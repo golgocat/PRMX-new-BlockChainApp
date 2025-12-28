@@ -243,13 +243,23 @@ pub fn send_observations_batch(
         commitment_after,
     );
     
-    // Compute HMAC signature
-    let signature = commitment::compute_hmac_signature(hmac_secret, payload.as_bytes());
-    let signature_hex = hex_encode(&signature);
+    // Get current timestamp in milliseconds
+    let timestamp = sp_io::offchain::timestamp().unix_millis();
+    let timestamp_str = format!("{}", timestamp);
     
     // Generate nonce
     let nonce = commitment::generate_nonce();
     let nonce_hex = hex_encode(&nonce);
+    
+    // Compute signature: Blake2(secret || payload || timestamp || nonce)
+    let mut sign_data = Vec::new();
+    sign_data.extend_from_slice(hmac_secret);
+    sign_data.extend_from_slice(payload.as_bytes());
+    sign_data.extend_from_slice(timestamp_str.as_bytes());
+    sign_data.extend_from_slice(nonce_hex.as_bytes());
+    
+    let signature = commitment::compute_hmac_signature(&[], &sign_data);
+    let signature_hex = hex_encode(&signature);
     
     log::info!(
         target: "prmx-oracle-v3",
@@ -263,6 +273,7 @@ pub fn send_observations_batch(
     let request = http::Request::post(&full_url, alloc::vec![body_bytes])
         .add_header("Content-Type", "application/json")
         .add_header("X-HMAC-Signature", &signature_hex)
+        .add_header("X-Timestamp", &timestamp_str)
         .add_header("X-Nonce", &nonce_hex);
     
     let timeout = sp_io::offchain::timestamp()
@@ -317,13 +328,23 @@ pub fn send_snapshot(
         commitment,
     );
     
-    // Compute HMAC signature
-    let signature = commitment::compute_hmac_signature(hmac_secret, payload.as_bytes());
-    let signature_hex = hex_encode(&signature);
+    // Get current timestamp in milliseconds
+    let timestamp = sp_io::offchain::timestamp().unix_millis();
+    let timestamp_str = format!("{}", timestamp);
     
     // Generate nonce
     let nonce = commitment::generate_nonce();
     let nonce_hex = hex_encode(&nonce);
+    
+    // Compute signature: Blake2(secret || payload || timestamp || nonce)
+    let mut sign_data = Vec::new();
+    sign_data.extend_from_slice(hmac_secret);
+    sign_data.extend_from_slice(payload.as_bytes());
+    sign_data.extend_from_slice(timestamp_str.as_bytes());
+    sign_data.extend_from_slice(nonce_hex.as_bytes());
+    
+    let signature = commitment::compute_hmac_signature(&[], &sign_data);
+    let signature_hex = hex_encode(&signature);
     
     log::info!(
         target: "prmx-oracle-v3",
@@ -336,6 +357,7 @@ pub fn send_snapshot(
     let request = http::Request::post(&full_url, alloc::vec![body_bytes])
         .add_header("Content-Type", "application/json")
         .add_header("X-HMAC-Signature", &signature_hex)
+        .add_header("X-Timestamp", &timestamp_str)
         .add_header("X-Nonce", &nonce_hex);
     
     let timeout = sp_io::offchain::timestamp()

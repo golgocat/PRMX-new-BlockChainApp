@@ -86,6 +86,43 @@ export declare function getEvidence(): Collection<Evidence>;
  */
 export declare function makeMonitorId(marketId: number, policyId: number): string;
 /**
+ * V3 Observation document structure
+ */
+export interface ObservationV3 {
+    _id: string;
+    policy_id: number;
+    epoch_time: number;
+    location_key: string;
+    event_type: string;
+    fields: Record<string, number>;
+    sample_hash: string;
+    commitment_after: string;
+    inserted_at: Date;
+}
+/**
+ * V3 Snapshot document structure
+ */
+export interface SnapshotV3 {
+    _id: string;
+    policy_id: number;
+    observed_until: number;
+    agg_state: object;
+    commitment: string;
+    inserted_at: Date;
+}
+/**
+ * Get V3 observations collection
+ */
+export declare function getObservationsV3(): Collection<ObservationV3>;
+/**
+ * Get V3 snapshots collection
+ */
+export declare function getSnapshotsV3(): Collection<SnapshotV3>;
+/**
+ * Ensure V3 indexes with TTL
+ */
+export declare function ensureV3Indexes(): Promise<void>;
+/**
  * Disconnect from MongoDB
  */
 export declare function disconnect(): Promise<void>;

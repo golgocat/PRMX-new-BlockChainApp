@@ -8,6 +8,7 @@ import { getMonitors, getBuckets, getEvidence, clearAllData, getObservationsV3, 
 import { runEvaluationCycle } from '../scheduler/monitor.js';
 import { evaluateMonitor } from '../evaluator/cumulative.js';
 import { fetchPrecipitation, fetchCurrentConditions, fetchHistorical24Hours } from '../accuweather/fetcher.js';
+import { config } from '../config.js';
 import crypto from 'crypto';
 
 /**
@@ -484,15 +485,27 @@ export function setupRoutes(app: Application): void {
   // V3 Ingest API Endpoints
   // =========================================================================
 
-  // HMAC secret for V3 ingest authentication
-  const V3_INGEST_HMAC_SECRET = process.env.V3_INGEST_HMAC_SECRET || 'default-dev-secret-change-in-production';
-  const V3_NONCE_WINDOW_MS = 5 * 60 * 1000; // 5 minute window for timestamp validation
+  // HMAC secret for V3 ingest authentication (from config)
+  const V3_INGEST_HMAC_SECRET = config.v3IngestHmacSecret;
+  const V3_NONCE_WINDOW_MS = config.v3NonceWindowMs;
+  const V3_DEV_MODE = config.v3DevMode;
   const usedNonces = new Map<string, number>(); // In production, use Redis
+  
+  if (V3_DEV_MODE) {
+    console.log('⚠️  V3 Ingest API running in DEV MODE - auth validation disabled');
+  }
 
   /**
    * Validate HMAC signature for V3 requests
+   * Supports both Blake2 (from OCW) and HMAC-SHA256 signatures
    */
   function validateV3Signature(req: Request): { valid: boolean; error?: string } {
+    // Skip auth in dev mode
+    if (V3_DEV_MODE) {
+      console.log('⚠️  V3 dev mode: skipping auth validation');
+      return { valid: true };
+    }
+
     const signature = req.headers['x-hmac-signature'] as string;
     const timestamp = req.headers['x-timestamp'] as string;
     const nonce = req.headers['x-nonce'] as string;
@@ -522,23 +535,57 @@ export function setupRoutes(app: Application): void {
       }
     }
 
-    // Compute expected signature
-    const payload = JSON.stringify(req.body) + timestamp + nonce;
-    const expectedSig = crypto
-      .createHmac('sha256', V3_INGEST_HMAC_SECRET)
-      .update(payload)
-      .digest('hex');
-
-    if (signature !== expectedSig) {
-      return { valid: false, error: 'Invalid signature' };
+    // Get raw body for signature verification
+    // The OCW sends: Blake2(secret || payload || timestamp || nonce)
+    const rawBody = JSON.stringify(req.body);
+    const signatureInput = V3_INGEST_HMAC_SECRET + rawBody + timestamp + nonce;
+    
+    // Try Blake2-256 signature (from Substrate OCW)
+    const blake2Sig = computeBlake2Signature(signatureInput);
+    if (signature === blake2Sig) {
+      return { valid: true };
     }
 
-    return { valid: true };
+    // Fallback to HMAC-SHA256 for testing tools
+    const hmacSig = crypto
+      .createHmac('sha256', V3_INGEST_HMAC_SECRET)
+      .update(rawBody + timestamp + nonce)
+      .digest('hex');
+
+    if (signature === hmacSig) {
+      return { valid: true };
+    }
+
+    console.log('Signature mismatch:');
+    console.log('  Received:', signature);
+    console.log('  Expected Blake2:', blake2Sig);
+    console.log('  Expected HMAC:', hmacSig);
+
+    return { valid: false, error: 'Invalid signature' };
+  }
+
+  /**
+   * Compute Blake2-256 signature (matching Substrate's BlakeTwo256)
+   */
+  function computeBlake2Signature(input: string): string {
+    // Use blake2b with 256-bit output to match Substrate's BlakeTwo256
+    const blake2b = crypto.createHash('blake2b512');
+    blake2b.update(input);
+    // Take first 32 bytes (256 bits) to match Blake2-256
+    return blake2b.digest('hex').slice(0, 64);
   }
 
   /**
    * POST /v1/observations/batch
    * Receive observation batch from OCW
+   * 
+   * OCW sends samples with fields:
+   * - epoch_time: number
+   * - precip_1h_mm_x1000: number
+   * - temp_c_x1000: number
+   * - wind_gust_mps_x1000: number
+   * - precip_type_mask: number
+   * - sample_hash: string (hex)
    */
   app.post('/v1/observations/batch', async (req: Request, res: Response) => {
     try {
@@ -551,13 +598,13 @@ export function setupRoutes(app: Application): void {
         });
       }
 
-      const { oracle_id, policy_id, location_key, event_type, samples, commitment_after, nonce } = req.body;
+      const { policy_id, location_key, samples, commitment_after } = req.body;
 
-      // Validate required fields
-      if (!oracle_id || policy_id === undefined || !samples || !Array.isArray(samples)) {
+      // Validate required fields - oracle_id is optional for OCW
+      if (policy_id === undefined || !samples || !Array.isArray(samples)) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: oracle_id, policy_id, samples',
+          error: 'Missing required fields: policy_id, samples',
         });
       }
 
@@ -567,12 +614,21 @@ export function setupRoutes(app: Application): void {
       let rejectedInvalid = 0;
 
       for (const sample of samples) {
-        if (!sample.epoch_time || !sample.sample_hash) {
+        if (!sample.epoch_time) {
           rejectedInvalid++;
           continue;
         }
 
         const docId = `${policy_id}:${sample.epoch_time}`;
+        
+        // Extract fields from OCW format
+        const fields: Record<string, number> = {};
+        if (sample.precip_1h_mm_x1000 !== undefined) fields.precip_1h_mm_x1000 = sample.precip_1h_mm_x1000;
+        if (sample.temp_c_x1000 !== undefined) fields.temp_c_x1000 = sample.temp_c_x1000;
+        if (sample.wind_gust_mps_x1000 !== undefined) fields.wind_gust_mps_x1000 = sample.wind_gust_mps_x1000;
+        if (sample.precip_type_mask !== undefined) fields.precip_type_mask = sample.precip_type_mask;
+        // Also support normalized_fields from test tools
+        if (sample.normalized_fields) Object.assign(fields, sample.normalized_fields);
         
         try {
           const result = await observations.updateOne(
@@ -582,9 +638,9 @@ export function setupRoutes(app: Application): void {
                 policy_id,
                 epoch_time: sample.epoch_time,
                 location_key: location_key || '',
-                event_type: event_type || '',
-                fields: sample.normalized_fields || {},
-                sample_hash: sample.sample_hash,
+                event_type: '', // Event type is in policy metadata, not per-observation
+                fields,
+                sample_hash: sample.sample_hash || '',
                 commitment_after: commitment_after || '',
                 inserted_at: new Date(),
               }
@@ -623,6 +679,12 @@ export function setupRoutes(app: Application): void {
   /**
    * POST /v1/snapshots
    * Receive snapshot from OCW
+   * 
+   * OCW sends:
+   * - policy_id: number
+   * - observed_until: number
+   * - agg_state: string (hex-encoded SCALE bytes)
+   * - commitment: string (hex)
    */
   app.post('/v1/snapshots', async (req: Request, res: Response) => {
     try {
@@ -635,18 +697,27 @@ export function setupRoutes(app: Application): void {
         });
       }
 
-      const { oracle_id, policy_id, observed_until, agg_state, commitment, nonce } = req.body;
+      const { policy_id, observed_until, agg_state, commitment } = req.body;
 
-      // Validate required fields
-      if (!oracle_id || policy_id === undefined || observed_until === undefined || !commitment) {
+      // Validate required fields - oracle_id is optional for OCW
+      if (policy_id === undefined || observed_until === undefined || !commitment) {
         return res.status(400).json({
           success: false,
-          error: 'Missing required fields: oracle_id, policy_id, observed_until, commitment',
+          error: 'Missing required fields: policy_id, observed_until, commitment',
         });
       }
 
       const snapshots = getSnapshotsV3();
       const docId = `${policy_id}:${observed_until}`;
+
+      // Handle agg_state - can be hex string or object
+      let parsedAggState: object;
+      if (typeof agg_state === 'string') {
+        // Hex-encoded SCALE bytes from OCW
+        parsedAggState = { encoded: agg_state };
+      } else {
+        parsedAggState = agg_state || {};
+      }
 
       const result = await snapshots.updateOne(
         { _id: docId },
@@ -654,7 +725,7 @@ export function setupRoutes(app: Application): void {
           $setOnInsert: {
             policy_id,
             observed_until,
-            agg_state: agg_state || {},
+            agg_state: parsedAggState,
             commitment,
             inserted_at: new Date(),
           }

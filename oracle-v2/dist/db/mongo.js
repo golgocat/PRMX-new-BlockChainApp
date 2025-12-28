@@ -106,6 +106,8 @@ async function ensureIndexes() {
     await monitors.createIndex({ state: 1 });
     await monitors.createIndex({ market_id: 1 });
     await buckets.createIndex({ monitor_id: 1 });
+    // Also create V3 indexes
+    await ensureV3Indexes();
 }
 /**
  * Get monitors collection
@@ -136,6 +138,40 @@ export function getEvidence() {
  */
 export function makeMonitorId(marketId, policyId) {
     return `${marketId}:${policyId}`;
+}
+/**
+ * Get V3 observations collection
+ */
+export function getObservationsV3() {
+    if (!db)
+        throw new Error('Database not connected');
+    return db.collection('observations_v3');
+}
+/**
+ * Get V3 snapshots collection
+ */
+export function getSnapshotsV3() {
+    if (!db)
+        throw new Error('Database not connected');
+    return db.collection('snapshots_v3');
+}
+/**
+ * Ensure V3 indexes with TTL
+ */
+export async function ensureV3Indexes() {
+    if (!db)
+        throw new Error('Database not connected');
+    const observations = db.collection('observations_v3');
+    const snapshots = db.collection('snapshots_v3');
+    // Observations: unique compound index + TTL (30 days)
+    await observations.createIndex({ policy_id: 1, epoch_time: 1 });
+    await observations.createIndex({ inserted_at: 1 }, { expireAfterSeconds: 30 * 24 * 3600 } // 30 days
+    );
+    // Snapshots: unique compound index + TTL (90 days)
+    await snapshots.createIndex({ policy_id: 1, observed_until: 1 });
+    await snapshots.createIndex({ inserted_at: 1 }, { expireAfterSeconds: 90 * 24 * 3600 } // 90 days
+    );
+    console.log('✅ V3 indexes created with TTL');
 }
 /**
  * Disconnect from MongoDB

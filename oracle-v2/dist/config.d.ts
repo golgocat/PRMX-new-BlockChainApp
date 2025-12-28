@@ -1,5 +1,6 @@
 /**
  * Configuration for V2 Oracle Service
+ * Extended with V3 Ingest API settings
  */
 export declare const config: {
     mongodbUri: string;
@@ -11,4 +12,7 @@ export declare const config: {
     manilaLocationKey: string;
     manilaMarketId: number;
     apiPort: number;
+    v3IngestHmacSecret: string;
+    v3DevMode: boolean;
+    v3NonceWindowMs: number;
 };

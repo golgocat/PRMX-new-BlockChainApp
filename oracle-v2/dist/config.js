@@ -1,5 +1,6 @@
 /**
  * Configuration for V2 Oracle Service
+ * Extended with V3 Ingest API settings
  */
 import dotenv from 'dotenv';
 dotenv.config();
@@ -21,4 +22,13 @@ export const config = {
     manilaMarketId: 0,
     // REST API port
     apiPort: parseInt(process.env.API_PORT || '3001', 10),
+    // =========================================================================
+    // V3 Ingest API Settings
+    // =========================================================================
+    // HMAC secret for V3 ingest authentication
+    v3IngestHmacSecret: process.env.V3_INGEST_HMAC_SECRET || 'default-dev-secret-change-in-production',
+    // Enable dev mode (skip auth validation)
+    v3DevMode: process.env.V3_DEV_MODE === 'true',
+    // Nonce window for replay protection (5 minutes)
+    v3NonceWindowMs: parseInt(process.env.V3_NONCE_WINDOW_MS || '300000', 10),
 };

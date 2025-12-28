@@ -56,19 +56,28 @@ function getStatusBadge(status: V3PolicyStatus, coverageEnd: number) {
 }
 
 function formatAggStateValue(aggState: V3AggState): string {
+  // Check for sentinel values (i64::MIN for max types, i64::MAX for min types)
+  // These indicate no observations have been recorded yet
+  const I64_MIN_APPROX = -9223372036854775000; // Close to i64::MIN
+  const I64_MAX_APPROX = 9223372036854775000;  // Close to i64::MAX
+  
   switch (aggState.type) {
     case 'PrecipSum':
       return `${(aggState.sumMmX1000 / 1000).toFixed(1)} mm`;
     case 'Precip1hMax':
+      if (aggState.max1hMmX1000 < I64_MIN_APPROX) return 'No data';
       return `${(aggState.max1hMmX1000 / 1000).toFixed(1)} mm/hr`;
     case 'TempMax':
+      if (aggState.maxCX1000 < I64_MIN_APPROX) return 'No data';
       return `${(aggState.maxCX1000 / 1000).toFixed(1)}°C`;
     case 'TempMin':
+      if (aggState.minCX1000 > I64_MAX_APPROX) return 'No data';
       return `${(aggState.minCX1000 / 1000).toFixed(1)}°C`;
     case 'WindGustMax':
+      if (aggState.maxMpsX1000 < I64_MIN_APPROX) return 'No data';
       return `${(aggState.maxMpsX1000 / 1000).toFixed(1)} m/s`;
     case 'PrecipTypeOccurred':
-      return `Mask: ${aggState.mask}`;
+      return aggState.mask === 0 ? 'None' : `Mask: ${aggState.mask}`;
     default:
       return 'N/A';
   }
@@ -121,7 +130,7 @@ export default function V3PolicyDetailPage() {
   
   if (!isConnected) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
           <Link href="/v3/policies">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -156,7 +165,7 @@ export default function V3PolicyDetailPage() {
   
   if (policyLoading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
           <Link href="/v3/policies">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -188,7 +197,7 @@ export default function V3PolicyDetailPage() {
   
   if (error || !policy) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
           <Link href="/v3/policies">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -224,7 +233,7 @@ export default function V3PolicyDetailPage() {
   ));
   
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -304,14 +313,17 @@ export default function V3PolicyDetailPage() {
                   <Activity className="w-5 h-5 text-prmx-cyan" />
                   Weather Monitoring
                 </h3>
-                {oracleState && (
-                  <span className="text-xs text-text-tertiary">
-                    Last updated: {new Date(oracleState.observedUntil * 1000).toLocaleString()}
-                  </span>
-                )}
+                <span className="text-xs text-text-tertiary">
+                  {oracleState?.observedUntil && oracleState.observedUntil > 0 
+                    ? `Last updated: ${new Date(oracleState.observedUntil * 1000).toLocaleString()}`
+                    : now < policy.coverageStart
+                      ? `Starts in ${formatTimeRemaining(policy.coverageStart)}`
+                      : 'Awaiting first observation'
+                  }
+                </span>
               </div>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
+            <CardContent className="p-6">
               {oracleLoading ? (
                 <div className="animate-pulse space-y-4">
                   <div className="h-20 bg-background-tertiary/50 rounded" />
@@ -387,7 +399,7 @@ export default function V3PolicyDetailPage() {
             <CardHeader>
               <h3 className="text-lg font-semibold">Coverage Details</h3>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
+            <CardContent className="p-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
@@ -401,9 +413,6 @@ export default function V3PolicyDetailPage() {
                       {formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)}
                     </p>
                   </div>
-                  {policy.eventSpec.earlyTrigger && (
-                    <Badge variant="warning">Early Trigger Enabled</Badge>
-                  )}
                 </div>
                 <div className="space-y-4">
                   <div>
@@ -502,7 +511,7 @@ export default function V3PolicyDetailPage() {
                 Financial Summary
               </h3>
             </CardHeader>
-            <CardContent className="p-6 pt-0 space-y-4">
+            <CardContent className="p-6 space-y-4">
               <div className="flex justify-between">
                 <span className="text-text-secondary">Total Shares</span>
                 <span className="font-medium">{policy.totalShares}</span>
@@ -536,7 +545,7 @@ export default function V3PolicyDetailPage() {
                   My Position
                 </h3>
               </CardHeader>
-              <CardContent className="p-6 pt-0 space-y-4">
+              <CardContent className="p-6 space-y-4">
                 {isHolder && (
                   <div className="p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30">
                     <p className="text-sm font-medium text-prmx-cyan">Policy Holder</p>
@@ -562,8 +571,8 @@ export default function V3PolicyDetailPage() {
                       </span>
                     </div>
                     {policy.status === 'Active' && !isExpired && (
-                      <Link href="/lp">
-                        <Button variant="secondary" size="sm" className="w-full mt-2">
+                      <Link href="/lp" className="block mt-6 pt-4 border-t border-border-secondary">
+                        <Button variant="secondary" size="sm" className="w-full">
                           Trade LP Tokens
                         </Button>
                       </Link>
@@ -579,7 +588,7 @@ export default function V3PolicyDetailPage() {
             <CardHeader>
               <h3 className="text-lg font-semibold">Policyholder</h3>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
+            <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-prmx-gradient flex items-center justify-center">
                   <Shield className="w-5 h-5 text-white" />
@@ -615,6 +624,10 @@ export default function V3PolicyDetailPage() {
 
 // Helper function to calculate progress to trigger
 function getProgressToTrigger(aggState: V3AggState, threshold: number): number {
+  // Sentinel values for uninitialized aggregation state
+  const I64_MIN_APPROX = -9223372036854775000;
+  const I64_MAX_APPROX = 9223372036854775000;
+  
   let currentValue: number;
   
   switch (aggState.type) {
@@ -622,16 +635,20 @@ function getProgressToTrigger(aggState: V3AggState, threshold: number): number {
       currentValue = aggState.sumMmX1000;
       break;
     case 'Precip1hMax':
+      if (aggState.max1hMmX1000 < I64_MIN_APPROX) return 0;
       currentValue = aggState.max1hMmX1000;
       break;
     case 'TempMax':
+      if (aggState.maxCX1000 < I64_MIN_APPROX) return 0;
       currentValue = aggState.maxCX1000;
       break;
     case 'TempMin':
+      if (aggState.minCX1000 > I64_MAX_APPROX) return 0;
       // For min temp, we want to track how close we are to going below threshold
       // This is inverted logic
       return threshold > 0 ? Math.max(0, 100 - (aggState.minCX1000 / threshold) * 100) : 0;
     case 'WindGustMax':
+      if (aggState.maxMpsX1000 < I64_MIN_APPROX) return 0;
       currentValue = aggState.maxMpsX1000;
       break;
     case 'PrecipTypeOccurred':
@@ -642,6 +659,6 @@ function getProgressToTrigger(aggState: V3AggState, threshold: number): number {
   }
   
   if (threshold <= 0) return 0;
-  return (currentValue / threshold) * 100;
+  return Math.max(0, (currentValue / threshold) * 100);
 }
 

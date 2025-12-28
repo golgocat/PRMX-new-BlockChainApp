@@ -269,13 +269,6 @@ export default function V3PoliciesPage() {
                         ? "You don't have LP holdings in any V3 policies"
                         : "No policies match your search"
                   }
-                  action={
-                    <Link href="/v3/requests">
-                      <Button size="sm">
-                        Browse Marketplace
-                      </Button>
-                    </Link>
-                  }
                 />
               ) : (
                 filteredPolicies.map((policy) => {

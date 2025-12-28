@@ -41,6 +41,7 @@ import { formatUSDT, formatAddress, formatDateTimeUTC } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory, useLpPositionOutcomes, addTradeToHistory } from '@/hooks/useChainData';
+import { useV3Policies } from '@/hooks/useV3ChainData';
 import * as api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -70,6 +71,7 @@ export default function LpTradingPage() {
   const { orders, loading: ordersLoading, refresh: refreshOrders } = useLpOrders();
   const { holdings, loading: holdingsLoading, refresh: refreshHoldings } = useMyLpHoldings();
   const { policies } = usePolicies();
+  const { policies: v3Policies } = useV3Policies();
   const { markets } = useMarkets();
   const { trades, loading: tradesLoading, refresh: refreshTrades, addTrade, clearHistory } = useTradeHistory();
   const { outcomes, loading: outcomesLoading, refresh: refreshOutcomes } = useLpPositionOutcomes();
@@ -78,8 +80,30 @@ export default function LpTradingPage() {
   // Active tab state
   const [activeTab, setActiveTab] = useState<'orderbook' | 'history'>('orderbook');
 
-  // Helper to get policy by ID
-  const getPolicyById = (policyId: number) => policies.find(p => p.id === policyId);
+  // Helper to get policy by ID (checks V1/V2 first, then V3)
+  const getPolicyById = (policyId: number) => {
+    const v1v2Policy = policies.find(p => p.id === policyId);
+    if (v1v2Policy) return v1v2Policy;
+    
+    // Check V3 policies and adapt to compatible format
+    const v3Policy = v3Policies.find(p => p.id === policyId);
+    if (v3Policy) {
+      return {
+        id: v3Policy.id,
+        label: `Policy #${v3Policy.id}`,
+        marketId: -1, // V3 doesn't use markets
+        policyVersion: 'V3' as const,
+        coverageStart: v3Policy.coverageStart,
+        coverageEnd: v3Policy.coverageEnd,
+        capitalPool: {
+          totalShares: v3Policy.totalShares,
+        },
+        // V3-specific: store location name for display
+        locationName: v3Policy.location?.name,
+      };
+    }
+    return undefined;
+  };
   
   // Helper to get market by ID
   const getMarketById = (marketId: number) => markets.find(m => m.id === marketId);
@@ -636,7 +660,7 @@ export default function LpTradingPage() {
                               <div className="flex items-center gap-2">
                                 <span className="font-semibold">{policy?.label || `Policy #${order.policyId}`}</span>
                                 <Badge 
-                                  variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                                  variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
                                   className="text-xs"
                                 >
                                   {policy?.policyVersion || 'V1'}
@@ -795,65 +819,73 @@ export default function LpTradingPage() {
                     const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
                     const potentialPayout = holding.shares * (market?.payoutPerShare || BigInt(100_000_000));
                     const defiInfo = policyDefiInfoMap.get(holding.policyId);
+                    const isExpiringSoon = daysRemaining <= 3 && daysRemaining > 0;
+                    const isEnded = daysRemaining <= 0;
                     
                     return (
                     <div
                       key={index}
                       onClick={() => handleOpenHoldingModal(holding.policyId)}
-                      className="p-3 rounded-xl bg-background-tertiary/50 border border-border-secondary cursor-pointer hover:bg-background-tertiary/80 hover:border-prmx-cyan/50 transition-all group"
+                      className="p-4 rounded-xl bg-background-tertiary/30 border border-border-secondary cursor-pointer hover:bg-background-tertiary/60 hover:border-prmx-cyan/50 transition-all group"
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                          <span className="font-medium group-hover:text-prmx-cyan transition-colors">{policy?.label || `Policy #${holding.policyId}`}</span>
-                            <Badge 
-                              variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
-                              className="text-xs"
-                            >
-                              {policy?.policyVersion || 'V1'}
-                            </Badge>
-                            {/* DeFi Allocation Indicator */}
-                            {defiInfo?.isAllocatedToDefi && (
-                              <Badge variant="success" className="text-xs px-1.5 py-0.5">
-                                📈 DeFi
+                      {/* Top Row: Policy ID + Badges */}
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center text-white font-bold text-sm">
+                            #{holding.policyId}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <Badge 
+                                variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                                className="text-xs px-2"
+                              >
+                                {policy?.policyVersion || 'V1'}
                               </Badge>
+                              {defiInfo?.isAllocatedToDefi && (
+                                <Badge variant="success" className="text-xs px-1.5">
+                                  📈
+                                </Badge>
+                              )}
+                            </div>
+                            {(market || policy?.locationName) && (
+                              <p className="text-xs text-text-tertiary flex items-center gap-1 mt-0.5">
+                                <MapPin className="w-3 h-3" />
+                                {market?.name || policy?.locationName}
+                              </p>
                             )}
                           </div>
-                          {market && (
-                            <p className="text-xs text-text-secondary flex items-center gap-1 mt-0.5">
-                              <MapPin className="w-3 h-3" />
-                              {market.name}
-                            </p>
-                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="success">{holding.shares.toString()} shares</Badge>
-                          <ChevronRight className="w-4 h-4 text-text-tertiary group-hover:text-prmx-cyan transition-colors" />
-                        </div>
+                        <ChevronRight className="w-5 h-5 text-text-tertiary group-hover:text-prmx-cyan transition-colors" />
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-text-secondary">Max Payout: </span>
-                          <span className="text-success font-medium">
-                            {formatUSDT(potentialPayout)}
-                          </span>
-                        </div>
-                        {policy && (
-                          <div className="text-right">
-                            <span className="text-text-secondary">Expires: </span>
-                            <span className={cn(
-                              "font-medium",
-                              daysRemaining <= 3 ? "text-warning" : "text-text-primary"
-                            )}>
-                              {daysRemaining > 0 ? `${daysRemaining}d` : 'Ended'}
-                            </span>
+                      
+                      {/* Stats Row */}
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <span className="text-text-tertiary text-xs">Shares</span>
+                            <p className="font-semibold text-prmx-cyan">{holding.shares.toString()}</p>
                           </div>
-                        )}
+                          <div>
+                            <span className="text-text-tertiary text-xs">Payout</span>
+                            <p className="font-semibold text-success">{formatUSDT(potentialPayout)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-text-tertiary text-xs">Expires</span>
+                          <p className={cn(
+                            "font-semibold",
+                            isEnded ? "text-error" : isExpiringSoon ? "text-warning" : "text-text-primary"
+                          )}>
+                            {isEnded ? 'Ended' : `${daysRemaining}d`}
+                          </p>
+                        </div>
                       </div>
+                      
                       {/* DeFi Principal Display */}
                       {defiInfo?.position && (
-                        <div className="mt-2 pt-2 border-t border-border-secondary/50 text-xs">
-                          <span className="text-text-tertiary">DeFi Allocated: </span>
+                        <div className="mt-3 pt-3 border-t border-border-secondary/30 flex items-center justify-between text-xs">
+                          <span className="text-text-tertiary">DeFi Allocated</span>
                           <span className="text-prmx-purple-light font-medium">
                             {formatUSDT(defiInfo.position.principalUsdt)}
                           </span>
@@ -1345,7 +1377,7 @@ export default function LpTradingPage() {
                     <div className="flex items-center gap-2">
                       <h4 className="font-semibold">{policy?.label || `Policy #${selectedOrder.policyId}`}</h4>
                       <Badge 
-                        variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                        variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
                         className="text-xs"
                       >
                         {policy?.policyVersion || 'V1'}
@@ -1543,7 +1575,7 @@ export default function LpTradingPage() {
                 <div className="flex items-center gap-2">
                   <h3 className="text-xl font-bold">{policy?.label || `Policy #${selectedHoldingPolicyId}`}</h3>
                   <Badge 
-                    variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                    variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
                     className="text-sm"
                   >
                     {policy?.policyVersion || 'V1'}
@@ -1851,7 +1883,7 @@ export default function LpTradingPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold">{policy.label || `Policy #${selectedTrade.policyId}`}</span>
                           <Badge 
-                            variant={policy.policyVersion === 'V2' ? 'purple' : 'default'} 
+                            variant={policy.policyVersion === 'V3' ? 'cyan' : policy.policyVersion === 'V2' ? 'purple' : 'default'} 
                             className="text-xs"
                           >
                             {policy.policyVersion || 'V1'}
@@ -2034,7 +2066,7 @@ export default function LpTradingPage() {
                         <div className="flex items-center gap-2">
                           <span className="font-semibold">{policy.label || `Policy #${selectedOutcome.policyId}`}</span>
                           <Badge 
-                            variant={policy.policyVersion === 'V2' ? 'purple' : 'default'} 
+                            variant={policy.policyVersion === 'V3' ? 'cyan' : policy.policyVersion === 'V2' ? 'purple' : 'default'} 
                             className="text-xs"
                           >
                             {policy.policyVersion || 'V1'}
@@ -2206,7 +2238,7 @@ export default function LpTradingPage() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xl font-bold">{policy?.label || `Policy #${order.policyId}`}</span>
                         <Badge 
-                          variant={policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                          variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
                           className="text-xs"
                         >
                           {policy?.policyVersion || 'V1'}

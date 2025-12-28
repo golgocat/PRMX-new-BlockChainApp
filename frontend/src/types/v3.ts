@@ -247,8 +247,11 @@ export interface V3Acceptance {
 // Utility Functions
 // =============================================================================
 
-export function formatThresholdValue(value: number, unit: V3ThresholdUnit): string {
-  switch (unit) {
+export function formatThresholdValue(value: number, unit: V3ThresholdUnit | string): string {
+  // Normalize unit to handle different formats from chain
+  const normalizedUnit = normalizeUnit(unit);
+  
+  switch (normalizedUnit) {
     case 'MmX1000':
       return `${(value / 1000).toFixed(1)} mm`;
     case 'CelsiusX1000':
@@ -258,8 +261,33 @@ export function formatThresholdValue(value: number, unit: V3ThresholdUnit): stri
     case 'PrecipTypeMask':
       return `mask ${value}`;
     default:
+      // Fallback: if unit contains mm, celsius, mps, format accordingly
+      if (unit.toLowerCase().includes('mm')) {
+        return `${(value / 1000).toFixed(1)} mm`;
+      }
+      if (unit.toLowerCase().includes('celsius')) {
+        return `${(value / 1000).toFixed(1)}°C`;
+      }
+      if (unit.toLowerCase().includes('mps')) {
+        return `${(value / 1000).toFixed(1)} m/s`;
+      }
       return value.toString();
   }
+}
+
+// Helper to normalize unit strings from chain
+function normalizeUnit(unit: string): string {
+  const mapping: Record<string, string> = {
+    'mm_x1000': 'MmX1000',
+    'celsius_x1000': 'CelsiusX1000',
+    'mps_x1000': 'MpsX1000',
+    'precip_type_mask': 'PrecipTypeMask',
+    'MmX1000': 'MmX1000',
+    'CelsiusX1000': 'CelsiusX1000',
+    'MpsX1000': 'MpsX1000',
+    'PrecipTypeMask': 'PrecipTypeMask',
+  };
+  return mapping[unit] || unit;
 }
 
 export function getEventTypeInfo(type: V3EventType): V3EventTypeInfo | undefined {

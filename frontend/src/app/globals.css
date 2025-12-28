@@ -392,6 +392,28 @@ html.light .prmx-rdp .rdp-day_outside .rdp-button {
     @apply transition-all duration-200;
   }
 
+  /* DateTime picker styling for dark mode */
+  .input-field[type="datetime-local"],
+  .input-field[type="date"],
+  .input-field[type="time"] {
+    color-scheme: dark;
+  }
+
+  .input-field[type="datetime-local"]::-webkit-calendar-picker-indicator,
+  .input-field[type="date"]::-webkit-calendar-picker-indicator,
+  .input-field[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  }
+
+  .input-field[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+  .input-field[type="date"]::-webkit-calendar-picker-indicator:hover,
+  .input-field[type="time"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
+  }
+
   .select-field {
     @apply input-field appearance-none cursor-pointer;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239CA3AF'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");

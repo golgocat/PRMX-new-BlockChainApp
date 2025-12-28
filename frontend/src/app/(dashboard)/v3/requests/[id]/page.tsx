@@ -167,7 +167,7 @@ export default function V3RequestDetailPage() {
   
   if (!isConnected) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
           <Link href="/v3/requests">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -202,7 +202,7 @@ export default function V3RequestDetailPage() {
   
   if (loading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
           <Link href="/v3/requests">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -234,7 +234,7 @@ export default function V3RequestDetailPage() {
   
   if (error || !request) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-8 max-w-6xl mx-auto">
         <div className="flex items-center gap-4">
           <Link href="/v3/requests">
             <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
@@ -267,7 +267,7 @@ export default function V3RequestDetailPage() {
   const isExpired = request.expiresAt <= now;
   
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -341,15 +341,19 @@ export default function V3RequestDetailPage() {
           {/* Event Details */}
           <Card>
             <CardHeader>
-              <h3 className="text-lg font-semibold">Event Details</h3>
+              <h3 className="text-lg font-semibold">Coverage Details</h3>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
+            <CardContent className="p-6">
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <div>
                     <p className="text-sm text-text-secondary mb-1">Event Type</p>
-                    <p className="font-medium text-lg">{eventInfo?.label}</p>
-                    <p className="text-sm text-text-tertiary">{eventInfo?.description}</p>
+                    <p className="font-medium text-lg">
+                      {eventInfo?.label || request.eventSpec.eventType}
+                    </p>
+                    {eventInfo?.description && (
+                      <p className="text-sm text-text-tertiary">{eventInfo.description}</p>
+                    )}
                   </div>
                   <div>
                     <p className="text-sm text-text-secondary mb-1">Trigger Threshold</p>
@@ -357,9 +361,6 @@ export default function V3RequestDetailPage() {
                       {formatThresholdValue(request.eventSpec.threshold.value, request.eventSpec.threshold.unit)}
                     </p>
                   </div>
-                  {request.eventSpec.earlyTrigger && (
-                    <Badge variant="warning">Early Trigger Enabled</Badge>
-                  )}
                 </div>
                 <div className="space-y-4">
                   <div>
@@ -392,38 +393,47 @@ export default function V3RequestDetailPage() {
             <CardHeader>
               <h3 className="text-lg font-semibold">Financial Terms</h3>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Premium per Share</span>
-                    <span className="font-medium text-success">{formatUSDT(request.premiumPerShare)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Payout per Share</span>
-                    <span className="font-medium">{formatUSDT(request.payoutPerShare)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Collateral per Share</span>
-                    <span className="font-medium">{formatUSDT(calculateCollateral(1))}</span>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Per Share Rates */}
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium text-text-tertiary uppercase tracking-wide mb-3">Per Share</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-border-secondary">
+                      <span className="text-text-secondary">Premium</span>
+                      <span className="font-semibold text-success">{formatUSDT(request.premiumPerShare)}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-border-secondary">
+                      <span className="text-text-secondary">Payout</span>
+                      <span className="font-semibold">{formatUSDT(request.payoutPerShare)}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-text-secondary">Collateral</span>
+                      <span className="font-semibold">{formatUSDT(calculateCollateral(1))}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Total Shares</span>
-                    <span className="font-medium">{request.totalShares}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Total Premium</span>
-                    <span className="font-medium text-success">
-                      {formatUSDT(BigInt(request.totalShares) * request.premiumPerShare)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">Max Payout</span>
-                    <span className="font-medium text-prmx-cyan">
-                      {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare)}
-                    </span>
+                
+                {/* Totals */}
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium text-text-tertiary uppercase tracking-wide mb-3">Totals</h4>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between py-2 border-b border-border-secondary">
+                      <span className="text-text-secondary">Shares</span>
+                      <span className="font-semibold">{request.totalShares}</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b border-border-secondary">
+                      <span className="text-text-secondary">Total Premium</span>
+                      <span className="font-semibold text-success">
+                        {formatUSDT(BigInt(request.totalShares) * request.premiumPerShare)}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between py-2">
+                      <span className="text-text-secondary">Max Payout</span>
+                      <span className="font-semibold text-prmx-cyan text-lg">
+                        {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -435,7 +445,7 @@ export default function V3RequestDetailPage() {
             <CardHeader>
               <h3 className="text-lg font-semibold">Requester</h3>
             </CardHeader>
-            <CardContent className="p-6 pt-0">
+            <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-prmx-gradient flex items-center justify-center">
                   <Users className="w-5 h-5 text-white" />
@@ -457,7 +467,7 @@ export default function V3RequestDetailPage() {
               <CardHeader>
                 <h3 className="text-lg font-semibold">Accept Request</h3>
               </CardHeader>
-              <CardContent className="p-6 pt-0">
+              <CardContent className="p-6">
                 {canAccept ? (
                   <div className="space-y-4">
                     <div>
@@ -548,7 +558,7 @@ export default function V3RequestDetailPage() {
               <CardHeader>
                 <h3 className="text-lg font-semibold">Manage Request</h3>
               </CardHeader>
-              <CardContent className="p-6 pt-0">
+              <CardContent className="p-6">
                 {canCancel ? (
                   <div className="space-y-4">
                     <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">

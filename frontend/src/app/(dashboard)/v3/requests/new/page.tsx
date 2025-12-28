@@ -51,7 +51,8 @@ export default function NewV3RequestPage() {
   // Form state
   const [eventType, setEventType] = useState<V3EventType>('PrecipSumGte');
   const [thresholdValue, setThresholdValue] = useState<number>(50000); // 50mm default
-  const [earlyTrigger, setEarlyTrigger] = useState(false);
+  // Early trigger is always enabled for V3 - payout immediately when threshold is met
+  const earlyTrigger = true;
   const [locationId, setLocationId] = useState<number | null>(null);
   const [coverageStart, setCoverageStart] = useState<string>('');
   const [coverageEnd, setCoverageEnd] = useState<string>('');
@@ -88,7 +89,7 @@ export default function NewV3RequestPage() {
     
     if (!coverageStart) errors.push('Coverage start date is required');
     if (!coverageEnd) errors.push('Coverage end date is required');
-    if (!locationId) errors.push('Please select a location');
+    if (locationId === null) errors.push('Please select a location');
     if (startTs < now) errors.push('Coverage start must be in the future');
     if (endTs <= startTs) errors.push('Coverage end must be after start');
     if (coverageStart && coverageEnd && (endTs - startTs) > 30 * 24 * 60 * 60 * 1000) {
@@ -126,7 +127,7 @@ export default function NewV3RequestPage() {
   
   const handleSubmit = async () => {
     const keypair = getKeypair();
-    if (!keypair || !locationId) {
+    if (!keypair || locationId === null) {
       toast.error('Wallet not connected or location not selected');
       return;
     }
@@ -307,21 +308,6 @@ export default function NewV3RequestPage() {
                       Range: {formatThresholdValue(eventInfo.minThreshold, eventInfo.unit as V3ThresholdUnit)} - {formatThresholdValue(eventInfo.maxThreshold, eventInfo.unit as V3ThresholdUnit)}
                     </p>
                   </div>
-                  
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={earlyTrigger}
-                      onChange={(e) => setEarlyTrigger(e.target.checked)}
-                      className="w-5 h-5 rounded border-border-primary text-prmx-cyan focus:ring-prmx-cyan"
-                    />
-                    <div>
-                      <span className="font-medium">Enable Early Trigger</span>
-                      <p className="text-xs text-text-secondary">
-                        Payout immediately when threshold is reached (before coverage ends)
-                      </p>
-                    </div>
-                  </label>
                 </div>
               )}
               
@@ -353,8 +339,11 @@ export default function NewV3RequestPage() {
                   <div className="h-12 bg-background-tertiary/50 rounded-xl animate-pulse" />
                 ) : (
                   <select
-                    value={locationId || ''}
-                    onChange={(e) => setLocationId(parseInt(e.target.value))}
+                    value={locationId ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setLocationId(val ? parseInt(val, 10) : null);
+                    }}
                     className="select-field w-full"
                   >
                     <option value="">Select a location...</option>
@@ -502,9 +491,6 @@ export default function NewV3RequestPage() {
                         </p>
                       </div>
                     </div>
-                    {earlyTrigger && (
-                      <Badge variant="warning">Early Trigger Enabled</Badge>
-                    )}
                   </div>
                   
                   <h4 className="font-medium text-text-secondary uppercase text-sm tracking-wide">Location</h4>

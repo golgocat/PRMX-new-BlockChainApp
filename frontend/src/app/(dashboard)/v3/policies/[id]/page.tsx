@@ -597,6 +597,92 @@ export default function V3PolicyDetailPage() {
             </CardContent>
           </Card>
           
+          {/* Settlement Outcome - Only show for settled policies */}
+          {(policy.status === 'Triggered' || policy.status === 'Matured' || policy.status === 'Settled') && (
+            <Card className={cn(
+              "border-2",
+              policy.status === 'Triggered' || oracleState?.status === 'Triggered'
+                ? "border-success/50 bg-success/5"
+                : "border-prmx-cyan/50 bg-prmx-cyan/5"
+            )}>
+              <CardHeader>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  {policy.status === 'Triggered' || oracleState?.status === 'Triggered' ? (
+                    <>
+                      <CheckCircle2 className="w-5 h-5 text-success" />
+                      Event Triggered - Payout Distributed
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-5 h-5 text-prmx-cyan" />
+                      Policy Matured - No Event
+                    </>
+                  )}
+                </h3>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {/* Outcome Summary */}
+                  <div className={cn(
+                    "p-4 rounded-lg",
+                    policy.status === 'Triggered' || oracleState?.status === 'Triggered'
+                      ? "bg-success/10"
+                      : "bg-prmx-cyan/10"
+                  )}>
+                    {policy.status === 'Triggered' || oracleState?.status === 'Triggered' ? (
+                      <div className="space-y-2">
+                        <p className="text-sm text-text-secondary">
+                          The weather event threshold was reached. The policyholder receives the full payout.
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Payout to Holder</span>
+                          <span className="text-2xl font-bold text-success">
+                            {formatUSDT(policy.maxPayout, false)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-text-tertiary">LP Collateral</span>
+                          <span className="text-text-secondary">Forfeited (paid to holder)</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm text-text-secondary">
+                          Coverage ended without the weather event occurring. LP providers receive their collateral back plus earned premium.
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-text-secondary">Returned to LPs</span>
+                          <span className="text-2xl font-bold text-prmx-cyan">
+                            {formatUSDT(policy.maxPayout + policy.premiumPaid, false)}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-text-tertiary">Breakdown</span>
+                          <span className="text-text-secondary">
+                            {formatUSDT(policy.maxPayout, false)} collateral + {formatUSDT(policy.premiumPaid, false)} premium
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Final Weather Reading */}
+                  {oracleState && (
+                    <div className="p-3 rounded-lg bg-background-tertiary/50">
+                      <p className="text-xs text-text-secondary mb-1">Final Weather Reading</p>
+                      <p className="font-medium">
+                        {getAggStateLabel(oracleState.aggState)}: {formatAggStateValue(oracleState.aggState)}
+                      </p>
+                      <p className="text-xs text-text-tertiary mt-1">
+                        Threshold: {formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           {/* LP Holders */}
           <Card>
             <CardHeader>

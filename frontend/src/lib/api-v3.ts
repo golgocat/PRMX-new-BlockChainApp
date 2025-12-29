@@ -288,6 +288,33 @@ export async function cancelV3Request(
   return BigInt(0);
 }
 
+/**
+ * Expire an underwrite request (governance/DAO only, or anyone after expiry time)
+ * Returns the refund amount sent to the requester
+ */
+export async function expireV3Request(
+  keypair: KeyringPair,
+  requestId: number
+): Promise<bigint> {
+  const api = await getApi();
+  
+  // Use sudo to call expire_request
+  // In production, this would be restricted to governance origin
+  const expireCall = api.tx.prmxMarketV3.expireRequest(requestId);
+  const tx = api.tx.sudo.sudo(expireCall);
+  
+  const events = await signAndWaitV3(tx, keypair);
+  
+  // Find RequestExpired event to get refund amount
+  for (const { event } of events) {
+    if (event.section === 'prmxMarketV3' && event.method === 'RequestExpired') {
+      return BigInt(event.data[2].toString());
+    }
+  }
+  
+  return BigInt(0);
+}
+
 // =============================================================================
 // V3 Policies
 // =============================================================================

@@ -20,10 +20,10 @@ import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { useWalletStore } from '@/stores/walletStore';
+import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useV3Request } from '@/hooks/useV3ChainData';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
-import { acceptV3Request, cancelV3Request } from '@/lib/api-v3';
+import { acceptV3Request, cancelV3Request, expireV3Request } from '@/lib/api-v3';
 import { 
   V3RequestStatus,
   getEventTypeInfo, 
@@ -66,12 +66,14 @@ export default function V3RequestDetailPage() {
   const requestId = params.id ? parseInt(params.id as string) : null;
   
   const { isConnected, selectedAccount, getKeypair } = useWalletStore();
+  const isDao = useIsDao();
   const { request, loading, error, refresh } = useV3Request(requestId);
   
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [sharesToAccept, setSharesToAccept] = useState<number>(1);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [isExpiring, setIsExpiring] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   const eventInfo = useMemo(() => 
@@ -164,6 +166,34 @@ export default function V3RequestDetailPage() {
       setIsCancelling(false);
     }
   };
+  
+  const handleExpire = async () => {
+    const keypair = getKeypair();
+    if (!keypair || !request) {
+      toast.error('Wallet not connected');
+      return;
+    }
+    
+    setIsExpiring(true);
+    try {
+      const refund = await expireV3Request(keypair, request.id);
+      toast.success(`Request expired. Refund to requester: ${formatUSDT(refund)}`);
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to expire request');
+    } finally {
+      setIsExpiring(false);
+    }
+  };
+  
+  // Check if request can be manually expired (DAO only, after expiry time)
+  const canExpire = useMemo(() =>
+    isDao && 
+    request && 
+    (request.status === 'Pending' || request.status === 'PartiallyFilled') &&
+    request.expiresAt <= Math.floor(Date.now() / 1000),
+    [isDao, request]
+  );
   
   if (!isConnected) {
     return (
@@ -646,6 +676,49 @@ export default function V3RequestDetailPage() {
                     View Policy Details
                   </Button>
                 </Link>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* DAO Expire Action - Only for expired requests that need cleanup */}
+          {canExpire && (
+            <Card className="border-warning/30 bg-warning/5">
+              <CardHeader>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-warning" />
+                  DAO Action: Expire Request
+                </h3>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <p className="text-sm text-text-secondary">
+                    This request has passed its expiry time but hasn't been cleaned up yet.
+                    Triggering expiry will refund the unfilled premium to the requester.
+                  </p>
+                  
+                  <div className="p-3 rounded-lg bg-background-tertiary/50">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-text-secondary">Unfilled Shares</span>
+                      <span className="font-medium">{remainingShares}</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-text-secondary">Refund Amount</span>
+                      <span className="font-medium">
+                        {formatUSDT(BigInt(remainingShares) * request.premiumPerShare, false)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={handleExpire}
+                    loading={isExpiring}
+                    icon={<Clock className="w-4 h-4" />}
+                  >
+                    Trigger Expiry
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           )}

@@ -533,11 +533,57 @@ export default function V3PolicyDetailPage() {
                     </div>
                   </div>
                   
-                  {/* Commitment hash */}
-                  <div className="p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30">
-                    <p className="text-xs text-text-secondary mb-1">Commitment Hash</p>
-                    <code className="text-xs break-all">{oracleState.commitment}</code>
-                  </div>
+                  {/* Next Snapshot & Commitment */}
+                  {(() => {
+                    const snapshotInfo = getNextSnapshotInfo(
+                      oracleState.observedUntil,
+                      policy.coverageStart,
+                      policy.coverageEnd,
+                      policy.status
+                    );
+                    const now = Math.floor(Date.now() / 1000);
+                    const isInFinal24h = policy.coverageEnd - now <= 24 * 3600;
+                    
+                    return (
+                      <div className="grid md:grid-cols-2 gap-4">
+                        {/* Next Snapshot */}
+                        {policy.status === 'Active' && (
+                          <div className={cn(
+                            "p-3 rounded-lg border",
+                            snapshotInfo.isUrgent 
+                              ? "bg-warning/10 border-warning/30"
+                              : "bg-background-tertiary/50 border-transparent"
+                          )}>
+                            <p className="text-xs text-text-secondary mb-1 flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              Next Snapshot
+                            </p>
+                            <p className={cn(
+                              "font-medium",
+                              snapshotInfo.isUrgent && "text-warning"
+                            )}>
+                              {snapshotInfo.label}
+                            </p>
+                            <p className="text-xs text-text-tertiary mt-1">
+                              {isInFinal24h
+                                ? 'Hourly updates (final 24h)'
+                                : 'Updates every 6 hours'
+                              }
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Commitment hash */}
+                        <div className={cn(
+                          "p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30",
+                          policy.status !== 'Active' && "md:col-span-2"
+                        )}>
+                          <p className="text-xs text-text-secondary mb-1">Commitment Hash</p>
+                          <code className="text-xs break-all">{oracleState.commitment}</code>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="text-center py-8 text-text-secondary">

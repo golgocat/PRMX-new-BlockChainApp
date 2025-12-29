@@ -1055,6 +1055,35 @@ pub mod pallet {
                             "All observations already processed for policy {}",
                             policy_id
                         );
+                        
+                        // Even with no new observations, check if coverage ended and we need to submit maturity
+                        if let Some((_, _event_spec, _coverage_start, coverage_end)) = Self::get_policy_metadata(policy_id) {
+                            if now_epoch > coverage_end && !local_state.finalized {
+                                log::info!(
+                                    target: "prmx-oracle-v3",
+                                    "✅ Submitting final MATURITY report for policy {} (no new observations)",
+                                    policy_id
+                                );
+                                
+                                if let Err(e) = Self::submit_final_report_on_chain(
+                                    policy_id,
+                                    OracleReportKindV3::Maturity,
+                                    local_state.last_seen_epoch,
+                                    local_state.agg_state.clone(),
+                                    local_state.commitment,
+                                ) {
+                                    log::warn!(
+                                        target: "prmx-oracle-v3",
+                                        "Failed to submit maturity report: {:?}",
+                                        e
+                                    );
+                                    local_state.record_error(ocw::OcwError::ChainSubmission, now_epoch);
+                                } else {
+                                    local_state.finalized = true;
+                                }
+                            }
+                        }
+                        
                         local_state.save(policy_id);
                         return Ok(());
                     }

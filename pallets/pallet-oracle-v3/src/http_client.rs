@@ -107,13 +107,17 @@ fn parse_accuweather_historical_response(json: &[u8]) -> Result<Vec<WeatherObser
             continue;
         }
         
-        // Find the end of this observation object
-        let obs_end = json_str[search_start + epoch_pos..]
-            .find("},")
-            .map(|p| search_start + epoch_pos + p + 2)
+        // Find the start of this observation object (the '{' before "EpochTime")
+        // Look backwards from epoch_pos to find the opening brace
+        let epoch_abs = search_start + epoch_pos;
+        let obj_start = json_str[..epoch_abs].rfind('{').unwrap_or(search_start);
+        
+        // Find the end of this observation object using proper brace matching
+        let obs_end = find_object_end(&json_str[obj_start..])
+            .map(|e| obj_start + e)
             .unwrap_or(json_str.len());
         
-        let obs_slice = &json_str[search_start + epoch_pos..obs_end];
+        let obs_slice = &json_str[obj_start..obs_end];
         
         // Parse precipitation (PastHour)
         let precip_mm = extract_precip_past_hour(obs_slice);
@@ -140,55 +144,129 @@ fn parse_accuweather_historical_response(json: &[u8]) -> Result<Vec<WeatherObser
         search_start = obs_end;
     }
     
-    log::info!(
-        target: "prmx-oracle-v3",
-        "📊 Parsed {} observations from AccuWeather response",
-        observations.len()
-    );
+    // Log sample observation for debugging
+    if !observations.is_empty() {
+        let sample = &observations[0];
+        log::info!(
+            target: "prmx-oracle-v3",
+            "📊 Parsed {} observations. Sample: temp={}°C, precip={}mm, wind={}m/s",
+            observations.len(),
+            sample.temp_c_x1000 as f64 / 1000.0,
+            sample.precip_1h_mm_x1000 as f64 / 1000.0,
+            sample.wind_gust_mps_x1000 as f64 / 1000.0
+        );
+    } else {
+        log::info!(
+            target: "prmx-oracle-v3",
+            "📊 Parsed 0 observations from AccuWeather response"
+        );
+    }
     
     Ok(observations)
 }
 
-/// Extract PastHour precipitation from observation JSON slice
-fn extract_precip_past_hour(json: &str) -> f64 {
-    // Look for: "PastHour":{"Metric":{"Value":X.X
-    if let Some(past_hour_pos) = json.find("\"PastHour\":{\"Metric\":{\"Value\":") {
-        let value_start = past_hour_pos + 31;
-        if let Some(value_end) = json[value_start..].find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-') {
-            return json[value_start..value_start + value_end]
-                .parse::<f64>()
-                .unwrap_or(0.0);
+/// Find the end position of a JSON object, properly handling nested braces
+/// Returns the position after the closing brace (including the comma if present)
+fn find_object_end(json: &str) -> Option<usize> {
+    let mut depth = 0;
+    let mut in_string = false;
+    let mut escape_next = false;
+    
+    for (i, c) in json.char_indices() {
+        if escape_next {
+            escape_next = false;
+            continue;
+        }
+        
+        match c {
+            '\\' if in_string => escape_next = true,
+            '"' => in_string = !in_string,
+            '{' if !in_string => depth += 1,
+            '}' if !in_string => {
+                depth -= 1;
+                if depth == 0 {
+                    // Found the matching closing brace
+                    // Return position after it (and comma if present)
+                    if json.len() > i + 1 && json.as_bytes()[i + 1] == b',' {
+                        return Some(i + 2);
+                    }
+                    return Some(i + 1);
+                }
+            }
+            _ => {}
         }
     }
-    0.0
+    None
+}
+
+/// Helper to extract a numeric value from JSON, handling whitespace variations
+/// Searches for the key sequence and extracts the numeric value that follows
+fn extract_json_value(json: &str, keys: &[&str]) -> Option<f64> {
+    let mut search_pos = 0;
+    
+    // Find each key in sequence
+    for key in keys {
+        let key_pattern = format!("\"{}\"", key);
+        let pos = json[search_pos..].find(&key_pattern)?;
+        search_pos += pos + key_pattern.len();
+        
+        // Skip whitespace and colon
+        let rest = &json[search_pos..];
+        let colon_pos = rest.find(':')?;
+        search_pos += colon_pos + 1;
+    }
+    
+    // Skip whitespace after the last colon
+    let rest = &json[search_pos..];
+    let value_start = rest.find(|c: char| c.is_ascii_digit() || c == '-' || c == '.')?;
+    let value_slice = &rest[value_start..];
+    
+    // Find end of numeric value
+    let value_end = value_slice
+        .find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
+        .unwrap_or(value_slice.len());
+    
+    if value_end > 0 {
+        value_slice[..value_end].parse::<f64>().ok()
+    } else {
+        None
+    }
+}
+
+/// Extract past hour precipitation from observation JSON slice
+fn extract_precip_past_hour(json: &str) -> f64 {
+    // Try "Precip1hr" first (top-level, simpler)
+    if let Some(val) = extract_json_value(json, &["Precip1hr", "Metric", "Value"]) {
+        return val;
+    }
+    // Fallback to "PrecipitationSummary" -> "PastHour" (nested)
+    extract_json_value(json, &["PrecipitationSummary", "PastHour", "Metric", "Value"])
+        .unwrap_or(0.0)
 }
 
 /// Extract temperature from observation JSON slice
 fn extract_temperature(json: &str) -> f64 {
-    // Look for: "Temperature":{"Metric":{"Value":X.X
-    if let Some(temp_pos) = json.find("\"Temperature\":{\"Metric\":{\"Value\":") {
-        let value_start = temp_pos + 34;
-        if let Some(value_end) = json[value_start..].find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-') {
-            return json[value_start..value_start + value_end]
-                .parse::<f64>()
-                .unwrap_or(0.0);
-        }
+    // Look for: "Temperature" -> "Metric" -> "Value"
+    let temp = extract_json_value(json, &["Temperature", "Metric", "Value"])
+        .unwrap_or(0.0);
+    
+    // Debug: log temperature extraction
+    if temp != 0.0 {
+        log::debug!(
+            target: "prmx-oracle-v3",
+            "🌡️ Parsed temperature: {}°C",
+            temp
+        );
     }
-    0.0
+    
+    temp
 }
 
 /// Extract wind gust speed from observation JSON slice
 fn extract_wind_gust(json: &str) -> f64 {
-    // Look for: "WindGust":{"Speed":{"Metric":{"Value":X.X
-    if let Some(gust_pos) = json.find("\"WindGust\":{\"Speed\":{\"Metric\":{\"Value\":") {
-        let value_start = gust_pos + 41;
-        if let Some(value_end) = json[value_start..].find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-') {
-            return json[value_start..value_start + value_end]
-                .parse::<f64>()
-                .unwrap_or(0.0);
-        }
-    }
-    0.0
+    // Look for: "WindGust" -> "Speed" -> "Metric" -> "Value"
+    extract_json_value(json, &["WindGust", "Speed", "Metric", "Value"])
+        .unwrap_or(0.0)
 }
 
 /// Extract precipitation type from observation JSON slice

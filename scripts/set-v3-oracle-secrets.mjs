@@ -26,7 +26,7 @@
  */
 
 import { ApiPromise, WsProvider } from '@polkadot/api';
-import { u8aToHex, stringToU8a } from '@polkadot/util';
+import { u8aToHex, stringToU8a, compactAddLength } from '@polkadot/util';
 
 // Storage key prefixes (must match OCW constants)
 const STORAGE_PREFIX = 'ocw:v3:';
@@ -120,21 +120,28 @@ async function main() {
     console.log('');
 
     try {
+        // Helper to SCALE-encode Vec<u8> (compact length prefix + raw bytes)
+        const scaleEncodeBytes = (value) => {
+            const bytes = stringToU8a(value);
+            // compactAddLength adds SCALE compact length prefix
+            return u8aToHex(compactAddLength(bytes));
+        };
+
         // HMAC Secret
         const hmacKey = u8aToHex(stringToU8a(INGEST_HMAC_SECRET_KEY));
-        const hmacValue = u8aToHex(stringToU8a(config.hmacSecret));
+        const hmacValue = scaleEncodeBytes(config.hmacSecret);
         await api.rpc.offchain.localStorageSet('PERSISTENT', hmacKey, hmacValue);
         console.log('  ✅ HMAC secret stored');
 
         // AccuWeather API Key
         const awKey = u8aToHex(stringToU8a(ACCUWEATHER_API_KEY));
-        const awValue = u8aToHex(stringToU8a(config.accuweatherKey));
+        const awValue = scaleEncodeBytes(config.accuweatherKey);
         await api.rpc.offchain.localStorageSet('PERSISTENT', awKey, awValue);
         console.log('  ✅ AccuWeather API key stored');
 
         // Ingest API URL
         const urlKey = u8aToHex(stringToU8a(INGEST_API_URL_KEY));
-        const urlValue = u8aToHex(stringToU8a(config.ingestUrl));
+        const urlValue = scaleEncodeBytes(config.ingestUrl);
         await api.rpc.offchain.localStorageSet('PERSISTENT', urlKey, urlValue);
         console.log('  ✅ Ingest API URL stored');
 

@@ -14,8 +14,10 @@
 #   ./scripts/restart-dev-environment.sh [--tmp|--persistent]
 #
 # ENVIRONMENT VARIABLES:
+#   ACCUWEATHER_API_KEY     - API key for AccuWeather (required for V1 & V3 oracles)
+#   V3_INGEST_HMAC_SECRET   - HMAC secret for V3 Ingest API auth (required for V3)
+#   V3_INGEST_API_URL       - V3 Ingest API URL (default: http://localhost:3001)
 #   R_PRICING_API_KEY       - API key for R Pricing service (default: test_api_key)
-#   ACCUWEATHER_API_KEY     - API key for AccuWeather (default: Standard tier key)
 #   NODE_PATH               - Path to Node.js binaries
 #   PRMX_DATA_DIR           - Data directory for persistent mode (default: /tmp/prmx-data)
 #
@@ -26,8 +28,14 @@
 #   # Persistent chain (data survives restarts)
 #   ./scripts/restart-dev-environment.sh --persistent
 #
-#   # With custom API keys
-#   ACCUWEATHER_API_KEY="your_key" ./scripts/restart-dev-environment.sh
+#   # With V1 + V3 oracle keys (recommended)
+#   ACCUWEATHER_API_KEY="your_key" V3_INGEST_HMAC_SECRET="your_secret" ./scripts/restart-dev-environment.sh
+#
+#   # Full example with all keys
+#   ACCUWEATHER_API_KEY="zpka_xxx" \
+#   V3_INGEST_HMAC_SECRET="your_32_char_secret" \
+#   R_PRICING_API_KEY="your_key" \
+#   ./scripts/restart-dev-environment.sh
 #
 # SERVICES:
 #   - Blockchain Node:       ws://localhost:9944
@@ -52,6 +60,10 @@ PRMX_DATA_DIR="${PRMX_DATA_DIR:-/tmp/prmx-data}"
 # NOTE: Set these via environment variables for production use
 R_PRICING_API_KEY="${R_PRICING_API_KEY:-test_api_key}"
 ACCUWEATHER_API_KEY="${ACCUWEATHER_API_KEY:-}"
+
+# V3 Oracle Secrets
+V3_INGEST_HMAC_SECRET="${V3_INGEST_HMAC_SECRET:-}"
+V3_INGEST_API_URL="${V3_INGEST_API_URL:-http://localhost:3001}"
 
 # Mode: "tmp" or "persistent"
 MODE="tmp"
@@ -234,6 +246,43 @@ wait_for_node() {
 }
 
 # =============================================================================
+# V3 Oracle Secrets Injection
+# =============================================================================
+inject_v3_secrets() {
+    log_step "Injecting V3 oracle secrets..."
+    
+    cd "$PROJECT_ROOT/scripts"
+    export PATH="$NODE_PATH:$PATH"
+    
+    # Check if both required V3 secrets are provided
+    if [ -n "$ACCUWEATHER_API_KEY" ] && [ -n "$V3_INGEST_HMAC_SECRET" ]; then
+        # Source nvm if available (needed for node command)
+        if [ -f "$HOME/.nvm/nvm.sh" ]; then
+            source "$HOME/.nvm/nvm.sh" 2>/dev/null || true
+        fi
+        
+        node set-v3-oracle-secrets.mjs \
+            --accuweather-key "$ACCUWEATHER_API_KEY" \
+            --hmac-secret "$V3_INGEST_HMAC_SECRET" \
+            --ingest-url "$V3_INGEST_API_URL" \
+            2>&1 | grep -E "^\s*(✅|🎉|Storage)" || true
+        
+        if [ ${PIPESTATUS[0]} -eq 0 ]; then
+            log_success "V3 oracle secrets configured"
+        else
+            log_warning "V3 oracle secrets injection had issues (check set-v3-oracle-secrets.mjs)"
+        fi
+    else
+        if [ -z "$V3_INGEST_HMAC_SECRET" ]; then
+            log_warning "V3 secrets skipped (V3_INGEST_HMAC_SECRET not set)"
+        fi
+        if [ -z "$ACCUWEATHER_API_KEY" ]; then
+            log_warning "V3 secrets skipped (ACCUWEATHER_API_KEY not set)"
+        fi
+    fi
+}
+
+# =============================================================================
 # Off-chain Oracle Service
 # =============================================================================
 start_oracle_service() {
@@ -351,6 +400,9 @@ if [ "$MODE" = "tmp" ]; then
 else
     start_node_persistent
 fi
+
+# Inject V3 oracle secrets (requires node to be running)
+inject_v3_secrets
 
 # Start services
 start_oracle_service

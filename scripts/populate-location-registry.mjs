@@ -398,8 +398,9 @@ async function main() {
         : addLocationCall;
 
       // Submit and wait for finalization
+      // Using high tip to ensure priority over OCW transactions
       await new Promise((resolve, reject) => {
-        tx.signAndSend(alice, { nonce: -1 }, ({ status, events, dispatchError }) => {
+        tx.signAndSend(alice, { nonce: -1, tip: 1_000_000_000_000n }, ({ status, events, dispatchError }) => {
           if (dispatchError) {
             if (dispatchError.isModule) {
               const decoded = api.registry.findMetaError(dispatchError.asModule);
@@ -412,7 +413,7 @@ async function main() {
             successCount++;
             resolve();
           }
-        });
+        }).catch(reject);
       });
 
     } catch (error) {

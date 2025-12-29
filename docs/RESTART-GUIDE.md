@@ -21,23 +21,31 @@ This guide explains the restart process for the PRMX development environment, in
 
 ## Quick Start
 
-> **⚠️ IMPORTANT: API Key Required**
+> **⚠️ IMPORTANT: API Keys Required**
 > 
-> **For temporary mode (`--tmp`), you MUST set the `ACCUWEATHER_API_KEY` environment variable** for the V1 Oracle to fetch rainfall data. Without it, all markets will show 0.0mm rainfall.
+> - **`ACCUWEATHER_API_KEY`**: Required for V1 Oracle rainfall data (without it, all markets show 0.0mm)
+> - **`V3_INGEST_HMAC_SECRET`**: Required for V3 Oracle monitoring (without it, V3 policies won't be monitored)
+> - See [Environment Variables Reference](#environment-variables-reference) for all options
 
 ```bash
-# Temporary mode (fresh start each time) - REQUIRES API KEY
-ACCUWEATHER_API_KEY="your_accuweather_key" ./scripts/restart-dev-environment.sh
-
-# Or set it in your shell session first
-export ACCUWEATHER_API_KEY="your_accuweather_key"
+# Temporary mode with V1 + V3 oracles (recommended)
+ACCUWEATHER_API_KEY="your_accuweather_key" \
+V3_INGEST_HMAC_SECRET="your_32_char_secret" \
 ./scripts/restart-dev-environment.sh
 
-# Persistent mode (data survives restarts) - API key injected via CLI
+# Or set them in your shell session first
+export ACCUWEATHER_API_KEY="your_accuweather_key"
+export V3_INGEST_HMAC_SECRET="your_32_char_secret"
+./scripts/restart-dev-environment.sh
+
+# Persistent mode (data survives restarts)
 ./scripts/restart-dev-environment.sh --persistent
 
-# With both API keys
-ACCUWEATHER_API_KEY="your_key" R_PRICING_API_KEY="your_key" ./scripts/restart-dev-environment.sh
+# Full example with all keys
+ACCUWEATHER_API_KEY="your_key" \
+V3_INGEST_HMAC_SECRET="your_secret" \
+R_PRICING_API_KEY="your_key" \
+./scripts/restart-dev-environment.sh
 ```
 
 ---
@@ -47,15 +55,22 @@ ACCUWEATHER_API_KEY="your_key" R_PRICING_API_KEY="your_key" ./scripts/restart-de
 ### Temporary Mode (`--tmp`) - Default
 
 ```bash
-# ⚠️ REQUIRED: Set ACCUWEATHER_API_KEY environment variable
-ACCUWEATHER_API_KEY="your_accuweather_key" ./scripts/restart-dev-environment.sh --tmp
+# ⚠️ RECOMMENDED: Set both ACCUWEATHER_API_KEY and V3_INGEST_HMAC_SECRET
+ACCUWEATHER_API_KEY="your_accuweather_key" \
+V3_INGEST_HMAC_SECRET="your_32_char_secret" \
+./scripts/restart-dev-environment.sh --tmp
 ```
 
-**⚠️ API Key Requirement:**
-- **MUST set `ACCUWEATHER_API_KEY` environment variable** before running
-- The API key is read at genesis and stored in `PendingApiKey` (on-chain for ~100 blocks)
-- Without the API key, the OCW cannot fetch rainfall data (all markets will show 0.0mm)
-- The key is then copied to offchain local storage by the OCW
+**⚠️ API Key Requirements:**
+
+| Secret | Oracle | Effect if Missing |
+|--------|--------|-------------------|
+| `ACCUWEATHER_API_KEY` | V1 & V3 | All markets show 0.0mm rainfall, V3 policies not monitored |
+| `V3_INGEST_HMAC_SECRET` | V3 only | V3 policies not monitored (V1 still works) |
+
+**How secrets are injected:**
+- **V1**: API key read at genesis → stored in `PendingApiKey` (on-chain 100 blocks) → copied to offchain storage
+- **V3**: Secrets injected via RPC after node starts → stored directly in offchain storage (never on-chain)
 
 **Characteristics:**
 - Fresh blockchain genesis each restart
@@ -116,13 +131,16 @@ ACCUWEATHER_API_KEY="your_accuweather_key" ./scripts/restart-dev-environment.sh 
 ### Persistent Mode (`--persistent`)
 
 ```bash
+ACCUWEATHER_API_KEY="your_key" \
+V3_INGEST_HMAC_SECRET="your_secret" \
 ./scripts/restart-dev-environment.sh --persistent
 ```
 
 **Characteristics:**
 - Blockchain data persists across restarts
 - All policies, trades, and LP positions are preserved
-- API keys are injected via secure CLI (never on-chain)
+- V1 API keys injected via secure CLI on first run (never on-chain)
+- V3 secrets injected via RPC after node starts (stored in offchain storage)
 - Data stored in `$PRMX_DATA_DIR` (default: `/tmp/prmx-data`)
 
 **Use For:**
@@ -362,6 +380,20 @@ Write DIRECTLY to RocksDB (offchain storage)
   - Fetch AccuWeather data for V2 evaluations
   - Calculate cumulative/max rainfall
   - Submit V2 reports on-chain
+  - **V3 Ingest API**: Receive observations from on-chain OCW
+
+### V3 Oracle (On-chain OCW)
+
+- **Runs inside:** Blockchain node (offchain worker)
+- **Log:** `/tmp/prmx-node.log` (look for `prmx-oracle-v3` entries)
+- **Secrets Required:**
+  - `ACCUWEATHER_API_KEY` - For fetching weather data
+  - `V3_INGEST_HMAC_SECRET` - For authenticating with Ingest API
+- **Responsibilities:**
+  - Poll active V3 policies every ~60 seconds
+  - Fetch AccuWeather data for each policy's location
+  - Submit snapshots and final reports on-chain
+  - Send observations to Ingest API for off-chain storage
 
 ### 3. Frontend (`frontend`)
 
@@ -425,6 +457,37 @@ grep "api_key_pending" /tmp/prmx-node.log
 grep "Fetched.*hourly rainfall records" /tmp/prmx-node.log
 ```
 
+#### V3 policies not being monitored
+
+**Symptom:** V3 policies show "N/A" for Observed time, no snapshots being submitted
+
+**Cause:** V3 oracle secrets not configured
+
+**Solution:**
+```bash
+# 1. Check if secrets are configured
+node scripts/set-v3-oracle-secrets.mjs --dry-run
+
+# 2. If not configured, restart with V3 secrets
+ACCUWEATHER_API_KEY="your_key" \
+V3_INGEST_HMAC_SECRET="your_32_char_secret" \
+./scripts/restart-dev-environment.sh
+
+# 3. Or inject secrets into running node
+node scripts/set-v3-oracle-secrets.mjs \
+    --accuweather-key "your_key" \
+    --hmac-secret "your_32_char_secret"
+```
+
+**Verification:**
+```bash
+# Check V3 OCW logs
+grep "prmx-oracle-v3" /tmp/prmx-node.log
+
+# Monitor V3 policies
+node scripts/monitor-v3-policies.mjs --check-secrets
+```
+
 #### Markets not fetching data
 ```bash
 # Check if location keys are resolved
@@ -475,11 +538,13 @@ grep -i "error\|failed\|warning" /tmp/prmx-node.log
 
 ## Environment Variables Reference
 
-> **⚠️ CRITICAL: `ACCUWEATHER_API_KEY` is REQUIRED for temporary mode**
+> **⚠️ CRITICAL: Both `ACCUWEATHER_API_KEY` and `V3_INGEST_HMAC_SECRET` are recommended for full functionality**
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ACCUWEATHER_API_KEY` | **YES** (tmp mode) | None | AccuWeather API key for V1 Oracle. **Must be set** when using `--tmp` mode, otherwise all markets will show 0.0mm rainfall. |
+| `ACCUWEATHER_API_KEY` | **YES** | None | AccuWeather API key for V1 & V3 Oracles. **Must be set** for weather data fetching. |
+| `V3_INGEST_HMAC_SECRET` | **YES** (V3) | None | HMAC secret for V3 Ingest API authentication. Required for V3 policy monitoring. Should be at least 32 characters. |
+| `V3_INGEST_API_URL` | Optional | `http://localhost:3001` | V3 Ingest API URL (where off-chain oracle service runs) |
 | `R_PRICING_API_KEY` | Optional | `test_api_key` | R Pricing API key for quote pricing |
 | `NODE_PATH` | Optional | `/tmp/node-v18.20.8-darwin-arm64/bin` | Path to Node.js binaries |
 | `PRMX_DATA_DIR` | Optional | `/tmp/prmx-data` | Data directory for persistent mode |

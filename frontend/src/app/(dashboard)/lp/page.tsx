@@ -2200,7 +2200,7 @@ export default function LpTradingPage() {
           setShowOrderDetailModal(false);
           setSelectedOrderForDetail(null);
         }}
-        title="Order Details"
+        title=""
         size="md"
       >
         {selectedOrderForDetail && (() => {
@@ -2208,154 +2208,170 @@ export default function LpTradingPage() {
           const policy = getPolicyById(order.policyId);
           const market = policy ? getMarketById(policy.marketId) : null;
           const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
-          const potentialReturn = market ? calculatePotentialReturn(order.priceUsdt, market.payoutPerShare) : 0;
+          const isV3 = policy?.policyVersion === 'V3';
+          // For V3, use the policy's payout ($100/share = 100_000_000)
+          const payoutPerShare = isV3 ? BigInt(100_000_000) : (market?.payoutPerShare || BigInt(100_000_000));
+          const potentialReturn = calculatePotentialReturn(order.priceUsdt, payoutPerShare);
           const isOwner = isSameAddress(order.seller, selectedAccount?.address);
           const totalValue = order.remaining * order.priceUsdt;
           const sellerInfo = api.getAccountByAddress(order.seller);
+          // Get location name for V3
+          const locationName = isV3 ? (policy?.label?.split(' - ')[0] || 'Unknown Location') : market?.name;
           
           return (
-            <div className="space-y-5">
-              {/* Order Header */}
+            <div className="space-y-4">
+              {/* Gradient Header */}
               <div className={cn(
-                "p-5 rounded-xl border",
+                "relative -mx-6 -mt-6 px-6 pt-8 pb-6 overflow-hidden",
                 isOwner 
-                  ? "bg-prmx-cyan/10 border-prmx-cyan/30" 
-                  : "bg-background-tertiary/50 border-border-secondary"
+                  ? "bg-gradient-to-br from-prmx-cyan/20 via-prmx-purple/10 to-transparent"
+                  : "bg-gradient-to-br from-slate-800/50 via-slate-900/30 to-transparent"
               )}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-prmx-gradient flex items-center justify-center shrink-0">
-                      <Shield className="w-7 h-7 text-white" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xl font-bold">{policy?.label || `Policy #${order.policyId}`}</span>
-                        <Badge 
-                          variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
-                          className="text-xs"
-                        >
-                          {policy?.policyVersion || 'V1'}
+                {/* Decorative circles */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-prmx-cyan/10 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-24 h-24 bg-prmx-purple/10 rounded-full blur-2xl" />
+                
+                <div className="relative flex items-start gap-4">
+                  <div className={cn(
+                    "w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 shadow-lg",
+                    isV3 
+                      ? "bg-gradient-to-br from-cyan-500 to-teal-600"
+                      : "bg-gradient-to-br from-purple-500 to-pink-600"
+                  )}>
+                    <Shield className="w-8 h-8 text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                      <Badge 
+                        variant={isV3 ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
+                        className="text-xs font-semibold"
+                      >
+                        {policy?.policyVersion || 'V1'}
+                      </Badge>
+                      <Badge variant="error" className="text-xs font-semibold">
+                        <span className="flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3 rotate-180" />
+                          Sell Order
+                        </span>
+                      </Badge>
+                      {isOwner && (
+                        <Badge variant="success" className="text-xs font-semibold">
+                          Your Order
                         </Badge>
-                        <Badge variant="error" className="text-xs">Sell Order</Badge>
-                        {isOwner && <Badge variant="cyan" className="text-xs">Your Order</Badge>}
-                      </div>
-                      {market && (
-                        <p className="text-sm text-text-secondary flex items-center gap-1 mt-1">
-                          <MapPin className="w-3 h-3" />
-                          {market.name}
-                        </p>
                       )}
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Price & Value */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-success/10 border border-success/20">
-                  <p className="text-xs text-text-tertiary uppercase tracking-wide">Price per Share</p>
-                  <p className="text-2xl font-bold text-success mt-1">{formatUSDT(order.priceUsdt)}</p>
-                </div>
-                <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/20">
-                  <p className="text-xs text-text-tertiary uppercase tracking-wide">Total Value</p>
-                  <p className="text-2xl font-bold text-prmx-cyan mt-1">{formatUSDT(totalValue)}</p>
-                </div>
-              </div>
-
-              {/* Order Details Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Shares For Sale</p>
-                  <p className="text-lg font-semibold mt-1">{order.remaining.toString()}</p>
-                </div>
-                <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Original Quantity</p>
-                  <p className="text-lg font-semibold mt-1">{order.quantity.toString()}</p>
-                </div>
-                {market && (
-                  <>
-                    <div className="p-3 rounded-xl bg-background-tertiary/50">
-                      <p className="text-xs text-text-tertiary">Strike Threshold</p>
-                      <p className="text-lg font-semibold mt-1 flex items-center gap-1.5">
-                        <Droplets className="w-4 h-4 text-prmx-cyan" />
-                        {policy?.strikeMm ? `${policy.strikeMm / 10}mm` : `${market.strikeValue}mm`}
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-background-tertiary/50">
-                      <p className="text-xs text-text-tertiary">Max Payout per Share</p>
-                      <p className="text-lg font-semibold mt-1 text-success">{formatUSDT(market.payoutPerShare)}</p>
-                    </div>
-                  </>
-                )}
-                <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Time Remaining</p>
-                  <p className={cn(
-                    "text-lg font-semibold mt-1 flex items-center gap-1.5",
-                    daysRemaining <= 3 ? "text-warning" : ""
-                  )}>
-                    <Clock className="w-4 h-4" />
-                    {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
-                  </p>
-                </div>
-                {potentialReturn > 0 && (
-                  <div className="p-3 rounded-xl bg-background-tertiary/50">
-                    <p className="text-xs text-text-tertiary">Potential Return</p>
-                    <p className={cn(
-                      "text-lg font-semibold mt-1 flex items-center gap-1.5",
-                      potentialReturn >= 50 ? "text-success" : "text-prmx-cyan"
-                    )}>
-                      <TrendingUp className="w-4 h-4" />
-                      +{potentialReturn.toFixed(1)}%
+                    <h2 className="text-2xl font-bold text-white truncate">
+                      {policy?.label || `Policy #${order.policyId}`}
+                    </h2>
+                    <p className="text-sm text-text-secondary flex items-center gap-1.5 mt-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {locationName || 'Unknown'}
                     </p>
                   </div>
-                )}
+                </div>
               </div>
 
-              {/* Seller Info */}
-              <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
-                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Seller</p>
+              {/* Key Metrics - Hero Cards */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative p-5 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-green-600/10 border border-emerald-500/30 overflow-hidden">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/20 rounded-full blur-2xl" />
+                  <p className="text-xs text-emerald-400 font-medium uppercase tracking-wider">Price per Share</p>
+                  <p className="text-3xl font-bold text-emerald-400 mt-2">{formatUSDT(order.priceUsdt)}</p>
+                </div>
+                <div className="relative p-5 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-600/10 border border-cyan-500/30 overflow-hidden">
+                  <div className="absolute top-0 right-0 w-16 h-16 bg-cyan-500/20 rounded-full blur-2xl" />
+                  <p className="text-xs text-cyan-400 font-medium uppercase tracking-wider">Total Value</p>
+                  <p className="text-3xl font-bold text-cyan-400 mt-2">{formatUSDT(totalValue)}</p>
+                </div>
+              </div>
+
+              {/* Order Info Grid */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm text-center">
+                  <p className="text-2xl font-bold text-white">{order.remaining.toString()}</p>
+                  <p className="text-xs text-text-tertiary mt-1">Shares Available</p>
+                </div>
+                <div className={cn(
+                  "p-4 rounded-xl border backdrop-blur-sm text-center",
+                  daysRemaining <= 3 
+                    ? "bg-amber-500/10 border-amber-500/30" 
+                    : "bg-white/5 border-white/10"
+                )}>
+                  <p className={cn(
+                    "text-2xl font-bold flex items-center justify-center gap-1",
+                    daysRemaining <= 3 ? "text-amber-400" : "text-white"
+                  )}>
+                    <Clock className="w-5 h-5" />
+                    {daysRemaining}
+                  </p>
+                  <p className="text-xs text-text-tertiary mt-1">Days Left</p>
+                </div>
+                <div className={cn(
+                  "p-4 rounded-xl border backdrop-blur-sm text-center",
+                  potentialReturn >= 50 
+                    ? "bg-emerald-500/10 border-emerald-500/30" 
+                    : "bg-white/5 border-white/10"
+                )}>
+                  <p className={cn(
+                    "text-2xl font-bold flex items-center justify-center gap-1",
+                    potentialReturn >= 50 ? "text-emerald-400" : "text-prmx-cyan"
+                  )}>
+                    <TrendingUp className="w-5 h-5" />
+                    {potentialReturn.toFixed(0)}%
+                  </p>
+                  <p className="text-xs text-text-tertiary mt-1">Max Return</p>
+                </div>
+              </div>
+
+              {/* Seller Card */}
+              <div className="p-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-prmx-gradient flex items-center justify-center">
-                    <Users className="w-5 h-5 text-white" />
+                  <div className={cn(
+                    "w-12 h-12 rounded-xl flex items-center justify-center",
+                    isOwner 
+                      ? "bg-gradient-to-br from-cyan-500 to-blue-600"
+                      : "bg-gradient-to-br from-purple-500 to-pink-600"
+                  )}>
+                    <Users className="w-6 h-6 text-white" />
                   </div>
-                  <div>
-                    <p className="font-medium">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-text-tertiary uppercase tracking-wide">Seller</p>
+                    <p className="font-semibold text-lg">
                       {isOwner ? (
                         <span className="text-prmx-cyan">You</span>
                       ) : (
-                        sellerInfo?.name || 'Unknown'
+                        sellerInfo?.name || 'Anonymous'
                       )}
                     </p>
-                    <p className="text-xs text-text-tertiary font-mono">{order.seller}</p>
-                    {sellerInfo && !isOwner && (
-                      <Badge variant="default" className="text-xs mt-1">{sellerInfo.role}</Badge>
-                    )}
+                    <p className="text-xs text-text-tertiary font-mono truncate">{formatAddress(order.seller)}</p>
                   </div>
+                  {sellerInfo && !isOwner && (
+                    <Badge variant="default" className="text-xs shrink-0">{sellerInfo.role}</Badge>
+                  )}
                 </div>
               </div>
 
-              {/* Coverage Period */}
+              {/* Coverage Period Timeline */}
               {policy && (
-                <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
-                  <p className="text-xs text-text-tertiary uppercase tracking-wide mb-3">Coverage Period</p>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-text-tertiary">Start</p>
-                      <p className="font-medium">{new Date(policy.coverageStart * 1000).toLocaleDateString()}</p>
+                <div className="p-4 rounded-xl bg-gradient-to-r from-prmx-cyan/10 via-transparent to-prmx-purple/10 border border-prmx-cyan/20">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-center">
+                      <p className="text-xs text-text-tertiary mb-1">Start</p>
+                      <p className="font-semibold text-white">{new Date(policy.coverageStart * 1000).toLocaleDateString()}</p>
                     </div>
-                    <ArrowRight className="w-4 h-4 text-text-tertiary" />
-                    <div className="text-right">
-                      <p className="text-xs text-text-tertiary">End</p>
-                      <p className="font-medium">{new Date(policy.coverageEnd * 1000).toLocaleDateString()}</p>
+                    <div className="flex-1 mx-4 h-1 bg-gradient-to-r from-prmx-cyan via-prmx-purple to-prmx-cyan rounded-full opacity-50" />
+                    <div className="text-center">
+                      <p className="text-xs text-text-tertiary mb-1">End</p>
+                      <p className="font-semibold text-white">{new Date(policy.coverageEnd * 1000).toLocaleDateString()}</p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Order ID */}
-              <div className="p-3 rounded-xl bg-background-tertiary/30 border border-border-secondary">
-                <p className="text-xs text-text-tertiary">Order ID</p>
-                <p className="font-mono text-sm mt-0.5">{order.orderId}</p>
+              {/* Order ID Footer */}
+              <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5 text-xs">
+                <span className="text-text-tertiary">Order ID</span>
+                <span className="font-mono text-text-secondary">#{order.orderId}</span>
               </div>
 
               {/* Actions */}

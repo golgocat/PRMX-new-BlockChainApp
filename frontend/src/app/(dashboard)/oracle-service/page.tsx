@@ -29,7 +29,8 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
 import { SkeletonMonitorCard, SkeletonStatsCard } from '@/components/ui/Skeleton';
 import * as api from '@/lib/api';
-import { cn, formatId } from '@/lib/utils';
+import { formatId } from '@/lib/api-v3';
+import { cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { V2Monitor, V2MonitorStats, Policy } from '@/types';
 

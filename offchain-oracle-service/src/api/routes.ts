@@ -8,11 +8,12 @@
  */
 
 import { Application, Request, Response } from 'express';
-import { getMonitors, getBuckets, getEvidence, clearAllData, getObservationsV3, getSnapshotsV3 } from '../db/mongo.js';
+import { getMonitors, getBuckets, getEvidence, clearAllData, getObservationsV3, getSnapshotsV3, checkDatabaseHealth } from '../db/mongo.js';
 import { runEvaluationCycle } from '../scheduler/monitor.js';
 import { evaluateMonitor } from '../evaluator/cumulative.js';
 import { fetchPrecipitation, fetchCurrentConditions, fetchHistorical24Hours } from '../accuweather/fetcher.js';
 import { config } from '../config.js';
+import { getApi } from '../chain/listener.js';
 import crypto from 'crypto';
 
 /**
@@ -926,6 +927,175 @@ export function setupRoutes(app: Application): void {
         error: 'Failed to fetch stats',
       });
     }
+  });
+
+  // =========================================================================
+  // Admin API (/admin/*) - System health and monitoring
+  // =========================================================================
+
+  /**
+   * GET /admin/health
+   * Comprehensive health check endpoint for OCW system
+   */
+  app.get('/admin/health', async (req: Request, res: Response) => {
+    const startTime = Date.now();
+    const now = Math.floor(Date.now() / 1000);
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+
+    const services: {
+      oracle_v2: { status: 'online' | 'offline'; last_check: number; policies_monitored?: number };
+      oracle_v3: { status: 'online' | 'offline'; last_check: number; observations_24h?: number; snapshots_24h?: number };
+      database: { status: 'online' | 'offline'; last_check: number };
+      chain: { status: 'online' | 'offline'; last_check: number };
+    } = {
+      oracle_v2: { status: 'offline', last_check: now },
+      oracle_v3: { status: 'offline', last_check: now },
+      database: { status: 'offline', last_check: now },
+      chain: { status: 'offline', last_check: now },
+    };
+
+    // Check Oracle V2 (monitoring service)
+    try {
+      const monitors = getMonitors();
+      const monitoringCount = await monitors.countDocuments({ state: 'monitoring' });
+      services.oracle_v2 = {
+        status: 'online',
+        last_check: now,
+        policies_monitored: monitoringCount,
+      };
+    } catch (error) {
+      console.error('Oracle V2 health check failed:', error);
+    }
+
+    // Check Oracle V3 (ingest service)
+    try {
+      const observations = getObservationsV3();
+      const snapshots = getSnapshotsV3();
+      
+      const [obsCount24h, snapCount24h] = await Promise.all([
+        observations.countDocuments({
+          inserted_at: { $gte: new Date(oneDayAgo) }
+        }),
+        snapshots.countDocuments({
+          inserted_at: { $gte: new Date(oneDayAgo) }
+        }),
+      ]);
+
+      services.oracle_v3 = {
+        status: 'online',
+        last_check: now,
+        observations_24h: obsCount24h,
+        snapshots_24h: snapCount24h,
+      };
+    } catch (error) {
+      console.error('Oracle V3 health check failed:', error);
+    }
+
+    // Check Database
+    try {
+      const dbHealthy = await checkDatabaseHealth();
+      services.database = {
+        status: dbHealthy ? 'online' : 'offline',
+        last_check: now,
+      };
+    } catch (error) {
+      console.error('Database health check failed:', error);
+    }
+
+    // Check Chain connection
+    try {
+      const api = getApi();
+      if (api && api.isConnected) {
+        // Try to get latest block (with timeout)
+        const headerPromise = api.rpc.chain.getHeader();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 5000)
+        );
+        const header = await Promise.race([headerPromise, timeoutPromise]);
+        if (header) {
+          services.chain = {
+            status: 'online',
+            last_check: now,
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Chain health check failed:', error);
+      // Chain is offline if getApi throws or connection fails
+    }
+
+    // Calculate metrics
+    let policiesMonitored = 0;
+    let snapshotsLast24h = 0;
+    let observationsLast24h = 0;
+    let lastSuccessfulOperation = 0;
+
+    try {
+      // Count active V2 monitors
+      const monitors = getMonitors();
+      const v2Active = await monitors.countDocuments({ state: 'monitoring' });
+      
+      // Count active V3 policies (we need to query chain for this, but for now use snapshot count as proxy)
+      // In a full implementation, we'd query the chain, but for health check we'll use available data
+      
+      policiesMonitored = v2Active; // Will be enhanced when we can query V3 policies from chain
+
+      snapshotsLast24h = services.oracle_v3.snapshots_24h || 0;
+      observationsLast24h = services.oracle_v3.observations_24h || 0;
+
+      // Get last successful operation timestamp
+      const snapshots = getSnapshotsV3();
+      const observations = getObservationsV3();
+      
+      const [lastSnapshot, lastObservation] = await Promise.all([
+        snapshots.findOne(
+          {},
+          { sort: { inserted_at: -1 } }
+        ),
+        observations.findOne(
+          {},
+          { sort: { inserted_at: -1 } }
+        ),
+      ]);
+
+      const snapshotTime = lastSnapshot?.inserted_at ? Math.floor(new Date(lastSnapshot.inserted_at).getTime() / 1000) : 0;
+      const observationTime = lastObservation?.inserted_at ? Math.floor(new Date(lastObservation.inserted_at).getTime() / 1000) : 0;
+      lastSuccessfulOperation = Math.max(snapshotTime, observationTime);
+
+    } catch (error) {
+      console.error('Error calculating metrics:', error);
+    }
+
+    // Calculate overall status
+    let overallStatus: 'healthy' | 'degraded' | 'down' = 'healthy';
+    const onlineServices = [
+      services.oracle_v2.status,
+      services.oracle_v3.status,
+      services.database.status,
+      services.chain.status,
+    ].filter(s => s === 'online').length;
+
+    if (onlineServices === 0) {
+      overallStatus = 'down';
+    } else if (onlineServices < 4 || lastSuccessfulOperation < now - 3600) {
+      // Degraded if any service offline or no activity in last hour
+      overallStatus = 'degraded';
+    }
+
+    res.json({
+      success: true,
+      data: {
+        overall_status: overallStatus,
+        timestamp: now,
+        services,
+        metrics: {
+          policies_monitored: policiesMonitored,
+          snapshots_last_24h: snapshotsLast24h,
+          observations_last_24h: observationsLast24h,
+          last_successful_operation: lastSuccessfulOperation,
+        },
+      },
+    });
   });
 }
 

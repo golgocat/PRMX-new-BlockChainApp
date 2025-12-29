@@ -304,6 +304,22 @@ export async function ensureV3Indexes(): Promise<void> {
 }
 
 /**
+ * Check database connection health
+ */
+export async function checkDatabaseHealth(): Promise<boolean> {
+  if (!db) return false;
+  
+  try {
+    // Use ping command to check connection
+    await db.admin().ping();
+    return true;
+  } catch (error) {
+    console.error('Database health check failed:', error);
+    return false;
+  }
+}
+
+/**
  * Disconnect from MongoDB
  */
 export async function disconnect(): Promise<void> {

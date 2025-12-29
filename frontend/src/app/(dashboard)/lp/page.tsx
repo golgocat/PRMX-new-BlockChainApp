@@ -95,8 +95,10 @@ export default function LpTradingPage() {
         policyVersion: 'V3' as const,
         coverageStart: v3Policy.coverageStart,
         coverageEnd: v3Policy.coverageEnd,
+        status: v3Policy.status, // Include status for sell button visibility
         capitalPool: {
           totalShares: v3Policy.totalShares,
+          totalCapital: BigInt(v3Policy.totalShares) * BigInt(100_000_000), // $100 per share in USDT decimals
         },
         // V3-specific: store location name for display
         locationName: v3Policy.location?.name,

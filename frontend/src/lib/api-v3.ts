@@ -31,10 +31,14 @@ export const V3_PAYOUT_PER_SHARE = BigInt(100_000_000); // $100 with 6 decimals
 /**
  * Format a policy/request ID for display.
  * Truncates H128 hex strings for readability: "0x3a7f8b2c..." -> "0x3a7f...2c1d"
+ * Handles legacy number values gracefully.
  */
-export function formatId(id: string): string {
-  if (!id || id.length <= 12) return id;
-  return `${id.slice(0, 6)}...${id.slice(-4)}`;
+export function formatId(id: string | number | null | undefined): string {
+  if (id === null || id === undefined) return '';
+  // Convert to string if it's a number (legacy data)
+  const idStr = typeof id === 'string' ? id : String(id);
+  if (idStr.length <= 12) return idStr;
+  return `${idStr.slice(0, 6)}...${idStr.slice(-4)}`;
 }
 
 /**

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Shield, 
   Plus, 
@@ -33,6 +34,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 
 export default function PoliciesPage() {
+  const router = useRouter();
   const { isConnected, selectedAccount } = useWalletStore();
   const isDao = useIsDao();
   
@@ -295,7 +297,11 @@ export default function PoliciesPage() {
                   const settlementResult = settlementResults.get(policy.id);
                   
                   return (
-                    <TableRow key={policy.id}>
+                    <TableRow 
+                      key={policy.id} 
+                      className="cursor-pointer hover:bg-background-secondary/50 transition-colors"
+                      onClick={() => router.push(`/policies/${policy.id}`)}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-lg bg-prmx-gradient flex items-center justify-center">
@@ -390,7 +396,7 @@ export default function PoliciesPage() {
                         <div className="flex items-center gap-2">
                           {/* Manual settlement buttons - only visible to DAO */}
                           {isDao && canSettle && (
-                            <div className="flex gap-1">
+                            <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -413,11 +419,7 @@ export default function PoliciesPage() {
                               </Button>
                             </div>
                           )}
-                          <Link href={`/policies/${policy.id}`}>
-                            <Button variant="ghost" size="sm">
-                              <ChevronRight className="w-4 h-4" />
-                            </Button>
-                          </Link>
+                          <ChevronRight className="w-4 h-4 text-text-tertiary" />
                         </div>
                       </TableCell>
                     </TableRow>

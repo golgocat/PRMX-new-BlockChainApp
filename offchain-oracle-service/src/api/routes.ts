@@ -938,7 +938,6 @@ export function setupRoutes(app: Application): void {
    * Comprehensive health check endpoint for OCW system
    */
   app.get('/admin/health', async (req: Request, res: Response) => {
-    const startTime = Date.now();
     const now = Math.floor(Date.now() / 1000);
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
@@ -965,6 +964,7 @@ export function setupRoutes(app: Application): void {
       };
     } catch (error) {
       console.error('Oracle V2 health check failed:', error);
+      services.oracle_v2.status = 'offline';
     }
 
     // Check Oracle V3 (ingest service)
@@ -989,6 +989,7 @@ export function setupRoutes(app: Application): void {
       };
     } catch (error) {
       console.error('Oracle V3 health check failed:', error);
+      services.oracle_v3.status = 'offline';
     }
 
     // Check Database
@@ -1005,23 +1006,21 @@ export function setupRoutes(app: Application): void {
     // Check Chain connection
     try {
       const api = getApi();
-      if (api && api.isConnected) {
-        // Try to get latest block (with timeout)
-        const headerPromise = api.rpc.chain.getHeader();
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 5000)
-        );
-        const header = await Promise.race([headerPromise, timeoutPromise]);
-        if (header) {
-          services.chain = {
-            status: 'online',
-            last_check: now,
-          };
-        }
+      // Try to get latest block (with timeout)
+      const headerPromise = api.rpc.chain.getHeader();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 5000)
+      );
+      const header = await Promise.race([headerPromise, timeoutPromise]);
+      if (header) {
+        services.chain = {
+          status: 'online',
+          last_check: now,
+        };
       }
     } catch (error) {
       console.error('Chain health check failed:', error);
-      // Chain is offline if getApi throws or connection fails
+      services.chain.status = 'offline';
     }
 
     // Calculate metrics

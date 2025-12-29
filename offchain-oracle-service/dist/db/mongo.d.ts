@@ -123,6 +123,10 @@ export declare function getSnapshotsV3(): Collection<SnapshotV3>;
  */
 export declare function ensureV3Indexes(): Promise<void>;
 /**
+ * Check database connection health
+ */
+export declare function checkDatabaseHealth(): Promise<boolean>;
+/**
  * Disconnect from MongoDB
  */
 export declare function disconnect(): Promise<void>;

@@ -12,11 +12,12 @@ import {
   Settings,
   HelpCircle,
   ShoppingCart,
-  Umbrella
+  Umbrella,
+  Monitor
 } from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 import { cn } from '@/lib/utils';
-import { useUserRole, UserRole } from '@/stores/walletStore';
+import { useUserRole, UserRole, useIsDao } from '@/stores/walletStore';
 
 type NavItem = {
   href: string;
@@ -35,6 +36,7 @@ const mainNavItems: NavItem[] = [
   { href: '/lp', label: 'LP Trading', icon: Wallet, roles: ['dao', 'lp'] },
   { href: '/oracle', label: 'Oracle (V1)', icon: Cloud },
   { href: '/oracle-service', label: 'Oracle (V2)', icon: Activity },
+  { href: '/admin', label: 'Admin Dashboard', icon: Monitor, roles: ['dao'] },
 ];
 
 const secondaryNavItems: NavItem[] = [

@@ -218,6 +218,7 @@ export interface PolicyDefiInfo {
   investmentStatus: InvestmentStatus;
   position: LpPosition | null;
   isAllocatedToDefi: boolean;
+  poolAccount?: string;
 }
 
 // V2 Oracle Monitor Types (from MongoDB)

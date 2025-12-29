@@ -45,6 +45,44 @@ export function isV3PolicyId(policyId: number): boolean {
   return policyId >= V3_POLICY_ID_OFFSET;
 }
 
+/**
+ * Derive the V3 policy pool account address.
+ * This matches the on-chain derivation: PALLET_ID.into_sub_account_truncating(("policy", policy_id))
+ * where PALLET_ID = *b"prmxplv3"
+ */
+export async function getV3PolicyPoolAccount(policyId: number): Promise<string> {
+  try {
+    const { encodeAddress } = await import('@polkadot/util-crypto');
+    const { u8aConcat, stringToU8a, compactToU8a } = await import('@polkadot/util');
+    
+    // PalletId is "prmxplv3" (8 chars)
+    const palletId = stringToU8a('prmxplv3');
+    const modl = stringToU8a('modl');
+    
+    // SCALE encode the string "policy": compact length prefix + bytes
+    const policyBytes = stringToU8a('policy'); // 6 bytes
+    const policyLenPrefix = compactToU8a(policyBytes.length); // SCALE compact encoding
+    const seedPolicy = u8aConcat(policyLenPrefix, policyBytes);
+    
+    // policy_id is a u32 in LE format
+    const seedPolicyId = new Uint8Array(4);
+    new DataView(seedPolicyId.buffer).setUint32(0, policyId, true); // LE
+    
+    // Full data: modl(4) + pallet_id(8) + SCALE("policy") + policy_id
+    const seed = u8aConcat(seedPolicy, seedPolicyId);
+    const fullData = u8aConcat(modl, palletId, seed);
+    
+    // Pad to 32 bytes (Substrate's into_sub_account_truncating behavior)
+    const accountBytes = new Uint8Array(32);
+    accountBytes.set(fullData.slice(0, 32));
+    
+    return encodeAddress(accountBytes, 42);
+  } catch (error) {
+    console.warn('Failed to derive pool account:', error);
+    return '';
+  }
+}
+
 // =============================================================================
 // Helper: Sign and wait for transaction
 // =============================================================================

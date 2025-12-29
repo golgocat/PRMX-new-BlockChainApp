@@ -319,23 +319,28 @@ export default function V3PolicyDetailPage() {
       
       try {
         // Run queries in parallel with individual error handling
-        const [defiResult, balanceResult] = await Promise.allSettled([
+        const [defiResult, balanceResult, poolAccountResult] = await Promise.allSettled([
           api.getPolicyDefiInfo(policyId),
-          apiV3.getV3PolicyPoolBalance(policyId)
+          apiV3.getV3PolicyPoolBalance(policyId),
+          apiV3.getV3PolicyPoolAccount(policyId)
         ]);
         
         clearTimeout(timeoutId);
         
         if (cancelled) return;
         
+        // Get pool account address
+        const poolAccount = poolAccountResult.status === 'fulfilled' ? poolAccountResult.value : undefined;
+        
         // Handle defi info
         if (defiResult.status === 'fulfilled') {
-          setDefiInfo(defiResult.value);
+          setDefiInfo({ ...defiResult.value, poolAccount });
         } else {
           setDefiInfo({
             investmentStatus: 'NotInvested',
             position: null,
             isAllocatedToDefi: false,
+            poolAccount,
           });
         }
         
@@ -1055,6 +1060,31 @@ export default function V3PolicyDetailPage() {
                         <span className="font-medium">
                           {(Number(defiInfo.position.lpShares) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Pool Account Address */}
+                  {defiInfo.poolAccount && (
+                    <div className="pt-3 border-t border-border-secondary">
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-secondary text-sm">Pool Account</span>
+                        <div className="flex items-center gap-2">
+                          <code className="text-xs font-mono bg-background-tertiary px-2 py-1 rounded">
+                            {formatAddress(defiInfo.poolAccount)}
+                          </code>
+                          <button
+                            onClick={() => handleCopyAddress(defiInfo.poolAccount!)}
+                            className="p-1 hover:bg-background-tertiary rounded transition-colors"
+                            title="Copy full address"
+                          >
+                            {copiedAddress === defiInfo.poolAccount ? (
+                              <Check className="w-3 h-3 text-success" />
+                            ) : (
+                              <Copy className="w-3 h-3 text-text-tertiary" />
+                            )}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}

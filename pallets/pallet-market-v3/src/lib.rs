@@ -23,6 +23,7 @@ use frame_support::traits::{Get, Time};
 use frame_system::pallet_prelude::*;
 use prmx_primitives::{
     EventSpecV3, PolicyId, RequestStatusV3, V3_MIN_SHARES_PER_ACCEPT, V3_PAYOUT_PER_SHARE,
+    V3_POLICY_ID_OFFSET,
 };
 use sp_runtime::traits::{AccountIdConversion, Saturating, Zero};
 
@@ -79,6 +80,10 @@ pub trait PolicyApiV3<AccountId, Balance> {
         shares: u128,
     ) -> DispatchResult;
 
+    /// Allocate a specific amount to DeFi strategy (called after each acceptance)
+    fn allocate_to_defi(policy_id: PolicyId, amount: Balance) -> DispatchResult;
+
+    /// Legacy: trigger full allocation (kept for compatibility)
     fn trigger_defi_allocation(policy_id: PolicyId) -> DispatchResult;
 
     fn policy_pool_account(policy_id: PolicyId) -> AccountId;
@@ -108,6 +113,7 @@ impl LocationRegistryApiV3 for () {
 impl<AccountId: Clone, Balance: Default> PolicyApiV3<AccountId, Balance> for () {
     fn create_policy(_: PolicyId, _: AccountId, _: LocationId, _: EventSpecV3, _: u128, _: Balance, _: u64, _: u64) -> DispatchResult { Ok(()) }
     fn add_shares_to_policy(_: PolicyId, _: AccountId, _: u128) -> DispatchResult { Ok(()) }
+    fn allocate_to_defi(_: PolicyId, _: Balance) -> DispatchResult { Ok(()) }
     fn trigger_defi_allocation(_: PolicyId) -> DispatchResult { Ok(()) }
     fn policy_pool_account(_: PolicyId) -> AccountId { unimplemented!() }
 }
@@ -273,6 +279,15 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
+    /// Default value for NextRequestId - starts at V3_POLICY_ID_OFFSET
+    /// to avoid collision with V1/V2 policy IDs in shared prmxHoldings pallet.
+    pub struct NextRequestIdDefault;
+    impl frame_support::traits::Get<RequestId> for NextRequestIdDefault {
+        fn get() -> RequestId {
+            V3_POLICY_ID_OFFSET
+        }
+    }
+
     /// Underwrite requests by ID
     #[pallet::storage]
     #[pallet::getter(fn underwrite_requests)]
@@ -280,15 +295,51 @@ pub mod pallet {
         StorageMap<_, Blake2_128Concat, RequestId, UnderwriteRequest<T>, OptionQuery>;
 
     /// Next request ID
+    /// Initialized to V3_POLICY_ID_OFFSET to avoid collision with V1/V2 policy IDs
+    /// in the shared prmxHoldings pallet.
     #[pallet::storage]
     #[pallet::getter(fn next_request_id)]
-    pub type NextRequestId<T: Config> = StorageValue<_, RequestId, ValueQuery>;
+    pub type NextRequestId<T: Config> = StorageValue<_, RequestId, ValueQuery, NextRequestIdDefault>;
 
     /// Premium held in escrow per request (unfilled portion)
     #[pallet::storage]
     #[pallet::getter(fn escrow_balance)]
     pub type EscrowBalance<T: Config> =
         StorageMap<_, Blake2_128Concat, RequestId, T::Balance, ValueQuery>;
+
+    // =========================================================================
+    //                                  Hooks
+    // =========================================================================
+
+    #[pallet::hooks]
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+        fn on_runtime_upgrade() -> Weight {
+            // Migrate NextRequestId to use V3_POLICY_ID_OFFSET if it's below the offset
+            let current_id = NextRequestId::<T>::get();
+            if current_id < V3_POLICY_ID_OFFSET {
+                // If there are existing requests, we need to preserve their count
+                // by adding the offset to the current value
+                let new_id = V3_POLICY_ID_OFFSET + current_id;
+                NextRequestId::<T>::put(new_id);
+                log::info!(
+                    target: "pallet-market-v3",
+                    "🔄 Migrated NextRequestId from {} to {} (added V3_POLICY_ID_OFFSET)",
+                    current_id,
+                    new_id
+                );
+                // Return weight for one storage read and one storage write
+                T::DbWeight::get().reads_writes(1, 1)
+            } else {
+                log::info!(
+                    target: "pallet-market-v3",
+                    "✓ NextRequestId ({}) already >= V3_POLICY_ID_OFFSET, no migration needed",
+                    current_id
+                );
+                // Just one read
+                T::DbWeight::get().reads(1)
+            }
+        }
+    }
 
     // =========================================================================
     //                                  Events
@@ -657,10 +708,19 @@ pub mod pallet {
                 is_first_acceptance,
             });
 
-            if is_fully_filled {
-                // Trigger DeFi allocation
-                T::PolicyApi::trigger_defi_allocation(policy_id)?;
+            // Allocate collateral to DeFi incrementally (after each acceptance)
+            // This ensures all collateral is allocated, not just what's in pool when fully filled
+            if let Err(e) = T::PolicyApi::allocate_to_defi(policy_id, total_collateral) {
+                log::warn!(
+                    target: "pallet-market-v3",
+                    "⚠️ Incremental DeFi allocation failed for policy {}: {:?}",
+                    policy_id,
+                    e
+                );
+                // Don't fail - DeFi allocation is optional
+            }
 
+            if is_fully_filled {
                 Self::deposit_event(Event::RequestFullyFilled {
                     request_id,
                     total_shares: request.total_shares,

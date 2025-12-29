@@ -86,8 +86,22 @@ export async function getApi(): Promise<ApiPromise> {
   connectionPromise = (async () => {
     try {
       const provider = new WsProvider(WS_ENDPOINT);
-      const api = await ApiPromise.create({ provider });
-      await api.isReady;
+      
+      // Add timeout to connection
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Connection timeout: Unable to connect to ${WS_ENDPOINT} after 10 seconds. Make sure the PRMX node is running.`));
+        }, 10000); // 10 second timeout
+      });
+
+      const connectPromise = (async () => {
+        const api = await ApiPromise.create({ provider });
+        await api.isReady;
+        return api;
+      })();
+
+      const api = await Promise.race([connectPromise, timeoutPromise]);
+      
       apiInstance = api;
       console.log('Connected to PRMX chain:', api.genesisHash.toHex());
       return api;
@@ -1696,11 +1710,151 @@ export async function getAllocationPercentagePpm(): Promise<number> {
   const api = await getApi();
   try {
     const ppm = await api.query.prmxXcmCapital.allocationPercentagePpm();
-    return (ppm as any).toNumber?.() ?? Number(ppm.toString());
+    const stored = (ppm as any).toNumber?.() ?? Number(ppm.toString());
+    // If stored value is 0, return default (100%)
+    return stored === 0 ? 1_000_000 : stored;
   } catch (err) {
     console.error('Failed to get allocation percentage:', err);
     return 1_000_000; // Default to 100%
   }
+}
+
+/**
+ * Set allocation percentage for DeFi strategy (DAO only)
+ * @param percentagePpm - Percentage in parts per million (1_000_000 = 100%)
+ */
+export async function setAllocationPercentage(
+  signer: KeyringPair,
+  percentagePpm: number
+): Promise<string> {
+  const api = await getApi();
+  
+  // Cap at 100%
+  const capped = Math.min(percentagePpm, 1_000_000);
+  
+  // Requires sudo (root)
+  const innerCall = api.tx.prmxXcmCapital.setAllocationPercentage(capped);
+  const sudoCall = api.tx.sudo.sudo(innerCall);
+  
+  return new Promise((resolve, reject) => {
+    sudoCall.signAndSend(signer, ({ status, dispatchError, events }) => {
+      if (dispatchError) {
+        if (dispatchError.isModule) {
+          const decoded = api.registry.findMetaError(dispatchError.asModule);
+          reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+        } else {
+          reject(new Error(dispatchError.toString()));
+        }
+        return;
+      }
+      
+      // Check for failure events
+      if (events) {
+        const failedEvent = events.find(({ event }) => 
+          (event.section === 'system' && event.method === 'ExtrinsicFailed') ||
+          (event.section === 'sudo' && event.method === 'SudoFailed')
+        );
+        if (failedEvent) {
+          reject(new Error('Transaction failed on-chain'));
+          return;
+        }
+      }
+      
+      if (status.isFinalized) {
+        resolve(status.asFinalized.toHex());
+      }
+    });
+  });
+}
+
+/**
+ * Manually allocate policy capital to DeFi strategy (DAO only)
+ * @param policyId - The policy ID to allocate capital for
+ * @param amount - Amount to allocate (in smallest USDT units, with 6 decimals)
+ */
+export async function allocatePolicyToDefi(
+  signer: KeyringPair,
+  policyId: number,
+  amount: bigint
+): Promise<string> {
+  const api = await getApi();
+  
+  // Requires sudo (root)
+  const innerCall = api.tx.prmxXcmCapital.daoAllocateToDefi(policyId, amount.toString());
+  const sudoCall = api.tx.sudo.sudo(innerCall);
+  
+  return new Promise((resolve, reject) => {
+    sudoCall.signAndSend(signer, ({ status, dispatchError, events }) => {
+      if (dispatchError) {
+        if (dispatchError.isModule) {
+          const decoded = api.registry.findMetaError(dispatchError.asModule);
+          reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+        } else {
+          reject(new Error(dispatchError.toString()));
+        }
+        return;
+      }
+      
+      // Check for failure events
+      if (events) {
+        const failedEvent = events.find(({ event }) => 
+          (event.section === 'system' && event.method === 'ExtrinsicFailed') ||
+          (event.section === 'sudo' && event.method === 'SudoFailed')
+        );
+        if (failedEvent) {
+          reject(new Error('Transaction failed on-chain'));
+          return;
+        }
+      }
+      
+      if (status.isFinalized) {
+        resolve(status.asFinalized.toHex());
+      }
+    });
+  });
+}
+
+/**
+ * Manually allocate policy capital to DeFi strategy (LP holder with >=51% ownership)
+ * @param policyId - The policy ID to allocate capital for
+ * @param amount - Amount to allocate (in smallest USDT units, with 6 decimals)
+ */
+export async function lpAllocatePolicyToDefi(
+  signer: KeyringPair,
+  policyId: number,
+  amount: bigint
+): Promise<string> {
+  const api = await getApi();
+  
+  return new Promise((resolve, reject) => {
+    api.tx.prmxXcmCapital.lpAllocateToDefi(policyId, amount.toString())
+      .signAndSend(signer, ({ status, dispatchError, events }) => {
+        if (dispatchError) {
+          if (dispatchError.isModule) {
+            const decoded = api.registry.findMetaError(dispatchError.asModule);
+            reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+          } else {
+            reject(new Error(dispatchError.toString()));
+          }
+          return;
+        }
+        
+        // Check for failure events
+        if (events) {
+          const failedEvent = events.find(({ event }) => 
+            event.section === 'system' && event.method === 'ExtrinsicFailed'
+          );
+          if (failedEvent) {
+            reject(new Error('Transaction failed on-chain'));
+            return;
+          }
+        }
+        
+        if (status.isFinalized) {
+          resolve(status.asFinalized.toHex());
+        }
+      });
+  });
 }
 
 /**
@@ -1826,7 +1980,7 @@ export async function getV2Monitors(): Promise<V2Monitor[]> {
  */
 export async function getV2Monitor(id: string): Promise<V2Monitor | null> {
   try {
-    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors/${id}`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/monitoring/monitors/${id}`);
     const json = await response.json();
     
     if (!json.success) {
@@ -1902,8 +2056,14 @@ export interface V2Bucket {
  * Get hourly buckets for a V2 monitor
  */
 export async function getV2MonitorBuckets(monitorId: string): Promise<V2Bucket[]> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/38082c70-67cf-4ff9-812b-468e40015b84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:getV2MonitorBuckets:entry',message:'Get buckets called',data:{monitorId,url:`${ORACLE_SERVICE_URL}/monitoring/monitors/${monitorId}/buckets`},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   try {
-    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors/${monitorId}/buckets`);
+    const response = await fetch(`${ORACLE_SERVICE_URL}/monitoring/monitors/${monitorId}/buckets`);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/38082c70-67cf-4ff9-812b-468e40015b84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:getV2MonitorBuckets:response',message:'Buckets fetch response',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     const json = await response.json();
     
     if (!json.success) {
@@ -1927,11 +2087,25 @@ export async function backfillV2MonitorBuckets(monitorId: string): Promise<{
   backfilled_buckets: number;
   total_buckets: number;
 }> {
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/38082c70-67cf-4ff9-812b-468e40015b84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:backfillV2MonitorBuckets:entry',message:'Backfill function called',data:{monitorId,oracleServiceUrl:ORACLE_SERVICE_URL},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
   try {
-    const response = await fetch(`${ORACLE_SERVICE_URL}/v2/monitors/${monitorId}/backfill`, {
+    const url = `${ORACLE_SERVICE_URL}/monitoring/monitors/${monitorId}/backfill`;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/38082c70-67cf-4ff9-812b-468e40015b84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:backfillV2MonitorBuckets:before-fetch',message:'About to call backfill endpoint',data:{url,method:'POST'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    const response = await fetch(url, {
       method: 'POST',
     });
-    const json = await response.json();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/38082c70-67cf-4ff9-812b-468e40015b84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:backfillV2MonitorBuckets:after-fetch',message:'Fetch response received',data:{status:response.status,statusText:response.statusText,ok:response.ok,contentType:response.headers.get('content-type')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    const text = await response.text();
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/38082c70-67cf-4ff9-812b-468e40015b84',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'api.ts:backfillV2MonitorBuckets:response-text',message:'Response body preview',data:{textPreview:text.substring(0,200),textLength:text.length,looksLikeHtml:text.startsWith('<!DOCTYPE')||text.startsWith('<html')},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    const json = JSON.parse(text);
     
     if (!json.success) {
       throw new Error(json.error || 'Failed to backfill buckets');

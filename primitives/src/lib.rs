@@ -305,3 +305,10 @@ pub const V3_OBSERVATIONS_TTL_SECS: u64 = 30 * 24 * 3600;
 /// Snapshots TTL in seconds (90 days)
 pub const V3_SNAPSHOTS_TTL_SECS: u64 = 90 * 24 * 3600;
 
+/// Policy ID offset for V3 policies.
+/// V3 policy IDs start from this value to avoid collision with V1/V2 policy IDs.
+/// This ensures that when both systems share the prmxHoldings pallet, their IDs don't overlap.
+/// V1/V2 policies: 0 to 999,999
+/// V3 policies: 1,000,000+
+pub const V3_POLICY_ID_OFFSET: PolicyId = 1_000_000;
+

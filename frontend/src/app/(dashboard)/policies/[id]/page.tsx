@@ -32,6 +32,8 @@ import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
+import * as apiV3 from '@/lib/api-v3';
+import { isV3PolicyId } from '@/lib/api-v3';
 import { formatUSDT, formatDate, formatDateTimeUTC, formatAddress, formatCoordinates, formatTimeRemaining, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { Policy, Market, PolicyDefiInfo, V2Monitor, LpHolding } from '@/types';
@@ -73,8 +75,29 @@ export default function PolicyDetailPage() {
       setLoading(true);
     }
     try {
+      // New V3 policies have IDs >= 1,000,000 - redirect immediately
+      if (isV3PolicyId(policyId)) {
+        router.push(`/v3/policies/${policyId}`);
+        return;
+      }
+      
       const policies = await api.getPolicies();
       const found = policies.find(p => p.id === policyId);
+      
+      // If legacy policy not found, check if V3 policy exists (legacy IDs < 1,000,000) and redirect
+      if (!found) {
+        try {
+          const v3Policy = await apiV3.getV3Policy(policyId);
+          if (v3Policy) {
+            // V3 policy exists - redirect to V3 page
+            router.push(`/v3/policies/${policyId}`);
+            return;
+          }
+        } catch (v3Err) {
+          console.error('Failed to check V3 policy:', v3Err);
+        }
+      }
+      
       if (found) {
         setPolicy(found);
         // Load market info
@@ -109,9 +132,47 @@ export default function PolicyDetailPage() {
           }
         }
         // Load LP holdings for this policy
+        // Note: prmxHoldings is shared between V1/V2 and V3 policy systems
+        // Only filter when a V3 policy with the same ID exists (collision scenario)
         try {
           const holdings = await api.getLpHoldingsForPolicy(policyId);
-          setLpHoldings(holdings);
+          
+          // Check if a V3 policy with the same ID exists (potential collision)
+          let v3PolicyExists = false;
+          try {
+            const v3Policy = await apiV3.getV3Policy(policyId);
+            v3PolicyExists = v3Policy !== null;
+          } catch {
+            // V3 policy doesn't exist or error checking - no collision
+          }
+          
+          if (v3PolicyExists) {
+            // V3 policy with same ID exists - need to filter carefully
+            // Only show holdings that match the V1/V2 policy's expected total shares
+            const holdingsTotal = holdings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0);
+            const policyShares = Number(found.shares);
+            
+            if (holdingsTotal !== policyShares) {
+              // Holdings don't match V1/V2 policy - likely showing V3 data
+              // Filter to only show holdings from V1/V2 policy's LP holders list if available
+              const policyLpHolders = found.capitalPool?.lpHolders || [];
+              if (policyLpHolders.length > 0) {
+                const filteredHoldings = holdings.filter(h => 
+                  policyLpHolders.includes(h.holder)
+                );
+                setLpHoldings(filteredHoldings);
+              } else {
+                console.warn(`LP holdings collision for policy ${policyId}: V3 policy exists with same ID. holdings=${holdingsTotal}, v1v2Policy=${policyShares}`);
+                setLpHoldings([]);
+              }
+            } else {
+              // Holdings match V1/V2 policy shares - show them
+              setLpHoldings(holdings);
+            }
+          } else {
+            // No V3 collision - show all holdings for this policy
+            setLpHoldings(holdings);
+          }
         } catch (lpErr) {
           console.error('Failed to load LP holdings:', lpErr);
         }
@@ -659,7 +720,9 @@ export default function PolicyDetailPage() {
                 <div className="text-center py-6">
                   <Users className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
                   <p className="text-text-secondary text-sm">No LP tokens issued yet</p>
-                  <p className="text-text-tertiary text-xs mt-1">LP tokens are minted when LPs buy shares</p>
+                  <p className="text-text-tertiary text-xs mt-1">
+                    LP tokens are minted when LPs provide capital
+                  </p>
                 </div>
               ) : (
                 <>

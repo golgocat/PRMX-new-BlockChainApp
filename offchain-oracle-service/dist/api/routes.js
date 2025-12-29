@@ -922,6 +922,42 @@ export function setupRoutes(app) {
             snapshotsLast24h = services.oracle_v3.snapshots_24h || 0;
             observationsLast24h = services.oracle_v3.observations_24h || 0;
             // Get last successful operation timestamp
+            // Check BOTH on-chain oracle states AND database insertions
+            // On-chain is the source of truth for actual OCW snapshot submissions
+            let maxObservedUntil = 0;
+            try {
+                // Method 1: Check on-chain oracle states (most accurate - reflects actual OCW snapshot submissions)
+                const chainApi = getApi();
+                const policies = await chainApi.query.prmxPolicyV3.policies.entries();
+                if (policies.length > 0) {
+                    // Query oracle states for all policies (limit to 50 to avoid timeout)
+                    // Query each policy's oracle state individually (same pattern as frontend uses oracleStates(policyId))
+                    const oracleStatePromises = policies.slice(0, 50).map(async ([key]) => {
+                        try {
+                            const policyId = key.args[0].toNumber();
+                            const oracleState = await chainApi.query.prmxOracleV3.oracleStates(policyId);
+                            if (oracleState.isNone) {
+                                return 0;
+                            }
+                            const state = oracleState.unwrap();
+                            const human = state.toHuman ? state.toHuman() : state;
+                            // Use same parsing as frontend
+                            const observedUntil = parseInt((human.observedUntil || human.observed_until || '0').toString().replace(/,/g, ''));
+                            return observedUntil > 0 ? observedUntil : 0;
+                        }
+                        catch (error) {
+                            // Skip if query fails for this policy
+                            return 0;
+                        }
+                    });
+                    const observedUntilValues = await Promise.all(oracleStatePromises);
+                    maxObservedUntil = Math.max(...observedUntilValues, 0);
+                }
+            }
+            catch (error) {
+                console.error('[Health Check] Error checking on-chain oracle states:', error);
+            }
+            // Method 2: Check database insertions (backup - reflects ingest API activity)
             const snapshots = getSnapshotsV3();
             const observations = getObservationsV3();
             const [lastSnapshot, lastObservation] = await Promise.all([
@@ -930,7 +966,10 @@ export function setupRoutes(app) {
             ]);
             const snapshotTime = lastSnapshot?.inserted_at ? Math.floor(new Date(lastSnapshot.inserted_at).getTime() / 1000) : 0;
             const observationTime = lastObservation?.inserted_at ? Math.floor(new Date(lastObservation.inserted_at).getTime() / 1000) : 0;
-            lastSuccessfulOperation = Math.max(snapshotTime, observationTime);
+            const dbMaxTime = Math.max(snapshotTime, observationTime);
+            // Use the maximum of on-chain and database timestamps
+            // On-chain is primary since that's where OCW submits snapshots directly
+            lastSuccessfulOperation = Math.max(maxObservedUntil, dbMaxTime);
         }
         catch (error) {
             console.error('Error calculating metrics:', error);

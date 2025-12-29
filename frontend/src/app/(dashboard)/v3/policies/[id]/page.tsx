@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useMemo, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { 
   ArrowLeft,
   MapPin,
@@ -18,8 +18,12 @@ import {
   Percent,
   FileText,
   ChevronRight,
-  ShoppingCart
+  ShoppingCart,
+  Copy,
+  Check,
+  TrendingUp
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -36,6 +40,13 @@ import {
   formatThresholdValue
 } from '@/types/v3';
 import { formatUSDT, formatDateTimeUTCCompact, formatTimeRemaining, formatAddress, cn } from '@/lib/utils';
+import * as api from '@/lib/api';
+import * as apiV3 from '@/lib/api-v3';
+import { isV3PolicyId } from '@/lib/api-v3';
+import type { PolicyDefiInfo } from '@/types';
+import { useIsDao } from '@/stores/walletStore';
+import { Modal } from '@/components/ui/Modal';
+import { AlertCircle } from 'lucide-react';
 
 // Snapshot scheduling constants (matching pallet-oracle-v3)
 const V3_SNAPSHOT_INTERVAL_SECS = 6 * 3600;  // 6 hours
@@ -165,16 +176,57 @@ function getAggStateLabel(aggState: V3AggState): string {
 
 export default function V3PolicyDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const policyId = params.id ? parseInt(params.id as string) : null;
   
   const { isConnected, selectedAccount } = useWalletStore();
   const { policy, loading: policyLoading, error, refresh: refreshPolicy } = useV3Policy(policyId);
+  
+  // Check if legacy policy exists when V3 policy is not found - redirect if so
+  // Only needed for legacy V3 policy IDs (< 1,000,000) which may collide with V1/V2
+  useEffect(() => {
+    if (policyLoading || policy || policyId === null) return;
+    
+    // New V3 policy IDs (>= 1,000,000) can't collide with V1/V2 - no need to check
+    if (isV3PolicyId(policyId)) return;
+    
+    // Legacy V3 policy ID not found, check if legacy V1/V2 policy exists
+    const checkLegacyPolicy = async () => {
+      try {
+        const legacyPolicies = await api.getPolicies();
+        const legacyPolicy = legacyPolicies.find(p => p.id === policyId);
+        if (legacyPolicy) {
+          // Legacy policy exists - redirect to legacy page
+          router.push(`/policies/${policyId}`);
+        }
+      } catch (err) {
+        console.error('Failed to check legacy policy:', err);
+      }
+    };
+    
+    checkLegacyPolicy();
+  }, [policyLoading, policy, policyId, router]);
   const { oracleState, loading: oracleLoading, refresh: refreshOracle } = useV3OracleState(policyId);
   const { holders: lpHolders, loading: holdersLoading, refresh: refreshHolders } = useV3PolicyLpHolders(policyId);
   const { observations, loading: observationsLoading, error: observationsError, refresh: refreshObservations } = useV3Observations(policyId);
   
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [defiInfo, setDefiInfo] = useState<PolicyDefiInfo | null>(null);
+  const [defiLoading, setDefiLoading] = useState(true);
+  const [showAllocationModal, setShowAllocationModal] = useState(false);
+  const [isAllocating, setIsAllocating] = useState(false);
+  const [poolBalance, setPoolBalance] = useState<bigint | null>(null);
+  
+  const isDao = useIsDao();
+  
+  const handleCopyAddress = async (address: string) => {
+    await navigator.clipboard.writeText(address);
+    setCopiedAddress(address);
+    toast.success('Address copied to clipboard!');
+    setTimeout(() => setCopiedAddress(null), 2000);
+  };
   
   const eventInfo = useMemo(() => 
     policy ? getEventTypeInfo(policy.eventSpec.eventType) : null, 
@@ -191,10 +243,146 @@ export default function V3PolicyDetailPage() {
     [selectedAccount, lpHolders]
   );
   
+  // Check if user can allocate (DAO or >=51% LP holder)
+  const canAllocate = useMemo(() => {
+    if (!policy || !selectedAccount) return false;
+    if (isDao) return true; // DAO can always allocate
+    if (!myLpHolding || !policy.totalShares) return false;
+    // Check if LP holder has >=51% ownership
+    const ownershipPercentage = (myLpHolding.lpShares / policy.totalShares) * 100;
+    return ownershipPercentage >= 51;
+  }, [policy, selectedAccount, isDao, myLpHolding]);
+  
+  const handleAllocateToDefi = async () => {
+    if (!policyId || !policy || !selectedAccount || !poolBalance || poolBalance === 0n) {
+      toast.error('Cannot allocate: insufficient pool balance');
+      return;
+    }
+    
+    const keypair = useWalletStore.getState().getKeypair();
+    if (!keypair) {
+      toast.error('Please connect your wallet');
+      return;
+    }
+    
+    setIsAllocating(true);
+    try {
+      // Allocate 100% of pool balance
+      if (isDao) {
+        // DAO uses sudo
+        await api.allocatePolicyToDefi(keypair, policyId, poolBalance);
+      } else {
+        // LP holder uses direct call
+        await api.lpAllocatePolicyToDefi(keypair, policyId, poolBalance);
+      }
+      toast.success('Successfully allocated policy capital to DeFi strategy');
+      setShowAllocationModal(false);
+      
+      // Refresh data
+      await Promise.all([
+        refreshPolicy(),
+        api.getPolicyDefiInfo(policyId).then(setDefiInfo),
+        apiV3.getV3PolicyPoolBalance(policyId).then(setPoolBalance)
+      ]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to allocate to DeFi');
+    } finally {
+      setIsAllocating(false);
+    }
+  };
+  
+  // Load DeFi allocation info and pool balance
+  useEffect(() => {
+    if (policyId === null || policyId === undefined) {
+      setDefiLoading(false);
+      return;
+    }
+    
+    let cancelled = false;
+    let timeoutId: NodeJS.Timeout;
+    
+    const loadDefiInfo = async () => {
+      setDefiLoading(true);
+      
+      // Set a timeout to ensure we don't load forever
+      timeoutId = setTimeout(() => {
+        if (!cancelled) {
+          setDefiInfo({
+            investmentStatus: 'NotInvested',
+            position: null,
+            isAllocatedToDefi: false,
+          });
+          setPoolBalance(BigInt(0));
+          setDefiLoading(false);
+        }
+      }, 5000);
+      
+      try {
+        // Run queries in parallel with individual error handling
+        const [defiResult, balanceResult] = await Promise.allSettled([
+          api.getPolicyDefiInfo(policyId),
+          apiV3.getV3PolicyPoolBalance(policyId)
+        ]);
+        
+        clearTimeout(timeoutId);
+        
+        if (cancelled) return;
+        
+        // Handle defi info
+        if (defiResult.status === 'fulfilled') {
+          setDefiInfo(defiResult.value);
+        } else {
+          setDefiInfo({
+            investmentStatus: 'NotInvested',
+            position: null,
+            isAllocatedToDefi: false,
+          });
+        }
+        
+        // Handle pool balance
+        if (balanceResult.status === 'fulfilled') {
+          setPoolBalance(balanceResult.value);
+        } else {
+          setPoolBalance(BigInt(0));
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
+        if (!cancelled) {
+          setDefiInfo({
+            investmentStatus: 'NotInvested',
+            position: null,
+            isAllocatedToDefi: false,
+          });
+          setPoolBalance(BigInt(0));
+        }
+      } finally {
+        if (!cancelled) {
+          setDefiLoading(false);
+        }
+      }
+    };
+    
+    loadDefiInfo();
+    
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [policyId]);
+  
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       await Promise.all([refreshPolicy(), refreshOracle(), refreshHolders(), refreshObservations()]);
+      // Refresh DeFi info
+      if (policyId) {
+        try {
+          const defi = await api.getPolicyDefiInfo(policyId);
+          setDefiInfo(defi);
+        } catch (err) {
+          console.error('Failed to refresh DeFi info:', err);
+        }
+      }
     } finally {
       // Ensure animation is visible for at least 500ms
       setTimeout(() => setIsRefreshing(false), 500);
@@ -736,7 +924,18 @@ export default function V3PolicyDetailPage() {
                         <TableRow key={holder.holder}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <code className="text-sm">{formatAddress(holder.holder)}</code>
+                              <button
+                                onClick={() => handleCopyAddress(holder.holder)}
+                                className="flex items-center gap-1.5 group cursor-pointer hover:text-prmx-cyan transition-colors"
+                                title="Click to copy address"
+                              >
+                                <code className="text-sm group-hover:text-prmx-cyan transition-colors">{formatAddress(holder.holder)}</code>
+                                {copiedAddress === holder.holder ? (
+                                  <Check className="w-3.5 h-3.5 text-success" />
+                                ) : (
+                                  <Copy className="w-3.5 h-3.5 text-text-tertiary group-hover:text-prmx-cyan transition-colors" />
+                                )}
+                              </button>
                               {isMe && <Badge variant="cyan">You</Badge>}
                             </div>
                           </TableCell>
@@ -799,6 +998,178 @@ export default function V3PolicyDetailPage() {
             </CardContent>
           </Card>
           
+          {/* DeFi Allocation Card */}
+          <Card className={defiInfo?.isAllocatedToDefi ? 'border-success/30' : 'border-border-secondary'}>
+            <CardHeader className="pb-2">
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-success" />
+                DeFi Yield Strategy
+              </h2>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {defiLoading ? (
+                // Loading state
+                <div className="animate-pulse space-y-4">
+                  <div className="h-16 bg-background-tertiary/50 rounded-xl" />
+                  <div className="h-8 bg-background-tertiary/50 rounded-lg" />
+                </div>
+              ) : defiInfo ? (
+                <>
+                  {/* Investment Status */}
+                  <div className={`p-4 rounded-xl ${
+                    defiInfo.isAllocatedToDefi 
+                      ? 'bg-success/10 border border-success/30' 
+                      : 'bg-background-tertiary/50 border border-border-secondary'
+                  }`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-text-secondary">Status</span>
+                      <Badge 
+                        variant={defiInfo.isAllocatedToDefi ? 'success' : 'default'}
+                        className="text-xs"
+                      >
+                        {defiInfo.investmentStatus === 'Invested' && '🟢 Allocated to DeFi'}
+                        {defiInfo.investmentStatus === 'NotInvested' && '⚪ Not Allocated'}
+                        {defiInfo.investmentStatus === 'Unwinding' && '🔄 Unwinding'}
+                        {defiInfo.investmentStatus === 'Settled' && '✓ Settled'}
+                        {defiInfo.investmentStatus === 'Failed' && '❌ Failed'}
+                      </Badge>
+                    </div>
+                    {defiInfo.isAllocatedToDefi && (
+                      <p className="text-xs text-text-secondary">
+                        Locked funds are generating yield via Hydration Stableswap (Mock Strategy)
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Position Details (if allocated) */}
+                  {defiInfo.position && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary text-sm">Principal Allocated</span>
+                        <span className="font-medium text-success">
+                          {formatUSDT(defiInfo.position.principalUsdt, false)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary text-sm">LP Tokens</span>
+                        <span className="font-medium">
+                          {(Number(defiInfo.position.lpShares) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pool Balance Info (if not allocated) */}
+                  {!defiInfo.isAllocatedToDefi && poolBalance !== null && (
+                    <div className="flex justify-between p-3 rounded-lg bg-background-tertiary/50">
+                      <span className="text-text-secondary text-sm">Pool Balance</span>
+                      <span className="font-medium">
+                        {formatUSDT(poolBalance, false)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Manual Allocation Button (if not allocated and user can allocate) */}
+                  {!defiInfo.isAllocatedToDefi && canAllocate && poolBalance !== null && poolBalance > 0n && (
+                    <div className="pt-2 border-t border-border-secondary">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => setShowAllocationModal(true)}
+                        icon={<TrendingUp className="w-4 h-4" />}
+                      >
+                        Allocate to DeFi Strategy
+                      </Button>
+                      {!isDao && myLpHolding && (
+                        <p className="text-xs text-text-tertiary mt-2 text-center">
+                          You hold {myLpHolding.percentageOwned.toFixed(1)}% of LP tokens (>=51% required)
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Info tooltip */}
+                  <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
+                    <p className="text-xs text-text-secondary">
+                      💡 Policy funds may be allocated to DeFi strategies to generate yield. 
+                      The DAO guarantees coverage of potential losses.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                // Error/fallback state
+                <div className="text-center py-4 text-text-secondary">
+                  <p className="text-sm">Unable to load DeFi status</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          
+          {/* Allocation Confirmation Modal */}
+          <Modal
+            isOpen={showAllocationModal}
+            onClose={() => !isAllocating && setShowAllocationModal(false)}
+            title="Allocate to DeFi Strategy"
+            size="md"
+          >
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-warning/10 border border-warning/30">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-warning mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-warning mb-1">Confirm DeFi Allocation</p>
+                    <p className="text-xs text-text-secondary">
+                      This will allocate {poolBalance !== null ? formatUSDT(poolBalance, false) : 'all available'} from the policy pool to the DeFi yield strategy (Hydration Stableswap Pool 102).
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Policy ID</span>
+                  <span className="font-medium">#{policyId}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Pool Balance</span>
+                  <span className="font-medium">{poolBalance !== null ? formatUSDT(poolBalance, false) : 'Loading...'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-secondary">Allocation Amount</span>
+                  <span className="font-medium text-success">{poolBalance !== null ? formatUSDT(poolBalance, false) : 'Loading...'}</span>
+                </div>
+              </div>
+              
+              <div className="p-3 rounded-lg bg-background-tertiary/50">
+                <p className="text-xs text-text-secondary">
+                  <strong>Note:</strong> The DAO guarantees coverage of potential losses from DeFi investments. 
+                  Funds will be allocated to the Hydration Stableswap Pool 102 (Mock Strategy in current setup).
+                </p>
+              </div>
+              
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="secondary"
+                  className="flex-1"
+                  onClick={() => setShowAllocationModal(false)}
+                  disabled={isAllocating}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="primary"
+                  className="flex-1"
+                  onClick={handleAllocateToDefi}
+                  loading={isAllocating}
+                  icon={<TrendingUp className="w-4 h-4" />}
+                >
+                  {isAllocating ? 'Allocating...' : 'Confirm Allocation'}
+                </Button>
+              </div>
+            </div>
+          </Modal>
+          
           {/* My Position */}
           {(isHolder || myLpHolding) && (
             <Card>
@@ -856,9 +1227,20 @@ export default function V3PolicyDetailPage() {
                 <div className="w-10 h-10 rounded-full bg-prmx-gradient flex items-center justify-center">
                   <Shield className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <code className="text-sm">{formatAddress(policy.holder)}</code>
-                  {isHolder && <Badge variant="cyan" className="ml-2">You</Badge>}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleCopyAddress(policy.holder)}
+                    className="flex items-center gap-1.5 group cursor-pointer hover:text-prmx-cyan transition-colors"
+                    title="Click to copy address"
+                  >
+                    <code className="text-sm group-hover:text-prmx-cyan transition-colors">{formatAddress(policy.holder)}</code>
+                    {copiedAddress === policy.holder ? (
+                      <Check className="w-3.5 h-3.5 text-success" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-text-tertiary group-hover:text-prmx-cyan transition-colors" />
+                    )}
+                  </button>
+                  {isHolder && <Badge variant="cyan">You</Badge>}
                 </div>
               </div>
             </CardContent>

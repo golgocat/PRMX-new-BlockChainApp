@@ -98,7 +98,13 @@ impl<AccountId> HoldingsApiV3<AccountId> for () {
 pub trait CapitalApiV3<AccountId> {
     type Balance;
 
-    /// Auto-allocate policy capital to DeFi
+    /// Allocate a specific amount to DeFi (incremental, per-acceptance)
+    fn allocate_to_defi(
+        policy_id: PolicyId,
+        amount: Self::Balance,
+    ) -> Result<(), DispatchError>;
+
+    /// Auto-allocate policy capital to DeFi (legacy, full pool balance)
     fn auto_allocate_policy_capital(
         policy_id: PolicyId,
         pool_balance: Self::Balance,
@@ -118,6 +124,9 @@ pub trait CapitalApiV3<AccountId> {
 impl<AccountId> CapitalApiV3<AccountId> for () {
     type Balance = u128;
 
+    fn allocate_to_defi(_: PolicyId, _: u128) -> Result<(), DispatchError> {
+        Ok(())
+    }
     fn auto_allocate_policy_capital(_: PolicyId, _: u128) -> Result<(), DispatchError> {
         Ok(())
     }
@@ -415,7 +424,48 @@ pub mod pallet {
             })
         }
 
-        /// Trigger DeFi allocation for a policy (called when fully filled)
+        /// Allocate a specific amount to DeFi (called incrementally per acceptance)
+        pub fn allocate_to_defi(policy_id: PolicyId, amount: T::Balance) -> DispatchResult {
+            // Ensure policy exists
+            ensure!(
+                Policies::<T>::contains_key(policy_id),
+                Error::<T>::PolicyNotFound
+            );
+
+            if amount == T::Balance::zero() {
+                return Ok(());
+            }
+
+            // Call the capital API to allocate (it handles the actual XCM/mock strategy)
+            if let Err(e) = T::CapitalApi::allocate_to_defi(policy_id, amount) {
+                log::warn!(
+                    target: "pallet-policy-v3",
+                    "⚠️ Incremental DeFi allocation failed for policy {} (amount {}): {:?}",
+                    policy_id,
+                    amount.into(),
+                    e
+                );
+                // Don't fail - DeFi allocation is optional
+                return Ok(());
+            }
+
+            log::info!(
+                target: "pallet-policy-v3",
+                "✅ Allocated {} USDT to DeFi for policy {}",
+                amount.into(),
+                policy_id
+            );
+
+            Self::deposit_event(Event::DeFiAllocated {
+                policy_id,
+                amount,
+            });
+
+            Ok(())
+        }
+
+        /// Trigger DeFi allocation for a policy (legacy - allocates full pool balance)
+        /// Kept for backwards compatibility but no longer used for new policies
         pub fn trigger_defi_allocation(policy_id: PolicyId) -> DispatchResult {
             let mut policy = Policies::<T>::get(policy_id).ok_or(Error::<T>::PolicyNotFound)?;
 

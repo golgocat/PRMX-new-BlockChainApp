@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
   Wallet, 
   Plus, 
@@ -43,6 +43,7 @@ import { WalletConnectionModal } from '@/components/features/WalletConnectionMod
 import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory, useLpPositionOutcomes, addTradeToHistory } from '@/hooks/useChainData';
 import { useV3Policies } from '@/hooks/useV3ChainData';
 import * as api from '@/lib/api';
+import { isV3PolicyId, V3_POLICY_ID_OFFSET } from '@/lib/api-v3';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import type { LpAskOrder, Policy, DaoSolvencyInfo, PolicyDefiInfo, LpTradeRecord, LpPositionOutcome } from '@/types';
@@ -69,10 +70,50 @@ export default function LpTradingPage() {
   const isDao = useIsDao();
   
   const { orders, loading: ordersLoading, refresh: refreshOrders } = useLpOrders();
-  const { holdings, loading: holdingsLoading, refresh: refreshHoldings } = useMyLpHoldings();
+  const { holdings: rawHoldings, loading: holdingsLoading, refresh: refreshHoldings } = useMyLpHoldings();
   const { policies } = usePolicies();
   const { policies: v3Policies } = useV3Policies();
   const { markets } = useMarkets();
+  
+  // Process holdings to handle V1/V2 vs V3 policy ID identification
+  // V3 policies with IDs >= V3_POLICY_ID_OFFSET are clearly V3, no collision possible
+  // For legacy IDs (< V3_POLICY_ID_OFFSET), we need collision detection heuristics
+  const holdings = useMemo(() => {
+    return rawHoldings.map(holding => {
+      // New V3 policies have IDs >= 1,000,000 - no collision possible
+      if (isV3PolicyId(holding.policyId)) {
+        return { ...holding, _policyVersion: 'V3' as const };
+      }
+      
+      // For legacy policy IDs (< 1,000,000), check for potential collision
+      const v1v2Policy = policies.find(p => p.id === holding.policyId);
+      const v3Policy = v3Policies.find(p => p.id === holding.policyId);
+      
+      // If only one exists, no collision
+      if (v1v2Policy && !v3Policy) {
+        return { ...holding, _policyVersion: 'V1V2' as const };
+      }
+      if (v3Policy && !v1v2Policy) {
+        return { ...holding, _policyVersion: 'V3' as const };
+      }
+      
+      // Both exist - legacy collision case, use shares heuristic
+      if (v1v2Policy && v3Policy) {
+        const v1v2Shares = Number(v1v2Policy.shares || v1v2Policy.capitalPool?.totalShares || 0);
+        const v3Shares = v3Policy.totalShares;
+        const holdingShares = Number(holding.shares);
+        
+        // If holding shares <= V1/V2 total AND V1/V2 total < V3 total, it's likely V1/V2
+        if (holdingShares <= v1v2Shares && v1v2Shares < v3Shares) {
+          return { ...holding, _policyVersion: 'V1V2' as const };
+        } else {
+          return { ...holding, _policyVersion: 'V3' as const };
+        }
+      }
+      
+      return holding;
+    });
+  }, [rawHoldings, policies, v3Policies]);
   const { trades, loading: tradesLoading, refresh: refreshTrades, addTrade, clearHistory } = useTradeHistory();
   const { outcomes, loading: outcomesLoading, refresh: refreshOutcomes } = useLpPositionOutcomes();
   const [showWalletModal, setShowWalletModal] = useState(false);
@@ -80,30 +121,91 @@ export default function LpTradingPage() {
   // Active tab state
   const [activeTab, setActiveTab] = useState<'orderbook' | 'history'>('orderbook');
 
+  // Format V3 policy to compatible structure
+  const formatV3Policy = (v3Policy: typeof v3Policies[0]) => ({
+    id: v3Policy.id,
+    label: `Policy #${v3Policy.id}`,
+    marketId: -1, // V3 doesn't use markets
+    policyVersion: 'V3' as const,
+    coverageStart: v3Policy.coverageStart,
+    coverageEnd: v3Policy.coverageEnd,
+    status: v3Policy.status, // Include status for sell button visibility
+    capitalPool: {
+      totalShares: v3Policy.totalShares,
+      totalCapital: BigInt(v3Policy.totalShares) * BigInt(100_000_000), // $100 per share in USDT decimals
+    },
+    // V3-specific: store location name for display
+    locationName: v3Policy.location?.name,
+  });
+
   // Helper to get policy by ID (checks V1/V2 first, then V3)
+  // NOTE: Use getPolicyForHolding when you have an LP holding to get the correct policy
   const getPolicyById = (policyId: number) => {
+    // New V3 policies have IDs >= V3_POLICY_ID_OFFSET - skip V1/V2 check
+    if (isV3PolicyId(policyId)) {
+      const v3Policy = v3Policies.find(p => p.id === policyId);
+      return v3Policy ? formatV3Policy(v3Policy) : undefined;
+    }
+    
     const v1v2Policy = policies.find(p => p.id === policyId);
     if (v1v2Policy) return v1v2Policy;
     
-    // Check V3 policies and adapt to compatible format
+    // Check V3 policies (legacy IDs < V3_POLICY_ID_OFFSET)
     const v3Policy = v3Policies.find(p => p.id === policyId);
     if (v3Policy) {
-      return {
-        id: v3Policy.id,
-        label: `Policy #${v3Policy.id}`,
-        marketId: -1, // V3 doesn't use markets
-        policyVersion: 'V3' as const,
-        coverageStart: v3Policy.coverageStart,
-        coverageEnd: v3Policy.coverageEnd,
-        status: v3Policy.status, // Include status for sell button visibility
-        capitalPool: {
-          totalShares: v3Policy.totalShares,
-          totalCapital: BigInt(v3Policy.totalShares) * BigInt(100_000_000), // $100 per share in USDT decimals
-        },
-        // V3-specific: store location name for display
-        locationName: v3Policy.location?.name,
-      };
+      return formatV3Policy(v3Policy);
     }
+    return undefined;
+  };
+  
+  // Helper to get the correct policy for an LP holding
+  // This handles the case where V1/V2 and V3 policies have the same ID
+  // by checking which policy the holding's shares actually belong to
+  const getPolicyForHolding = (policyId: number, holdingShares: bigint, holderAddress?: string, policyVersionHint?: 'V1V2' | 'V3') => {
+    // New V3 policies have IDs >= V3_POLICY_ID_OFFSET - no collision possible
+    if (isV3PolicyId(policyId)) {
+      const v3Policy = v3Policies.find(p => p.id === policyId);
+      return v3Policy ? formatV3Policy(v3Policy) : undefined;
+    }
+    
+    const v1v2Policy = policies.find(p => p.id === policyId);
+    const v3Policy = v3Policies.find(p => p.id === policyId);
+    
+    // If only one exists, return that one
+    if (v1v2Policy && !v3Policy) return v1v2Policy;
+    if (v3Policy && !v1v2Policy) return formatV3Policy(v3Policy);
+    
+    // Both exist (legacy collision) - use version hint if provided
+    if (v1v2Policy && v3Policy) {
+      if (policyVersionHint === 'V1V2') {
+        return v1v2Policy;
+      }
+      if (policyVersionHint === 'V3') {
+        return formatV3Policy(v3Policy);
+      }
+      
+      // Check if the holder is in the V1/V2 policy's LP holders list
+      const isInV1V2LpHolders = holderAddress && 
+        v1v2Policy.capitalPool?.lpHolders?.some((h: string) => isSameAddress(h, holderAddress));
+      
+      if (isInV1V2LpHolders) {
+        return v1v2Policy;
+      }
+      
+      // Compare total shares to determine which policy the holding likely belongs to
+      const v1v2TotalShares = Number(v1v2Policy.shares || v1v2Policy.capitalPool?.totalShares || 0);
+      const v3TotalShares = v3Policy.totalShares;
+      const holdingSharesNum = Number(holdingShares);
+      
+      // If holding shares <= V1/V2 total, it's likely from V1/V2
+      if (holdingSharesNum <= v1v2TotalShares) {
+        return v1v2Policy;
+      }
+      
+      // If holding shares > V1/V2 total, it's likely from V3
+      return formatV3Policy(v3Policy);
+    }
+    
     return undefined;
   };
   
@@ -807,7 +909,10 @@ export default function LpTradingPage() {
                   )}
                   
                   {holdings.filter(h => h.shares > 0).map((holding, index) => {
-                    const policy = getPolicyById(holding.policyId);
+                    // Use getPolicyForHolding to correctly match the policy system this holding belongs to
+                    // Pass the _policyVersion hint if available from collision detection
+                    const policyVersionHint = (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined;
+                    const policy = getPolicyForHolding(holding.policyId, holding.shares, selectedAccount?.address, policyVersionHint);
                     const market = policy ? getMarketById(policy.marketId) : null;
                     const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
                     const potentialPayout = holding.shares * (market?.payoutPerShare || BigInt(100_000_000));
@@ -1540,7 +1645,12 @@ export default function LpTradingPage() {
       >
         {selectedHoldingPolicyId !== null && (() => {
           const holding = holdings.find(h => h.policyId === selectedHoldingPolicyId);
-          const policy = getPolicyById(selectedHoldingPolicyId);
+          // Use getPolicyForHolding to correctly identify which policy system (V1/V2 vs V3) 
+          // this holding belongs to, avoiding ID collisions between policy systems
+          const policyVersionHint = holding ? (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined : undefined;
+          const policy = holding 
+            ? getPolicyForHolding(selectedHoldingPolicyId, holding.shares, selectedAccount?.address, policyVersionHint)
+            : getPolicyById(selectedHoldingPolicyId);
           const market = policy ? getMarketById(policy.marketId) : null;
           
           if (!holding) return null;

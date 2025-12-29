@@ -540,6 +540,8 @@ impl pallet_prmx_xcm_capital::Config for Runtime {
     type XcmStrategyInterface = pallet_prmx_xcm_capital::MockXcmStrategyInterface<Runtime>;
     /// Policy pool account derivation from policy pallet
     type PolicyPoolAccount = PrmxPolicy;
+    /// Holdings API for LP token ownership checks
+    type HoldingsApi = PrmxHoldings;
 }
 
 // =============================================================================
@@ -645,6 +647,20 @@ pub struct CapitalApiV3Adapter;
 impl pallet_policy_v3::CapitalApiV3<AccountId> for CapitalApiV3Adapter {
     type Balance = Balance;
 
+    fn allocate_to_defi(
+        policy_id: prmx_primitives::PolicyId,
+        amount: Balance,
+    ) -> Result<(), sp_runtime::DispatchError> {
+        // V3 uses its own policy pool account derivation (pallet_policy_v3)
+        // Use the new method that accepts the pool account directly
+        let pool_account = pallet_policy_v3::Pallet::<Runtime>::policy_pool_account(policy_id);
+        pallet_prmx_xcm_capital::Pallet::<Runtime>::do_allocate_to_defi_with_account(
+            policy_id,
+            amount,
+            pool_account,
+        )
+    }
+
     fn auto_allocate_policy_capital(
         policy_id: prmx_primitives::PolicyId,
         pool_balance: Balance,
@@ -656,7 +672,13 @@ impl pallet_policy_v3::CapitalApiV3<AccountId> for CapitalApiV3Adapter {
         policy_id: prmx_primitives::PolicyId,
         required_local: Balance,
     ) -> Result<(), sp_runtime::DispatchError> {
-        pallet_prmx_xcm_capital::Pallet::<Runtime>::ensure_local_liquidity(policy_id, required_local)
+        // V3 uses its own policy pool account derivation (pallet_policy_v3)
+        let pool_account = pallet_policy_v3::Pallet::<Runtime>::policy_pool_account(policy_id);
+        pallet_prmx_xcm_capital::Pallet::<Runtime>::do_ensure_local_liquidity_with_account(
+            policy_id,
+            required_local,
+            pool_account,
+        )
     }
 
     fn on_policy_settled(
@@ -720,6 +742,10 @@ impl pallet_market_v3::PolicyApiV3<AccountId, Balance> for PolicyApiV3Adapter {
         shares: u128,
     ) -> Result<(), sp_runtime::DispatchError> {
         pallet_policy_v3::Pallet::<Runtime>::add_shares_to_policy(policy_id, underwriter, shares)
+    }
+
+    fn allocate_to_defi(policy_id: PolicyId, amount: Balance) -> Result<(), sp_runtime::DispatchError> {
+        pallet_policy_v3::Pallet::<Runtime>::allocate_to_defi(policy_id, amount)
     }
 
     fn trigger_defi_allocation(policy_id: PolicyId) -> Result<(), sp_runtime::DispatchError> {

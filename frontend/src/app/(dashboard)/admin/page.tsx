@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useOcwHealth } from '@/hooks/useOcwHealth';
 import { OcwHealthCard } from '@/components/admin/OcwHealthCard';
+import { OracleKeyStatus } from '@/components/admin/OracleKeyStatus';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import { useState } from 'react';
 
@@ -33,7 +34,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="purple" className="text-xs">Admin</Badge>
           </div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold">System Health</h1>
           <p className="text-text-secondary mt-1">DAO operator dashboard for system monitoring</p>
         </div>
         
@@ -64,7 +65,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center gap-2 mb-1">
             <Badge variant="purple" className="text-xs">Admin</Badge>
           </div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold">System Health</h1>
         </div>
         
         <Card>
@@ -97,6 +98,9 @@ export default function AdminDashboardPage() {
 
       {/* OCW Health Status */}
       <OcwHealthCard healthData={healthData} loading={loading} />
+
+      {/* Oracle Key Injections */}
+      <OracleKeyStatus />
 
       {/* Error State */}
       {error && (

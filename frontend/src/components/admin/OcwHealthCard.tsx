@@ -47,6 +47,51 @@ export function OcwHealthCard({ healthData, loading }: OcwHealthCardProps) {
     }
   };
 
+  const getStatusReason = () => {
+    const { overall_status, services, metrics, timestamp } = healthData;
+    const now = Math.floor(Date.now() / 1000);
+    
+    if (overall_status === 'healthy') {
+      return null;
+    }
+    
+    if (overall_status === 'down') {
+      const offlineServices = Object.entries(services)
+        .filter(([_, service]) => service.status === 'offline')
+        .map(([name, _]) => name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()));
+      
+      if (offlineServices.length > 0) {
+        return `${offlineServices.join(', ')} ${offlineServices.length === 1 ? 'is' : 'are'} offline`;
+      }
+      return 'All services are offline';
+    }
+    
+    // degraded status
+    const onlineCount = Object.values(services).filter(s => s.status === 'online').length;
+    const hoursSinceLastOp = metrics.last_successful_operation > 0 
+      ? (now - metrics.last_successful_operation) / 3600 
+      : Infinity;
+    
+    const reasons: string[] = [];
+    
+    if (onlineCount < 4) {
+      const offlineServices = Object.entries(services)
+        .filter(([_, service]) => service.status === 'offline')
+        .map(([name, _]) => name.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()));
+      reasons.push(`${offlineServices.join(', ')} ${offlineServices.length === 1 ? 'is' : 'are'} offline`);
+    }
+    
+    if (hoursSinceLastOp >= 1) {
+      if (hoursSinceLastOp < 24) {
+        reasons.push(`No activity in the last ${Math.floor(hoursSinceLastOp)} hours`);
+      } else {
+        reasons.push(`No activity in the last ${Math.floor(hoursSinceLastOp / 24)} days`);
+      }
+    }
+    
+    return reasons.length > 0 ? reasons.join(' • ') : 'Service degraded';
+  };
+
   const formatTimestamp = (timestamp: number) => {
     if (timestamp === 0) return 'Never';
     const date = new Date(timestamp * 1000);
@@ -67,12 +112,20 @@ export function OcwHealthCard({ healthData, loading }: OcwHealthCardProps) {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-prmx-cyan" />
-            <h3 className="text-lg font-semibold">OCW Health Status</h3>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-prmx-cyan" />
+              <h3 className="text-lg font-semibold">OCW Health Status</h3>
+            </div>
+            {getStatusBadge()}
           </div>
-          {getStatusBadge()}
+          {getStatusReason() && (
+            <p className="text-sm text-text-secondary flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-warning" />
+              {getStatusReason()}
+            </p>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-6">

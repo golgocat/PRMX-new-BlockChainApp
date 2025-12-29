@@ -28,6 +28,23 @@ import type {
 
 export const V3_PAYOUT_PER_SHARE = BigInt(100_000_000); // $100 with 6 decimals
 
+/**
+ * V3 Policy ID offset - V3 policies start from this ID to avoid collision
+ * with V1/V2 policy IDs in shared prmxHoldings storage.
+ * Must match V3_POLICY_ID_OFFSET in prmx-primitives.
+ */
+export const V3_POLICY_ID_OFFSET = 1_000_000;
+
+/**
+ * Check if a policy ID belongs to a V3 policy.
+ * V3 policies have IDs >= V3_POLICY_ID_OFFSET (1,000,000).
+ * Note: Legacy V3 policies (created before the offset was introduced) may have
+ * lower IDs and need special handling.
+ */
+export function isV3PolicyId(policyId: number): boolean {
+  return policyId >= V3_POLICY_ID_OFFSET;
+}
+
 // =============================================================================
 // Helper: Sign and wait for transaction
 // =============================================================================
@@ -392,6 +409,20 @@ export async function getV3OracleState(policyId: number): Promise<V3OracleState 
 // =============================================================================
 // Historical Observations
 // =============================================================================
+
+/**
+ * Get V3 policy pool balance
+ */
+export async function getV3PolicyPoolBalance(policyId: number): Promise<bigint> {
+  const api = await getApi();
+  try {
+    const balance = await api.query.prmxPolicyV3.policyPoolBalance(policyId);
+    return BigInt(balance.toString());
+  } catch (err) {
+    console.error(`Failed to get V3 policy pool balance for policy ${policyId}:`, err);
+    return BigInt(0);
+  }
+}
 
 /**
  * V3 Observation from oracle service

@@ -58,6 +58,8 @@ use sp_runtime::traits::Zero;
 
 // Import traits from policy pallet
 pub use pallet_prmx_policy::{CapitalApi, PolicyPoolAccountApi, PolicyId};
+// Import holdings API for LP ownership checks
+pub use pallet_prmx_holdings::HoldingsApi;
 
 // =============================================================================
 //                    Hydration Pool 102 Configuration
@@ -207,6 +209,9 @@ pub mod pallet {
 
         /// Policy pool account derivation API
         type PolicyPoolAccount: PolicyPoolAccountApi<Self::AccountId>;
+        
+        /// Holdings API for LP token ownership checks
+        type HoldingsApi: pallet_prmx_holdings::HoldingsApi<Self::AccountId>;
     }
 
     // =========================================================================
@@ -357,6 +362,8 @@ pub mod pallet {
         ArithmeticOverflow,
         /// Position is currently being unwound.
         PositionUnwinding,
+        /// LP holder does not own >=51% of LP tokens
+        NotEnoughLpOwnership,
     }
 
     // =========================================================================
@@ -439,6 +446,57 @@ pub mod pallet {
 
             Ok(())
         }
+
+        /// Allocate capital from a policy pool into the DeFi strategy (Hydration Pool 102).
+        ///
+        /// This can be called by LP holders who own >=51% of the policy's LP tokens.
+        /// The amount is transferred from the policy pool to the DeFi strategy, and the resulting LP shares are tracked.
+        ///
+        /// - `policy_id`: The policy whose capital to invest
+        /// - `amount`: Amount of USDT to invest
+        #[pallet::call_index(3)]
+        #[pallet::weight(100_000)]
+        pub fn lp_allocate_to_defi(
+            origin: OriginFor<T>,
+            policy_id: PolicyId,
+            amount: T::Balance,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+
+            // Check LP ownership: must own >=51% of LP tokens
+            let total_lp_shares = T::HoldingsApi::total_lp_shares(policy_id);
+            let lp_balance = T::HoldingsApi::lp_balance(policy_id, &who);
+
+            ensure!(
+                total_lp_shares > 0,
+                Error::<T>::NotEnoughLpOwnership
+            );
+
+            // Calculate ownership percentage (with 6 decimal precision)
+            // Ownership >= 51% means: lp_balance * 100 >= total_lp_shares * 51
+            // To avoid overflow, we use: lp_balance * 100 >= total_lp_shares * 51
+            let ownership_percentage = (lp_balance as u128)
+                .saturating_mul(100)
+                .checked_div(total_lp_shares)
+                .unwrap_or(0);
+
+            ensure!(
+                ownership_percentage >= 51,
+                Error::<T>::NotEnoughLpOwnership
+            );
+
+            log::info!(
+                target: "prmx-xcm-capital",
+                "🔐 LP holder {:?} ({}% ownership) allocating to DeFi for policy {}",
+                who,
+                ownership_percentage,
+                policy_id
+            );
+
+            Self::do_allocate_to_defi(policy_id, amount)?;
+
+            Ok(())
+        }
     }
 
     // =========================================================================
@@ -456,10 +514,21 @@ pub mod pallet {
             }
         }
 
-        /// Internal implementation of allocate_to_defi
+        /// Internal implementation of allocate_to_defi (uses configured PolicyPoolAccount)
         pub fn do_allocate_to_defi(
             policy_id: PolicyId,
             amount: T::Balance,
+        ) -> Result<(), DispatchError> {
+            let pool_account = T::PolicyPoolAccount::policy_pool_account(policy_id);
+            Self::do_allocate_to_defi_with_account(policy_id, amount, pool_account)
+        }
+
+        /// Internal implementation of allocate_to_defi with explicit pool account
+        /// This is used by V3 which has its own policy pool derivation
+        pub fn do_allocate_to_defi_with_account(
+            policy_id: PolicyId,
+            amount: T::Balance,
+            pool_account: T::AccountId,
         ) -> Result<(), DispatchError> {
             // Check current status
             let status = PolicyInvestmentStatus::<T>::get(policy_id);
@@ -467,9 +536,6 @@ pub mod pallet {
                 status == InvestmentStatus::NotInvested,
                 Error::<T>::AlreadyInvested
             );
-
-            // Get pool account
-            let pool_account = T::PolicyPoolAccount::policy_pool_account(policy_id);
 
             // Verify pool has enough funds
             let pool_balance = T::Assets::balance(T::UsdtAssetId::get(), &pool_account);
@@ -623,13 +689,25 @@ pub mod pallet {
         }
 
         /// Ensure local liquidity for a policy by unwinding LP position if needed.
+        /// (Uses configured PolicyPoolAccount)
+        pub fn do_ensure_local_liquidity(
+            policy_id: PolicyId,
+            required_local: T::Balance,
+        ) -> Result<(), DispatchError> {
+            let pool_account = T::PolicyPoolAccount::policy_pool_account(policy_id);
+            Self::do_ensure_local_liquidity_with_account(policy_id, required_local, pool_account)
+        }
+
+        /// Ensure local liquidity with explicit pool account.
+        /// This is used by V3 which has its own policy pool derivation.
         ///
         /// This is called before settlement to ensure the policy pool has enough
         /// USDT to fulfill obligations. If DAO cannot cover the full shortfall,
         /// it covers what it can and LPs absorb the remaining loss.
-        pub fn do_ensure_local_liquidity(
+        pub fn do_ensure_local_liquidity_with_account(
             policy_id: PolicyId,
             required_local: T::Balance,
+            pool_account: T::AccountId,
         ) -> Result<(), DispatchError> {
             let status = PolicyInvestmentStatus::<T>::get(policy_id);
 
@@ -647,8 +725,6 @@ pub mod pallet {
             // Get the position
             let pos = PolicyLpPositions::<T>::get(policy_id)
                 .ok_or(Error::<T>::NoPositionToUnwind)?;
-
-            let pool_account = T::PolicyPoolAccount::policy_pool_account(policy_id);
 
             // Mark as unwinding
             PolicyInvestmentStatus::<T>::insert(policy_id, InvestmentStatus::Unwinding);

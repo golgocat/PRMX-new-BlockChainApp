@@ -31,6 +31,7 @@ cumulus-primitives-core = { git = "https://github.com/paritytech/polkadot-sdk.gi
 # Local dependencies
 pallet-prmx-markets = { path = "../prmx-markets", default-features = false }
 pallet-prmx-policy = { path = "../prmx-policy", default-features = false }
+pallet-prmx-holdings = { path = "../prmx-holdings", default-features = false }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
@@ -54,6 +55,7 @@ std = [
     "cumulus-primitives-core/std",
     "pallet-prmx-markets/std",
     "pallet-prmx-policy/std",
+    "pallet-prmx-holdings/std",
 ]
 runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",

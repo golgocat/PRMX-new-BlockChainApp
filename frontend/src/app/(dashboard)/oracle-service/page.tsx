@@ -29,14 +29,14 @@ import { StatCard } from '@/components/ui/StatCard';
 import { Modal } from '@/components/ui/Modal';
 import { SkeletonMonitorCard, SkeletonStatsCard } from '@/components/ui/Skeleton';
 import * as api from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { cn, formatId } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { V2Monitor, V2MonitorStats, Policy } from '@/types';
 
 export default function OracleV2Page() {
   const [monitors, setMonitors] = useState<V2Monitor[]>([]);
   const [stats, setStats] = useState<V2MonitorStats | null>(null);
-  const [policies, setPolicies] = useState<Map<number, Policy>>(new Map());
+  const [policies, setPolicies] = useState<Map<string, Policy>>(new Map());
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [serviceHealthy, setServiceHealthy] = useState<boolean | null>(null);
@@ -128,7 +128,7 @@ export default function OracleV2Page() {
       setMonitors(monitorsData);
       
       // Create policy lookup map
-      const policyMap = new Map<number, Policy>();
+      const policyMap = new Map<string, Policy>();
       policiesData.forEach(p => policyMap.set(p.id, p));
       setPolicies(policyMap);
       setStats(statsData);
@@ -324,7 +324,7 @@ export default function OracleV2Page() {
                 const isNearThreshold = progressPercent >= 75;
                 const isTriggered = monitor.cumulative_mm >= monitor.strike_mm;
                 const policy = policies.get(monitor.policy_id);
-                const policyLabel = policy?.label || `policy-${monitor.policy_id}`;
+                const policyLabel = policy?.label || `policy-${formatId(monitor.policy_id)}`;
                 
                 return (
                   <div 
@@ -356,7 +356,7 @@ export default function OracleV2Page() {
                             {getStateBadge(monitor.state)}
                           </div>
                           <p className="text-xs text-text-tertiary">
-                            Policy ID: #{monitor.policy_id} • Monitor: {monitor._id}
+                            Policy ID: #{formatId(monitor.policy_id)} • Monitor: {monitor._id}
                           </p>
                         </div>
                       </div>
@@ -597,7 +597,7 @@ export default function OracleV2Page() {
                 const progressPercent = Math.min(100, (monitor.cumulative_mm / monitor.strike_mm) * 100);
                 const isTriggered = monitor.state === 'triggered';
                 const policy = policies.get(monitor.policy_id);
-                const policyLabel = policy?.label || `policy-${monitor.policy_id}`;
+                const policyLabel = policy?.label || `policy-${formatId(monitor.policy_id)}`;
                 
                 return (
                   <div 
@@ -627,7 +627,7 @@ export default function OracleV2Page() {
                             {getStateBadge(monitor.state)}
                           </div>
                           <p className="text-xs text-text-tertiary">
-                            Policy ID: #{monitor.policy_id} • Monitor: {monitor._id}
+                            Policy ID: #{formatId(monitor.policy_id)} • Monitor: {monitor._id}
                           </p>
                         </div>
                       </div>

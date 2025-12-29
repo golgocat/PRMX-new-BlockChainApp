@@ -225,9 +225,9 @@ export interface PolicyDefiInfo {
 export type V2MonitorState = 'monitoring' | 'triggered' | 'matured' | 'reported';
 
 export interface V2Monitor {
-  _id: string;              // Composite UID: "0:42" (market_id:policy_id)
+  _id: string;              // Composite UID: "0:0x1234..." (market_id:policy_id_hex)
   market_id: number;
-  policy_id: number;
+  policy_id: string;        // H128 as hex string
   coverage_start: number;   // Unix timestamp
   coverage_end: number;     // Unix timestamp
   strike_mm: number;        // Strike threshold in mm (scaled by 10)

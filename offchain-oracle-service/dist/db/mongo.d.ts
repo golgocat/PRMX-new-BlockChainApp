@@ -8,7 +8,7 @@ import { Db, Collection } from 'mongodb';
 export interface Monitor {
     _id: string;
     market_id: number;
-    policy_id: number;
+    policy_id: string;
     coverage_start: number;
     coverage_end: number;
     strike_mm: number;
@@ -84,13 +84,13 @@ export declare function getEvidence(): Collection<Evidence>;
 /**
  * Generate monitor ID (composite key)
  */
-export declare function makeMonitorId(marketId: number, policyId: number): string;
+export declare function makeMonitorId(marketId: number, policyId: string): string;
 /**
  * V3 Observation document structure
  */
 export interface ObservationV3 {
     _id: string;
-    policy_id: number;
+    policy_id: string;
     epoch_time: number;
     location_key: string;
     event_type: string;
@@ -104,7 +104,7 @@ export interface ObservationV3 {
  */
 export interface SnapshotV3 {
     _id: string;
-    policy_id: number;
+    policy_id: string;
     observed_until: number;
     agg_state: object;
     commitment: string;

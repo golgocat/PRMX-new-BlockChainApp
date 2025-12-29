@@ -75,8 +75,8 @@ export function setupRoutes(app) {
     // Get monitor by policy_id (convenience endpoint)
     app.get('/monitoring/policies/:policyId/monitor', async (req, res) => {
         try {
-            const policyId = parseInt(req.params.policyId, 10);
-            if (isNaN(policyId)) {
+            const policyId = req.params.policyId; // H128 as hex string
+            if (!policyId) {
                 return res.status(400).json({
                     success: false,
                     error: 'Invalid policy ID',
@@ -738,8 +738,8 @@ export function setupRoutes(app) {
      */
     app.get('/ingest/observations/:policyId', async (req, res) => {
         try {
-            const policyId = parseInt(req.params.policyId, 10);
-            if (isNaN(policyId)) {
+            const policyId = req.params.policyId; // H128 as hex string
+            if (!policyId) {
                 return res.status(400).json({
                     success: false,
                     error: 'Invalid policy ID',
@@ -770,8 +770,8 @@ export function setupRoutes(app) {
      */
     app.get('/ingest/snapshots/:policyId', async (req, res) => {
         try {
-            const policyId = parseInt(req.params.policyId, 10);
-            if (isNaN(policyId)) {
+            const policyId = req.params.policyId; // H128 as hex string
+            if (!policyId) {
                 return res.status(400).json({
                     success: false,
                     error: 'Invalid policy ID',

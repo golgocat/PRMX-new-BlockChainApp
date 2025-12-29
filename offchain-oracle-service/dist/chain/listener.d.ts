@@ -10,7 +10,7 @@ export declare function connectToChain(): Promise<ApiPromise>;
  * Subscribe to V2 policy events (created, settled)
  */
 export declare function subscribeToV2PolicyCreated(onPolicyCreated: (policy: {
-    policy_id: number;
+    policy_id: string;
     market_id: number;
     coverage_start: number;
     coverage_end: number;
@@ -22,7 +22,7 @@ export declare function subscribeToV2PolicyCreated(onPolicyCreated: (policy: {
  * Handle V2PolicyCreated event - create monitor document and fetch 24h historical data
  */
 export declare function handleV2PolicyCreated(policy: {
-    policy_id: number;
+    policy_id: string;
     market_id: number;
     coverage_start: number;
     coverage_end: number;

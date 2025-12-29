@@ -17,7 +17,7 @@ export type V2Outcome = 'Triggered' | 'MaturedNoEvent';
  * Submit a V2 report to the chain
  */
 export async function submitV2Report(
-  policyId: number,
+  policyId: string,  // H128 as hex string
   outcome: V2Outcome,
   observedAt: number,
   cumulativeMm: number,
@@ -91,7 +91,7 @@ export async function submitV2Report(
 /**
  * Check if a V2 report already exists on-chain
  */
-export async function checkV2ReportExists(policyId: number): Promise<boolean> {
+export async function checkV2ReportExists(policyId: string): Promise<boolean> {
   const api = getApi();
   const report = await api.query.prmxOracle.v2FinalReportByPolicy(policyId);
   // Check if report exists (Option type unwrapping)

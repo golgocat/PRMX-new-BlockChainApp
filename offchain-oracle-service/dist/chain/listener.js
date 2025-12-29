@@ -37,9 +37,9 @@ export async function subscribeToV2PolicyCreated(onPolicyCreated) {
             // Handle V2PolicyCreated
             if (event.section === 'prmxPolicy' && event.method === 'V2PolicyCreated') {
                 const [policyId, marketId, coverageStart, coverageEnd, strikeMm, lat, lon] = event.data;
-                console.log(`📋 V2PolicyCreated event detected: policy_id=${policyId}`);
+                console.log(`📋 V2PolicyCreated event detected: policy_id=${policyId.toHex()}`);
                 onPolicyCreated({
-                    policy_id: Number(policyId.toString()),
+                    policy_id: policyId.toHex(),
                     market_id: Number(marketId.toString()),
                     coverage_start: Number(coverageStart.toString()),
                     coverage_end: Number(coverageEnd.toString()),
@@ -53,16 +53,16 @@ export async function subscribeToV2PolicyCreated(onPolicyCreated) {
             if (event.section === 'prmxOracle' && event.method === 'V2ReportAccepted') {
                 const [policyId, outcome, cumulativeMm, evidenceHash] = event.data;
                 const outcomeStr = outcome.toString();
-                console.log(`📊 V2ReportAccepted event detected: policy_id=${policyId}, outcome=${outcomeStr}`);
-                handleV2Settlement(Number(policyId.toString()), outcomeStr, Number(cumulativeMm.toString()), evidenceHash.toHex()).catch(err => console.error('Error handling V2ReportAccepted:', err));
+                console.log(`📊 V2ReportAccepted event detected: policy_id=${policyId.toHex()}, outcome=${outcomeStr}`);
+                handleV2Settlement(policyId.toHex(), outcomeStr, Number(cumulativeMm.toString()), evidenceHash.toHex()).catch(err => console.error('Error handling V2ReportAccepted:', err));
             }
             // Handle V2PolicySettled (from policy pallet)
             // Event fields: policy_id, outcome, cumulative_mm, evidence_hash
             if (event.section === 'prmxPolicy' && event.method === 'V2PolicySettled') {
                 const [policyId, outcome, cumulativeMm, evidenceHash] = event.data;
                 const outcomeStr = outcome.toString();
-                console.log(`✅ V2PolicySettled event detected: policy_id=${policyId}, outcome=${outcomeStr}`);
-                handleV2Settlement(Number(policyId.toString()), outcomeStr, Number(cumulativeMm.toString()), evidenceHash.toHex()).catch(err => console.error('Error handling V2PolicySettled:', err));
+                console.log(`✅ V2PolicySettled event detected: policy_id=${policyId.toHex()}, outcome=${outcomeStr}`);
+                handleV2Settlement(policyId.toHex(), outcomeStr, Number(cumulativeMm.toString()), evidenceHash.toHex()).catch(err => console.error('Error handling V2PolicySettled:', err));
             }
         });
     });
@@ -71,7 +71,8 @@ export async function subscribeToV2PolicyCreated(onPolicyCreated) {
 /**
  * Handle V2 settlement - update monitor state in MongoDB
  */
-async function handleV2Settlement(policyId, outcome, cumulativeMm, evidenceHash) {
+async function handleV2Settlement(policyId, // H128 as hex string
+outcome, cumulativeMm, evidenceHash) {
     const monitors = getMonitors();
     // Find monitor for this policy (assume Manila market for V2)
     const monitorId = makeMonitorId(0, policyId);

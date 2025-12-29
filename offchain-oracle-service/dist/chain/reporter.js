@@ -9,7 +9,8 @@ import CryptoJS from 'crypto-js';
 /**
  * Submit a V2 report to the chain
  */
-export async function submitV2Report(policyId, outcome, observedAt, cumulativeMm, evidenceJson) {
+export async function submitV2Report(policyId, // H128 as hex string
+outcome, observedAt, cumulativeMm, evidenceJson) {
     const api = getApi();
     const keyring = new Keyring({ type: 'sr25519' });
     const reporter = keyring.addFromUri(config.reporterMnemonic);

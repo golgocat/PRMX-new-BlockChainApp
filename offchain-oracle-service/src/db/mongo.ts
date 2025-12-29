@@ -12,9 +12,9 @@ let db: Db | null = null;
  * Monitor document structure (policy tracking)
  */
 export interface Monitor {
-  _id: string;             // Composite UID: "0:42" (market_id:policy_id)
+  _id: string;             // Composite UID: "0:0x1234..." (market_id:policy_id_hex)
   market_id: number;
-  policy_id: number;
+  policy_id: string;       // H128 as hex string
   coverage_start: number;
   coverage_end: number;
   strike_mm: number;
@@ -226,7 +226,7 @@ export function getEvidence(): Collection<Evidence> {
 /**
  * Generate monitor ID (composite key)
  */
-export function makeMonitorId(marketId: number, policyId: number): string {
+export function makeMonitorId(marketId: number, policyId: string): string {
   return `${marketId}:${policyId}`;
 }
 
@@ -239,7 +239,7 @@ export function makeMonitorId(marketId: number, policyId: number): string {
  */
 export interface ObservationV3 {
   _id: string;             // policy_id:epoch_time
-  policy_id: number;
+  policy_id: string;       // H128 as hex string
   epoch_time: number;
   location_key: string;
   event_type: string;
@@ -254,7 +254,7 @@ export interface ObservationV3 {
  */
 export interface SnapshotV3 {
   _id: string;             // policy_id:observed_until
-  policy_id: number;
+  policy_id: string;       // H128 as hex string
   observed_until: number;
   agg_state: object;
   commitment: string;

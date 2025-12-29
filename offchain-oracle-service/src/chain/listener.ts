@@ -43,7 +43,7 @@ export async function connectToChain(): Promise<ApiPromise> {
  */
 export async function subscribeToV2PolicyCreated(
   onPolicyCreated: (policy: {
-    policy_id: number;
+    policy_id: string;   // H128 as hex string
     market_id: number;
     coverage_start: number;
     coverage_end: number;
@@ -60,10 +60,10 @@ export async function subscribeToV2PolicyCreated(
       if (event.section === 'prmxPolicy' && event.method === 'V2PolicyCreated') {
         const [policyId, marketId, coverageStart, coverageEnd, strikeMm, lat, lon] = event.data;
         
-        console.log(`📋 V2PolicyCreated event detected: policy_id=${policyId}`);
+        console.log(`📋 V2PolicyCreated event detected: policy_id=${policyId.toHex()}`);
         
         onPolicyCreated({
-          policy_id: Number(policyId.toString()),
+          policy_id: policyId.toHex(),
           market_id: Number(marketId.toString()),
           coverage_start: Number(coverageStart.toString()),
           coverage_end: Number(coverageEnd.toString()),
@@ -79,10 +79,10 @@ export async function subscribeToV2PolicyCreated(
         const [policyId, outcome, cumulativeMm, evidenceHash] = event.data;
         const outcomeStr = outcome.toString();
         
-        console.log(`📊 V2ReportAccepted event detected: policy_id=${policyId}, outcome=${outcomeStr}`);
+        console.log(`📊 V2ReportAccepted event detected: policy_id=${policyId.toHex()}, outcome=${outcomeStr}`);
         
         handleV2Settlement(
-          Number(policyId.toString()),
+          policyId.toHex(),
           outcomeStr,
           Number(cumulativeMm.toString()),
           evidenceHash.toHex()
@@ -95,10 +95,10 @@ export async function subscribeToV2PolicyCreated(
         const [policyId, outcome, cumulativeMm, evidenceHash] = event.data;
         const outcomeStr = outcome.toString();
         
-        console.log(`✅ V2PolicySettled event detected: policy_id=${policyId}, outcome=${outcomeStr}`);
+        console.log(`✅ V2PolicySettled event detected: policy_id=${policyId.toHex()}, outcome=${outcomeStr}`);
         
         handleV2Settlement(
-          Number(policyId.toString()),
+          policyId.toHex(),
           outcomeStr,
           Number(cumulativeMm.toString()),
           evidenceHash.toHex()
@@ -114,7 +114,7 @@ export async function subscribeToV2PolicyCreated(
  * Handle V2 settlement - update monitor state in MongoDB
  */
 async function handleV2Settlement(
-  policyId: number,
+  policyId: string,  // H128 as hex string
   outcome: string,
   cumulativeMm: number,
   evidenceHash: string
@@ -160,7 +160,7 @@ async function handleV2Settlement(
  * Handle V2PolicyCreated event - create monitor document and fetch 24h historical data
  */
 export async function handleV2PolicyCreated(policy: {
-  policy_id: number;
+  policy_id: string;   // H128 as hex string
   market_id: number;
   coverage_start: number;
   coverage_end: number;

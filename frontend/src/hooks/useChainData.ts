@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useTransition } from 'react';
 import { useWalletStore } from '@/stores/walletStore';
 import * as api from '@/lib/api';
+import * as apiV3 from '@/lib/api-v3';
 import type { Market, Policy, QuoteRequest, LpAskOrder, LpHolding, LpTradeRecord, LpPositionOutcome } from '@/types';
 
 // Default polling interval for real-time updates (15 seconds - smoother UX)
@@ -233,16 +234,28 @@ export function useLpOrders() {
     setError(null);
     
     try {
-      // Fetch both orders and policies to filter expired ones
-      const [orderData, policies] = await Promise.all([
+      // Fetch orders and both V1/V2 and V3 policies to filter expired ones
+      const [orderData, v1v2Policies, v3Policies] = await Promise.all([
         api.getLpOrders(),
         api.getPolicies(),
+        apiV3.getV3Policies(),
       ]);
       
       const now = Math.floor(Date.now() / 1000);
       
-      // Create a map of policy ID to policy for quick lookup
-      const policyMap = new Map(policies.map(p => [p.id, p]));
+      // Create a unified map of policy ID to policy info for quick lookup
+      // Include both V1/V2 and V3 policies
+      const policyMap = new Map<number, { status: string; coverageEnd: number }>();
+      
+      // Add V1/V2 policies
+      for (const p of v1v2Policies) {
+        policyMap.set(p.id, { status: p.status, coverageEnd: p.coverageEnd });
+      }
+      
+      // Add V3 policies (adapt to same format)
+      for (const p of v3Policies) {
+        policyMap.set(p.id, { status: p.status, coverageEnd: p.coverageEnd });
+      }
       
       // Filter orders:
       // 1. Must have remaining quantity > 0

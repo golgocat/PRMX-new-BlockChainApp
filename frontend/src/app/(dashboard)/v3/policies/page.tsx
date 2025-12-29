@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Shield,
   Search, 
@@ -64,6 +65,7 @@ function getStatusBadge(status: V3PolicyStatus, coverageEnd: number) {
 }
 
 export default function V3PoliciesPage() {
+  const router = useRouter();
   const { isConnected, selectedAccount } = useWalletStore();
   const isDao = useIsDao();
   
@@ -258,7 +260,7 @@ export default function V3PoliciesPage() {
                 <TableHeaderCell>Shares</TableHeaderCell>
                 <TableHeaderCell>Max Payout</TableHeaderCell>
                 <TableHeaderCell>Status</TableHeaderCell>
-                <TableHeaderCell></TableHeaderCell>
+                <TableHeaderCell>{'\u00A0'}</TableHeaderCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -296,7 +298,14 @@ export default function V3PoliciesPage() {
                   const isExpired = policy.coverageEnd <= now;
                   
                   return (
-                    <TableRow key={policy.id} className={cn(isRefreshing && 'opacity-50')}>
+                    <TableRow 
+                      key={policy.id} 
+                      className={cn(
+                        'cursor-pointer hover:bg-background-tertiary/50 transition-colors',
+                        isRefreshing && 'opacity-50'
+                      )}
+                      onClick={() => router.push(`/v3/policies/${policy.id}`)}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span className="text-lg">{eventInfo?.icon || '🌡️'}</span>
@@ -356,11 +365,7 @@ export default function V3PoliciesPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/v3/policies/${policy.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <ChevronRight className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <ChevronRight className="w-4 h-4 text-text-tertiary" />
                       </TableCell>
                     </TableRow>
                   );

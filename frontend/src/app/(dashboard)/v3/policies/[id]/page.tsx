@@ -36,6 +36,70 @@ import {
 } from '@/types/v3';
 import { formatUSDT, formatDateTimeUTCCompact, formatTimeRemaining, formatAddress, cn } from '@/lib/utils';
 
+// Snapshot scheduling constants (matching pallet-oracle-v3)
+const V3_SNAPSHOT_INTERVAL_SECS = 6 * 3600;  // 6 hours
+const V3_SNAPSHOT_INTERVAL_FINAL_SECS = 3600; // 1 hour (final 24h)
+
+/**
+ * Calculate next snapshot time based on OCW scheduling logic
+ */
+function getNextSnapshotInfo(
+  observedUntil: number,
+  coverageStart: number,
+  coverageEnd: number,
+  status: V3PolicyStatus
+): { label: string; timestamp: number | null; isUrgent: boolean } {
+  const now = Math.floor(Date.now() / 1000);
+  
+  // Policy is not active
+  if (status !== 'Active') {
+    return { label: 'Policy finalized', timestamp: null, isUrgent: false };
+  }
+  
+  // Coverage hasn't started
+  if (now < coverageStart) {
+    return { label: 'Starts after coverage begins', timestamp: coverageStart, isUrgent: false };
+  }
+  
+  // Coverage has ended
+  if (now > coverageEnd) {
+    return { label: 'Pending final report', timestamp: null, isUrgent: true };
+  }
+  
+  // Calculate interval based on time remaining
+  const timeToEnd = coverageEnd - now;
+  const isInFinal24Hours = timeToEnd <= 24 * 3600;
+  const interval = isInFinal24Hours ? V3_SNAPSHOT_INTERVAL_FINAL_SECS : V3_SNAPSHOT_INTERVAL_SECS;
+  
+  // No observations yet
+  if (observedUntil === 0) {
+    return { 
+      label: 'Awaiting first observation', 
+      timestamp: null, 
+      isUrgent: false 
+    };
+  }
+  
+  // Calculate next snapshot time
+  const lastSnapshotApprox = observedUntil; // Best approximation
+  const nextSnapshot = lastSnapshotApprox + interval;
+  
+  // If next snapshot time is in the past, it should happen soon
+  if (nextSnapshot <= now) {
+    return { 
+      label: 'Due now', 
+      timestamp: now, 
+      isUrgent: true 
+    };
+  }
+  
+  return {
+    label: formatTimeRemaining(nextSnapshot),
+    timestamp: nextSnapshot,
+    isUrgent: isInFinal24Hours
+  };
+}
+
 function getStatusBadge(status: V3PolicyStatus, coverageEnd: number) {
   const now = Math.floor(Date.now() / 1000);
   const isExpired = coverageEnd <= now;
@@ -239,6 +303,25 @@ export default function V3PolicyDetailPage() {
     ((now - policy.coverageStart) / (policy.coverageEnd - policy.coverageStart)) * 100
   ));
   
+  // Get status badge for header (smaller size)
+  const getHeaderStatusBadge = (status: V3PolicyStatus, coverageEnd: number) => {
+    if (status === 'Active' && coverageEnd <= now) {
+      return <Badge variant="warning" className="text-xs">Pending Settlement</Badge>;
+    }
+    switch (status) {
+      case 'Active':
+        return <Badge variant="success" className="text-xs">Active</Badge>;
+      case 'Triggered':
+        return <Badge variant="info" className="text-xs">Event Triggered</Badge>;
+      case 'Matured':
+        return <Badge variant="default" className="text-xs">Matured</Badge>;
+      case 'Settled':
+        return <Badge variant="cyan" className="text-xs">Settled</Badge>;
+      default:
+        return <Badge variant="default" className="text-xs">{status}</Badge>;
+    }
+  };
+  
   return (
     <div className="space-y-8 max-w-6xl mx-auto pt-4">
       {/* Header */}
@@ -250,10 +333,17 @@ export default function V3PolicyDetailPage() {
             </Button>
           </Link>
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <Badge variant="purple" className="text-xs">V3 P2P</Badge>
-              {isHolder && <Badge variant="cyan">Your Policy</Badge>}
-              {myLpHolding && !isHolder && <Badge variant="purple">LP Holder</Badge>}
+              {isHolder && <Badge variant="cyan" className="text-xs">Your Policy</Badge>}
+              {myLpHolding && !isHolder && <Badge variant="purple" className="text-xs">LP Holder</Badge>}
+              {getHeaderStatusBadge(policy.status, policy.coverageEnd)}
+              {policy.location && (
+                <Badge variant="default" className="text-xs flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  {policy.location.name}
+                </Badge>
+              )}
             </div>
             <h1 className="text-3xl font-bold flex items-center gap-3">
               <span className="text-4xl">{eventInfo?.icon}</span>
@@ -274,6 +364,66 @@ export default function V3PolicyDetailPage() {
       <div className="grid md:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
+          {/* Coverage Details */}
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold">Coverage Details</h3>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-text-secondary mb-1">Event Type</p>
+                    <p className="font-medium text-lg">{eventInfo?.label}</p>
+                    <p className="text-sm text-text-tertiary">{eventInfo?.description}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-text-secondary mb-1">Trigger Threshold</p>
+                    <p className="font-medium text-lg">
+                      {formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)}
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-text-secondary mb-1">
+                      <MapPin className="w-4 h-4 inline mr-1" />
+                      Location
+                    </p>
+                    <p className="font-medium text-lg">{policy.location?.name || `Location #${policy.locationId}`}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-text-secondary mb-2">
+                      <Calendar className="w-4 h-4 inline mr-1" />
+                      Coverage Period
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
+                        <p className="text-xs text-text-tertiary">Start</p>
+                        <p className="font-medium text-sm">
+                          {new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                        </p>
+                        <p className="text-xs text-text-tertiary">
+                          {new Date(policy.coverageStart * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                        </p>
+                      </div>
+                      <span className="text-text-tertiary">→</span>
+                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
+                        <p className="text-xs text-text-tertiary">End</p>
+                        <p className="font-medium text-sm">
+                          {new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                        </p>
+                        <p className="text-xs text-text-tertiary">
+                          {new Date(policy.coverageEnd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
           {/* Status Card */}
           <Card>
             <CardContent className="p-6">
@@ -398,66 +548,6 @@ export default function V3PolicyDetailPage() {
                   </p>
                 </div>
               )}
-            </CardContent>
-          </Card>
-          
-          {/* Event Details */}
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Coverage Details</h3>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-text-secondary mb-1">Event Type</p>
-                    <p className="font-medium text-lg">{eventInfo?.label}</p>
-                    <p className="text-sm text-text-tertiary">{eventInfo?.description}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-text-secondary mb-1">Trigger Threshold</p>
-                    <p className="font-medium text-lg">
-                      {formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)}
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-text-secondary mb-1">
-                      <MapPin className="w-4 h-4 inline mr-1" />
-                      Location
-                    </p>
-                    <p className="font-medium text-lg">{policy.location?.name || `Location #${policy.locationId}`}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-text-secondary mb-2">
-                      <Calendar className="w-4 h-4 inline mr-1" />
-                      Coverage Period
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
-                        <p className="text-xs text-text-tertiary">Start</p>
-                        <p className="font-medium text-sm">
-                          {new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
-                        </p>
-                        <p className="text-xs text-text-tertiary">
-                          {new Date(policy.coverageStart * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
-                        </p>
-                      </div>
-                      <span className="text-text-tertiary">→</span>
-                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
-                        <p className="text-xs text-text-tertiary">End</p>
-                        <p className="font-medium text-sm">
-                          {new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
-                        </p>
-                        <p className="text-xs text-text-tertiary">
-                          {new Date(policy.coverageEnd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </CardContent>
           </Card>
           

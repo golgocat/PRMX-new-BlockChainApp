@@ -501,8 +501,16 @@ export function useV3Observations(policyId: number | null) {
     try {
       const data = await apiV3.getV3Observations(policyId);
       setObservations(data);
+      // Log for debugging
+      if (data.length === 0) {
+        console.log(`[V3 Observations] No observations found for policy ${policyId}`);
+      } else {
+        console.log(`[V3 Observations] Found ${data.length} observations for policy ${policyId}`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch observations');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch observations';
+      setError(errorMessage);
+      console.error(`[V3 Observations] Error fetching observations for policy ${policyId}:`, err);
     } finally {
       setLoading(false);
     }

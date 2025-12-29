@@ -171,7 +171,7 @@ export default function V3PolicyDetailPage() {
   const { policy, loading: policyLoading, error, refresh: refreshPolicy } = useV3Policy(policyId);
   const { oracleState, loading: oracleLoading, refresh: refreshOracle } = useV3OracleState(policyId);
   const { holders: lpHolders, loading: holdersLoading, refresh: refreshHolders } = useV3PolicyLpHolders(policyId);
-  const { observations, loading: observationsLoading, refresh: refreshObservations } = useV3Observations(policyId);
+  const { observations, loading: observationsLoading, error: observationsError, refresh: refreshObservations } = useV3Observations(policyId);
   
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -609,6 +609,7 @@ export default function V3PolicyDetailPage() {
               coverageStart={policy.coverageStart}
               coverageEnd={policy.coverageEnd}
               loading={observationsLoading}
+              error={observationsError}
             />
           )}
           

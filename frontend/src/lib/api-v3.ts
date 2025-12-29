@@ -421,19 +421,32 @@ export async function getV3Observations(policyId: number): Promise<V3Observation
   const oracleServiceUrl = process.env.NEXT_PUBLIC_ORACLE_SERVICE_URL || 'http://localhost:3001';
   
   try {
-    const response = await fetch(`${oracleServiceUrl}/ingest/observations/${policyId}`);
+    const url = `${oracleServiceUrl}/ingest/observations/${policyId}`;
+    console.log(`[API] Fetching V3 observations from: ${url}`);
+    
+    const response = await fetch(url);
     if (!response.ok) {
       if (response.status === 404) {
+        console.log(`[API] No observations endpoint found (404) for policy ${policyId}`);
         return []; // No observations yet
       }
-      throw new Error(`Failed to fetch observations: ${response.statusText}`);
+      const errorText = await response.text().catch(() => response.statusText);
+      console.error(`[API] Failed to fetch observations: ${response.status} ${errorText}`);
+      throw new Error(`Failed to fetch observations: ${response.status} ${errorText}`);
     }
     
     const data = await response.json();
-    return data.success ? data.data : [];
+    const observations = data.success ? data.data : [];
+    console.log(`[API] Fetched ${observations.length} observations for policy ${policyId}`);
+    return observations;
   } catch (error) {
-    console.error('Error fetching V3 observations:', error);
-    return []; // Return empty array on error
+    // Check if it's a network error (CORS, connection refused, etc.)
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.error(`[API] Network error fetching observations (oracle service may not be running):`, error);
+      throw new Error('Cannot connect to oracle service. Make sure it is running on ' + oracleServiceUrl);
+    }
+    console.error('[API] Error fetching V3 observations:', error);
+    throw error; // Re-throw to let the hook handle it
   }
 }
 

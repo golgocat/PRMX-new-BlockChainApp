@@ -51,6 +51,7 @@ interface WeatherHistoryChartProps {
   coverageStart: number;
   coverageEnd: number;
   loading?: boolean;
+  error?: string | null;
 }
 
 /**
@@ -128,6 +129,7 @@ export function WeatherHistoryChart({
   coverageStart,
   coverageEnd,
   loading = false,
+  error = null,
 }: WeatherHistoryChartProps) {
   const { theme } = useThemeStore();
   const colors = useMemo(() => getChartColors(theme), [theme]);
@@ -297,7 +299,7 @@ export function WeatherHistoryChart({
     );
   }
 
-  if (filteredObservations.length === 0) {
+  if (error) {
     return (
       <Card>
         <CardHeader>
@@ -305,11 +307,51 @@ export function WeatherHistoryChart({
         </CardHeader>
         <CardContent>
           <div className="h-72 flex items-center justify-center">
-            <div className="text-center text-text-secondary">
-              <p className="mb-2">No observations available yet</p>
-              <p className="text-sm text-text-tertiary">
-                Weather data will appear here once observations are recorded
+            <div className="text-center text-text-secondary max-w-md">
+              <p className="mb-2 text-error">Failed to load observations</p>
+              <p className="text-sm text-text-tertiary">{error}</p>
+              <p className="text-xs text-text-tertiary mt-2">
+                Make sure the oracle service is running on port 3001
               </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (filteredObservations.length === 0) {
+    const now = Math.floor(Date.now() / 1000);
+    const hasStarted = now >= coverageStart;
+    const hasEnded = now >= coverageEnd;
+    
+    let message = 'No observations available yet';
+    let detail = 'Weather data will appear here once observations are recorded';
+    
+    if (!hasStarted) {
+      const startDate = new Date(coverageStart * 1000);
+      detail = `Coverage starts on ${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}. Observations will begin after coverage starts.`;
+    } else if (hasEnded) {
+      detail = 'Coverage period has ended. No observations were recorded during this period.';
+    } else {
+      detail = 'The offchain worker is monitoring this policy. Observations will appear here as they are recorded.';
+    }
+    
+    return (
+      <Card>
+        <CardHeader>
+          <h3 className="text-lg font-semibold">Weather History</h3>
+        </CardHeader>
+        <CardContent>
+          <div className="h-72 flex items-center justify-center">
+            <div className="text-center text-text-secondary max-w-md">
+              <p className="mb-2">{message}</p>
+              <p className="text-sm text-text-tertiary">{detail}</p>
+              {observations.length > 0 && (
+                <p className="text-xs text-text-tertiary mt-2">
+                  Note: {observations.length} observation{observations.length !== 1 ? 's' : ''} found, but none within the coverage period
+                </p>
+              )}
             </div>
           </div>
         </CardContent>

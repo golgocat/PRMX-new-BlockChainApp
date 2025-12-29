@@ -502,7 +502,7 @@ fn build_observations_json(
     samples_json.push_str("]");
     
     format!(
-        r#"{{"policy_id":{},"location_key":"{}","samples":{},"commitment_after":"{}"}}"#,
+        r#"{{"policy_id":"{}","location_key":"{}","samples":{},"commitment_after":"{}"}}"#,
         policy_id,
         location_key_str,
         samples_json,
@@ -521,7 +521,7 @@ fn build_snapshot_json(
     let commitment_hex = hex_encode(&commitment);
     
     format!(
-        r#"{{"policy_id":{},"observed_until":{},"agg_state":"{}","commitment":"{}"}}"#,
+        r#"{{"policy_id":"{}","observed_until":{},"agg_state":"{}","commitment":"{}"}}"#,
         policy_id,
         observed_until,
         agg_state_hex,

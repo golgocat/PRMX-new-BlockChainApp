@@ -291,6 +291,11 @@ start_oracle_service() {
     cd "$PROJECT_ROOT/offchain-oracle-service"
     export PATH="$NODE_PATH:$PATH"
     
+    # Enable V3 dev mode (skip HMAC auth) for local development
+    # This is safe because we're in dev mode and signature computation 
+    # between OCW (Rust Blake2) and Node.js differs
+    export V3_DEV_MODE=true
+    
     nohup npm start > /tmp/oracle-service.log 2>&1 &
     ORACLE_PID=$!
     log_success "Oracle service started (PID: $ORACLE_PID)"

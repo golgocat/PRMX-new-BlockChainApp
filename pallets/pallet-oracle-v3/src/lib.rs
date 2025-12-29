@@ -206,16 +206,11 @@ pub mod pallet {
                 Call::expire_request_unsigned {
                     request_id,
                 } => {
-                    // Validate request is expired via trait
-                    // Note: We use a fixed timestamp check here since we can't
-                    // reliably get current time in validate_unsigned
-                    // The actual expiry check happens in the extrinsic
-                    let now = sp_io::offchain::timestamp().unix_millis() / 1000;
+                    // Note: We cannot use sp_io::offchain::timestamp() here because
+                    // validate_unsigned runs in the transaction pool context, not OCW.
+                    // The actual expiry check happens in the extrinsic itself.
+                    // Here we only do basic validation to allow the transaction through.
                     
-                    if !T::RequestExpiryApi::is_request_expired(*request_id, now) {
-                        return Err(InvalidTransaction::Custom(4).into());
-                    }
-
                     ValidTransaction::with_tag_prefix("OracleV3RequestExpiry")
                         .priority(50) // Lower priority than final reports
                         .and_provides((request_id, "expiry"))

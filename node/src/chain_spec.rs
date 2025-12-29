@@ -58,7 +58,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
         vec![authority_keys_from_seed("Alice")],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
-        // Pre-funded accounts
+        // Pre-funded accounts (for testing)
         vec![
             get_account_id_from_seed::<sr25519::Public>("Alice"),
             get_account_id_from_seed::<sr25519::Public>("Bob"),
@@ -67,6 +67,10 @@ pub fn development_config() -> Result<ChainSpec, String> {
             get_account_id_from_seed::<sr25519::Public>("Eve"),
             get_account_id_from_seed::<sr25519::Public>("Ferdie"),
         ],
+        // Dedicated DAO account (//DAO)
+        get_account_id_from_seed::<sr25519::Public>("DAO"),
+        // Dedicated Oracle account (//Oracle)
+        get_account_id_from_seed::<sr25519::Public>("Oracle"),
         true,
     ))
     .build())
@@ -89,7 +93,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
         ],
         // Sudo account
         get_account_id_from_seed::<sr25519::Public>("Alice"),
-        // Pre-funded accounts
+        // Pre-funded accounts (for testing)
         vec![
             get_account_id_from_seed::<sr25519::Public>("Alice"),
             get_account_id_from_seed::<sr25519::Public>("Bob"),
@@ -98,6 +102,10 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
             get_account_id_from_seed::<sr25519::Public>("Eve"),
             get_account_id_from_seed::<sr25519::Public>("Ferdie"),
         ],
+        // Dedicated DAO account (//DAO)
+        get_account_id_from_seed::<sr25519::Public>("DAO"),
+        // Dedicated Oracle account (//Oracle)
+        get_account_id_from_seed::<sr25519::Public>("Oracle"),
         true,
     ))
     .build())
@@ -108,6 +116,8 @@ fn testnet_genesis(
     initial_authorities: Vec<(AuraId, GrandpaId)>,
     root_key: AccountId,
     endowed_accounts: Vec<AccountId>,
+    dao_account: AccountId,
+    oracle_account: AccountId,
     _enable_println: bool,
 ) -> serde_json::Value {
     // Initial PRMX balance for endowed accounts
@@ -124,16 +134,12 @@ fn testnet_genesis(
     let charlie = endowed_accounts[2].clone();
     let dave = endowed_accounts[3].clone();
 
-    // Single DAO account (must match runtime configuration)
-    // Both DaoAccountId and DaoCapitalAccountId = [0u8; 32]
-    let dao_account = AccountId::from([0u8; 32]);
-
     serde_json::json!({
         "balances": {
             "balances": endowed_accounts
                 .iter()
                 .cloned()
-                .chain(vec![dao_account.clone()])
+                .chain(vec![dao_account.clone(), oracle_account.clone()])
                 .map(|k| (k, ENDOWMENT))
                 .collect::<Vec<_>>(),
         },
@@ -160,11 +166,12 @@ fn testnet_genesis(
             ],
             "accounts": vec![
                 // [id, account, balance]
-                (USDT_ASSET_ID, alice, 100_000_000 * USDT_MULTIPLIER),       // DAO Admin
+                (USDT_ASSET_ID, alice, 100_000_000 * USDT_MULTIPLIER),       // Sudo Admin
                 (USDT_ASSET_ID, bob, 10_000 * USDT_MULTIPLIER),              // Customer
                 (USDT_ASSET_ID, charlie, 1_000_000 * USDT_MULTIPLIER),       // LP 1
                 (USDT_ASSET_ID, dave, 1_000_000 * USDT_MULTIPLIER),          // LP 2
                 (USDT_ASSET_ID, dao_account, 60_000_000 * USDT_MULTIPLIER),  // DAO (combined treasury + capital)
+                (USDT_ASSET_ID, oracle_account.clone(), 1_000 * USDT_MULTIPLIER), // Oracle (for tx fees)
             ],
         },
         // PRMX Markets - Market Configurations
@@ -324,8 +331,13 @@ fn testnet_genesis(
         // Register oracle providers and configure AccuWeather API
         "prmxOracle": {
             // Oracle providers (accounts authorized for signed transactions from OCW)
+            // Use dedicated Oracle account to avoid nonce conflicts with tests
             "oracleProviders": vec![
-                endowed_accounts[0].clone(), // Alice
+                oracle_account.clone(), // Dedicated Oracle account (//Oracle)
+            ],
+            // V2 reporters (accounts authorized to submit V2 reports from off-chain oracle service)
+            "v2Reporters": vec![
+                oracle_account.clone(), // Dedicated Oracle account (//Oracle)
             ],
             // AccuWeather API key from environment variable
             "accuweatherApiKey": env::var("ACCUWEATHER_API_KEY")
@@ -351,8 +363,9 @@ fn testnet_genesis(
                 .map(|u| u.into_bytes())
                 .unwrap_or_else(|_| b"http://34.51.195.144:19090/pricing".to_vec()),
             // Quote providers (accounts authorized to submit quote results from OCW)
+            // Use dedicated Oracle account to avoid nonce conflicts with tests
             "quoteProviders": vec![
-                endowed_accounts[0].clone(), // Alice
+                oracle_account, // Dedicated Oracle account (//Oracle)
             ],
         },
     })

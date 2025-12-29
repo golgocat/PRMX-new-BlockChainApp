@@ -45,8 +45,9 @@ export const config = {
   accuweatherApiKey: process.env.ACCUWEATHER_API_KEY || '',
   accuweatherBaseUrl: 'https://dataservice.accuweather.com',
   
-  // Reporter account mnemonic
-  reporterMnemonic: process.env.REPORTER_MNEMONIC || '//Alice',
+  // Reporter account mnemonic - uses dedicated Oracle account to avoid nonce conflicts
+  // with test scripts and DAO operations
+  reporterMnemonic: process.env.REPORTER_MNEMONIC || '//Oracle',
   
   // Polling interval (default: 30 minutes)
   pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '1800000', 10),

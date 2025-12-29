@@ -33,6 +33,7 @@ import {
   isRequestAcceptable,
   calculateCollateral
 } from '@/types/v3';
+import { formatId } from '@/lib/api-v3';
 
 type TabValue = 'open' | 'my' | 'all';
 
@@ -101,13 +102,13 @@ export default function V3RequestsPage() {
       const eventInfo = getEventTypeInfo(request.eventSpec.eventType);
       const searchLower = searchQuery.toLowerCase();
       return (
-        request.id.toString().includes(searchQuery) ||
+        request.id.toLowerCase().includes(searchLower) ||
         request.location?.name.toLowerCase().includes(searchLower) ||
         eventInfo?.label.toLowerCase().includes(searchLower) ||
         request.requester.toLowerCase().includes(searchLower)
       );
     })
-    .sort((a, b) => sortOrder === 'asc' ? a.id - b.id : b.id - a.id);
+    .sort((a, b) => sortOrder === 'asc' ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id));
 
   const handleRefresh = useCallback(async () => {
     setIsRefreshingButton(true);
@@ -281,7 +282,9 @@ export default function V3RequestsPage() {
                   return (
                     <TableRow key={request.id} className={cn(isRefreshing && 'opacity-50')}>
                       <TableCell>
-                        <span className="font-mono text-sm font-medium text-prmx-cyan">#{request.id}</span>
+                        <Link href={`/v3/requests/${request.id}`} className="font-mono text-sm font-medium text-prmx-cyan hover:underline">
+                          #{formatId(request.id)}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">

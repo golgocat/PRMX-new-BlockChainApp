@@ -23,8 +23,8 @@ extern crate alloc;
 
 pub use pallet::*;
 
-/// Policy ID type (matches pallet_prmx_policy)
-pub type PolicyId = u64;
+/// Policy ID type - re-exported from primitives
+pub use prmx_primitives::PolicyId;
 
 /// Trait for other pallets to interact with LP Token holdings
 pub trait HoldingsApi<AccountId> {

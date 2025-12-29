@@ -373,7 +373,8 @@ export async function getQuoteRequests(): Promise<QuoteRequest[]> {
   const entries = await api.query.prmxQuote.quoteRequests.entries();
   
   const quotes = await Promise.all(entries.map(async ([key, value]) => {
-    const quoteId = (key.args[0] as any).toNumber();
+    // H128 quote IDs are hex strings
+    const quoteId = (key.args[0] as any).toHex ? (key.args[0] as any).toHex() : key.args[0].toString();
     const data = (value as any).toJSON();
     
     // Try to get the quote result
@@ -419,12 +420,13 @@ export async function getQuoteRequests(): Promise<QuoteRequest[]> {
 }
 
 /**
- * Get the next quote ID (useful for determining the last created quote)
+ * @deprecated With H128 hash-based IDs, there is no sequential quote ID counter.
+ * Quote IDs are now randomly generated hashes and cannot be predicted.
+ * This function is kept for backwards compatibility but always returns 0.
  */
 export async function getNextQuoteId(): Promise<number> {
-  const api = await getApi();
-  const nextId = await api.query.prmxQuote.nextQuoteId();
-  return (nextId as any).toNumber();
+  console.warn('getNextQuoteId is deprecated: H128 quote IDs are hash-based, not sequential');
+  return 0;
 }
 
 /**
@@ -440,11 +442,8 @@ export async function requestQuote(
     longitude: number;
     shares: number;
   }
-): Promise<number> {
+): Promise<string> {
   const api = await getApi();
-  
-  // Get the next quote ID before submitting (it will be assigned to our quote)
-  const expectedQuoteId = await getNextQuoteId();
   
   return new Promise((resolve, reject) => {
     api.tx.prmxQuote.requestPolicyQuote(
@@ -465,25 +464,17 @@ export async function requestQuote(
         return;
       }
       if (status.isFinalized) {
-        // Log all events for debugging
-        console.log('Events:', events.map(({ event }) => `${event.section}.${event.method}`));
-        
         const quoteEvent = events.find(({ event }) => 
           event.method === 'QuoteRequested'
         );
         if (quoteEvent) {
-          // Try to get quote_id from named data or positional data
+          // H128 quote IDs are hex strings
           const data = quoteEvent.event.data;
-          const quoteId = (data as any).quoteId?.toNumber?.() 
-            ?? (data as any).quote_id?.toNumber?.() 
-            ?? (data[0] as any)?.toNumber?.()
-            ?? expectedQuoteId; // Fallback to expected ID
-          console.log('Quote ID from event:', quoteId);
+          const quoteId = (data[0] as any).toHex ? (data[0] as any).toHex() : data[0].toString();
           resolve(quoteId);
         } else {
-          // Fallback: use the expected quote ID
-          console.warn('QuoteRequested event not found, using expected ID:', expectedQuoteId);
-          resolve(expectedQuoteId);
+          console.warn('QuoteRequested event not found');
+          resolve('');
         }
       }
     });
@@ -506,7 +497,7 @@ export async function requestQuoteV2(
     durationDays: number;    // 2-7 days
     strikeMm: number;        // Custom strike threshold in mm (1-300)
   }
-): Promise<number> {
+): Promise<string> {
   const api = await getApi();
   
   // Validate V2 requirements
@@ -519,8 +510,6 @@ export async function requestQuoteV2(
   if (params.strikeMm < 1 || params.strikeMm > 300) {
     throw new Error('V2 strike threshold must be between 1mm and 300mm');
   }
-  
-  const expectedQuoteId = await getNextQuoteId();
   
   // Scale strike to match on-chain storage (mm * 10)
   const scaledStrike = params.strikeMm * 10;
@@ -546,22 +535,17 @@ export async function requestQuoteV2(
         return;
       }
       if (status.isFinalized) {
-        console.log('V2 Quote Events:', events.map(({ event }) => `${event.section}.${event.method}`));
-        
         const quoteEvent = events.find(({ event }) => 
           event.method === 'QuoteRequested'
         );
         if (quoteEvent) {
+          // H128 quote IDs are hex strings
           const data = quoteEvent.event.data;
-          const quoteId = (data as any).quoteId?.toNumber?.() 
-            ?? (data as any).quote_id?.toNumber?.() 
-            ?? (data[0] as any)?.toNumber?.()
-            ?? expectedQuoteId;
-          console.log('V2 Quote ID:', quoteId);
+          const quoteId = (data[0] as any).toHex ? (data[0] as any).toHex() : data[0].toString();
           resolve(quoteId);
         } else {
-          console.warn('QuoteRequested event not found, using expected ID:', expectedQuoteId);
-          resolve(expectedQuoteId);
+          console.warn('QuoteRequested event not found');
+          resolve('');
         }
       }
     });
@@ -611,7 +595,8 @@ export async function getPolicies(): Promise<Policy[]> {
   const entries = await api.query.prmxPolicy.policies.entries();
   
   return entries.map(([key, value]) => {
-    const policyId = (key.args[0] as any).toNumber();
+    // H128 policy IDs are hex strings
+    const policyId = (key.args[0] as any).toHex ? (key.args[0] as any).toHex() : key.args[0].toString();
     const data = (value as any).toJSON();
     
     const shares = BigInt(data.shares || '1');
@@ -620,7 +605,7 @@ export async function getPolicies(): Promise<Policy[]> {
     const totalCapital = shares * PAYOUT_PER_SHARE;
     
     // Parse policy label (stored as hex-encoded bytes)
-    const policyLabel = hexToString(data.policyLabel) || `policy-${policyId}`;
+    const policyLabel = hexToString(data.policyLabel) || `policy-${policyId.substring(0, 10)}`;
     
     return {
       id: policyId,
@@ -665,13 +650,13 @@ export async function getPoliciesByHolder(holder: string): Promise<Policy[]> {
  * The derivation follows Substrate's logic:
  * 1. Start with "modl" prefix (4 bytes)
  * 2. Add PalletId (8 bytes): "prmxplcy"
- * 3. Add sub-account seed encoded as: "policy" string bytes + policy_id as u32 LE
+ * 3. Add sub-account seed encoded as: "policy" string bytes + policy_id as H128 (16 bytes)
  * 4. Pad to 32 bytes with zeros
  * 5. This becomes the AccountId directly (no hashing for truncating version)
  */
-export function derivePolicyPoolAddress(policyId: number): string {
+export function derivePolicyPoolAddress(policyId: string): string {
   const { encodeAddress } = require('@polkadot/util-crypto');
-  const { stringToU8a, u8aConcat } = require('@polkadot/util');
+  const { stringToU8a, u8aConcat, hexToU8a } = require('@polkadot/util');
   
   // "modl" prefix (4 bytes) - standard Substrate pallet account prefix
   const modlPrefix = stringToU8a('modl');
@@ -679,10 +664,10 @@ export function derivePolicyPoolAddress(policyId: number): string {
   // PALLET_ID = b"prmxplcy" (8 bytes)
   const palletId = stringToU8a('prmxplcy');
   
-  // Sub-account seed: "policy" (6 bytes) + policy_id as u32 LE (4 bytes)
+  // Sub-account seed: "policy" (6 bytes) + policy_id as H128 (16 bytes)
   const policyPrefix = stringToU8a('policy');
-  const policyIdBytes = new Uint8Array(4);
-  new DataView(policyIdBytes.buffer).setUint32(0, policyId, true); // little endian
+  // Convert hex string (0x...) to bytes
+  const policyIdBytes = hexToU8a(policyId);
   
   // Combine all parts
   const combined = u8aConcat(modlPrefix, palletId, policyPrefix, policyIdBytes);
@@ -698,7 +683,7 @@ export function derivePolicyPoolAddress(policyId: number): string {
 /**
  * Get the policy risk pool balance
  */
-export async function getPolicyPoolBalance(policyId: number): Promise<bigint> {
+export async function getPolicyPoolBalance(policyId: string): Promise<bigint> {
   const api = await getApi();
   const balance = await api.query.prmxPolicy.policyRiskPoolBalance(policyId);
   return BigInt(balance.toString());
@@ -707,7 +692,7 @@ export async function getPolicyPoolBalance(policyId: number): Promise<bigint> {
 /**
  * Get full policy pool info (address + balance)
  */
-export async function getPolicyPoolInfo(policyId: number): Promise<{
+export async function getPolicyPoolInfo(policyId: string): Promise<{
   address: string;
   balance: bigint;
 }> {
@@ -721,8 +706,8 @@ export async function getPolicyPoolInfo(policyId: number): Promise<{
  */
 export async function applyCoverage(
   signer: KeyringPair,
-  quoteId: number
-): Promise<number> {
+  quoteId: string
+): Promise<string> {
   const api = await getApi();
   
   return new Promise((resolve, reject) => {
@@ -742,10 +727,11 @@ export async function applyCoverage(
             event.section === 'prmxPolicy' && event.method === 'PolicyCreated'
           );
           if (policyEvent) {
-            const policyId = (policyEvent.event.data[0] as any).toNumber();
+            // H128 policy IDs are hex strings
+            const policyId = (policyEvent.event.data[0] as any).toHex ? (policyEvent.event.data[0] as any).toHex() : policyEvent.event.data[0].toString();
             resolve(policyId);
           } else {
-            resolve(-1);
+            resolve('');
           }
         }
       });
@@ -757,7 +743,7 @@ export async function applyCoverage(
  */
 export async function settlePolicy(
   signer: KeyringPair,
-  policyId: number,
+  policyId: string,
   eventOccurred: boolean
 ): Promise<string> {
   const api = await getApi();
@@ -798,8 +784,10 @@ export async function getLpHoldings(holder: string): Promise<LpHolding[]> {
     const [policyId, accountId] = key.args;
     if (accountId.toString() === holder) {
       const data = (value as any).toJSON();
+      // H128 policy IDs are hex strings
+      const policyIdHex = (policyId as any).toHex ? (policyId as any).toHex() : policyId.toString();
       holdings.push({
-        policyId: (policyId as any).toNumber(),
+        policyId: policyIdHex,
         holder,
         shares: BigInt(data.lpShares || data.shares || '0'),
         lockedShares: BigInt(data.lockedShares || '0'),
@@ -814,15 +802,21 @@ export async function getLpHoldings(holder: string): Promise<LpHolding[]> {
  * Get all LP holdings for a specific policy
  * Returns all holders and their shares for the given policy
  */
-export async function getLpHoldingsForPolicy(policyId: number): Promise<LpHolding[]> {
+export async function getLpHoldingsForPolicy(policyId: string): Promise<LpHolding[]> {
   const api = await getApi();
   const entries = await api.query.prmxHoldings.holdingsStorage.entries();
   
   const holdings: LpHolding[] = [];
   
+  // Normalize input policyId to lowercase for comparison
+  const normalizedPolicyId = policyId.toLowerCase();
+  
   for (const [key, value] of entries) {
     const [storedPolicyId, accountId] = key.args;
-    if ((storedPolicyId as any).toNumber() === policyId) {
+    // H128 policy IDs are hex strings
+    const storedPolicyIdHex = (storedPolicyId as any).toHex ? (storedPolicyId as any).toHex() : storedPolicyId.toString();
+    
+    if (storedPolicyIdHex.toLowerCase() === normalizedPolicyId) {
       const data = (value as any).toJSON();
       const shares = BigInt(data.lpShares || data.shares || '0');
       const lockedShares = BigInt(data.lockedShares || '0');
@@ -853,7 +847,7 @@ export async function getLpHoldingsForPolicy(policyId: number): Promise<LpHoldin
 /**
  * Get total LP shares issued for a policy (free + locked)
  */
-export async function getTotalLpShares(policyId: number): Promise<bigint> {
+export async function getTotalLpShares(policyId: string): Promise<bigint> {
   const holdings = await getLpHoldingsForPolicy(policyId);
   return holdings.reduce((sum, h) => sum + h.shares + h.lockedShares, BigInt(0));
 }
@@ -870,12 +864,24 @@ export async function getLpOrders(): Promise<LpAskOrder[]> {
   const entries = await api.query.prmxOrderbookLp.orders.entries();
   
   return entries.map(([key, value]) => {
-    const orderId = (key.args[0] as any).toNumber();
+    // H128 order IDs are hex strings
+    const orderId = (key.args[0] as any).toHex ? (key.args[0] as any).toHex() : key.args[0].toString();
     const data = (value as any).toJSON();
+    
+    // H128 policy ID - handle both hex string and object format
+    let policyId = data.policyId;
+    if (typeof policyId === 'object' && policyId !== null) {
+      // If it's an object, it might be a hex value - convert to string
+      policyId = policyId.toString ? policyId.toString() : JSON.stringify(policyId);
+    }
+    // Ensure policyId is a string (should be hex like "0x...")
+    if (typeof policyId !== 'string') {
+      policyId = String(policyId);
+    }
     
     return {
       orderId,
-      policyId: data.policyId,
+      policyId,
       seller: data.seller,
       priceUsdt: BigInt(data.price || data.priceUsdt || '0'),
       quantity: BigInt(data.quantity || '0'),
@@ -890,10 +896,10 @@ export async function getLpOrders(): Promise<LpAskOrder[]> {
  */
 export async function placeLpAsk(
   signer: KeyringPair,
-  policyId: number,
+  policyId: string,
   quantity: bigint,
   price: bigint
-): Promise<number> {
+): Promise<string> {
   const api = await getApi();
   
   return new Promise((resolve, reject) => {
@@ -914,10 +920,11 @@ export async function placeLpAsk(
             event.section === 'prmxOrderbookLp' && event.method === 'OrderPlaced'
           );
           if (orderEvent) {
-            const orderId = (orderEvent.event.data[0] as any).toNumber();
+            // H128 order IDs are hex strings
+            const orderId = (orderEvent.event.data[0] as any).toHex ? (orderEvent.event.data[0] as any).toHex() : orderEvent.event.data[0].toString();
             resolve(orderId);
           } else {
-            resolve(-1);
+            resolve('');
           }
         }
       });
@@ -929,9 +936,9 @@ export async function placeLpAsk(
  */
 export async function fillLpAsk(
   signer: KeyringPair,
-  orderId: number,
+  orderId: string,
   quantity: bigint,
-  policyId?: number,
+  policyId?: string,
   maxPrice?: bigint
 ): Promise<string> {
   const api = await getApi();
@@ -976,7 +983,7 @@ export async function fillLpAsk(
  */
 export async function cancelLpAsk(
   signer: KeyringPair,
-  orderId: number
+  orderId: string
 ): Promise<string> {
   const api = await getApi();
   
@@ -1187,7 +1194,7 @@ export interface SettlementResult {
 /**
  * Get settlement result for a policy
  */
-export async function getSettlementResult(policyId: number): Promise<SettlementResult | null> {
+export async function getSettlementResult(policyId: string): Promise<SettlementResult | null> {
   const api = await getApi();
   const result = await api.query.prmxPolicy.settlementResults(policyId);
   
@@ -1208,7 +1215,7 @@ export async function getSettlementResult(policyId: number): Promise<SettlementR
 export interface ThresholdTriggerLog {
   triggerId: number;
   marketId: number;
-  policyId: number;
+  policyId: string; // H128 hash ID as hex string
   triggeredAt: number; // Unix timestamp
   blockNumber: number;
   rollingSumMm: number; // Rainfall that triggered (in tenths of mm)
@@ -1642,7 +1649,7 @@ export const DAO_ACCOUNT_ADDRESS = TEST_ACCOUNTS.alice.address;
 /**
  * Get LP position for a policy (Hydration Pool 102)
  */
-export async function getLpPosition(policyId: number): Promise<LpPosition | null> {
+export async function getLpPosition(policyId: string): Promise<LpPosition | null> {
   const api = await getApi();
   try {
     const position = await api.query.prmxXcmCapital.policyLpPositions(policyId);
@@ -1664,7 +1671,7 @@ export async function getLpPosition(policyId: number): Promise<LpPosition | null
 /**
  * Get investment status for a policy
  */
-export async function getInvestmentStatus(policyId: number): Promise<InvestmentStatus> {
+export async function getInvestmentStatus(policyId: string): Promise<InvestmentStatus> {
   const api = await getApi();
   try {
     const status = await api.query.prmxXcmCapital.policyInvestmentStatus(policyId);
@@ -1774,7 +1781,7 @@ export async function setAllocationPercentage(
  */
 export async function allocatePolicyToDefi(
   signer: KeyringPair,
-  policyId: number,
+  policyId: string,
   amount: bigint
 ): Promise<string> {
   const api = await getApi();
@@ -1821,7 +1828,7 @@ export async function allocatePolicyToDefi(
  */
 export async function lpAllocatePolicyToDefi(
   signer: KeyringPair,
-  policyId: number,
+  policyId: string,
   amount: bigint
 ): Promise<string> {
   const api = await getApi();
@@ -1867,7 +1874,7 @@ export async function getDaoUsdtBalance(): Promise<bigint> {
 /**
  * Get full DeFi info for a policy (position + status)
  */
-export async function getPolicyDefiInfo(policyId: number): Promise<PolicyDefiInfo> {
+export async function getPolicyDefiInfo(policyId: string): Promise<PolicyDefiInfo> {
   const [position, investmentStatus] = await Promise.all([
     getLpPosition(policyId),
     getInvestmentStatus(policyId),
@@ -1933,7 +1940,8 @@ export async function getAllLpPositions(): Promise<LpPosition[]> {
     const entries = await api.query.prmxXcmCapital.policyLpPositions.entries();
     
     for (const [key, value] of entries) {
-      const policyId = (key.args[0] as any).toNumber();
+      // H128 policy IDs are hex strings
+      const policyId = (key.args[0] as any).toHex ? (key.args[0] as any).toHex() : key.args[0].toString();
       const data = (value as any).toJSON();
       
       positions.push({
@@ -1997,7 +2005,7 @@ export async function getV2Monitor(id: string): Promise<V2Monitor | null> {
 /**
  * Get V2 monitor by policy ID
  */
-export async function getV2MonitorByPolicy(policyId: number): Promise<V2Monitor | null> {
+export async function getV2MonitorByPolicy(policyId: string): Promise<V2Monitor | null> {
   try {
     const response = await fetch(`${ORACLE_SERVICE_URL}/monitoring/policies/${policyId}/monitor`);
     const json = await response.json();

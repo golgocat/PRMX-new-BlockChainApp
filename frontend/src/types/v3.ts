@@ -142,7 +142,7 @@ export type V3RequestStatus =
 // =============================================================================
 
 export interface V3Request {
-  id: number;
+  id: string; // H128 hash ID as hex string (e.g., "0x3a7f8b2c...")
   requester: string;
   locationId: number;
   location?: V3Location;
@@ -184,7 +184,7 @@ export type V3PolicyStatus =
 // =============================================================================
 
 export interface V3Policy {
-  id: number;
+  id: string; // H128 hash ID as hex string
   holder: string;           // Requester (policyholder)
   locationId: number;
   location?: V3Location;
@@ -212,7 +212,7 @@ export type V3AggState =
   | { type: 'PrecipTypeOccurred'; mask: number };
 
 export interface V3OracleState {
-  policyId: number;
+  policyId: string; // H128 hash ID as hex string
   eventSpec: V3EventSpec;
   aggState: V3AggState;
   observedUntil: number;
@@ -225,7 +225,7 @@ export interface V3OracleState {
 // =============================================================================
 
 export interface V3LpHolding {
-  policyId: number;
+  policyId: string; // H128 hash ID as hex string
   policy?: V3Policy;
   holder: string;
   lpShares: number;
@@ -237,7 +237,7 @@ export interface V3LpHolding {
 // =============================================================================
 
 export interface V3Acceptance {
-  requestId: number;
+  requestId: string; // H128 hash ID as hex string
   underwriter: string;
   shares: number;
   collateralLocked: bigint;

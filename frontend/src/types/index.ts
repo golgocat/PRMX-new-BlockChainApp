@@ -27,7 +27,7 @@ export interface WindowRules {
 
 // Policy Types
 export interface Policy {
-  id: number;
+  id: string; // H128 hash ID as hex string (e.g., "0x3a7f8b2c...")
   label: string; // Human-readable label like "manila-1", "tokyo-2"
   marketId: number;
   holder: string;
@@ -63,7 +63,7 @@ export type PolicyStatus = 'Active' | 'Expired' | 'Settled' | 'Cancelled';
 
 // Quote Types
 export interface QuoteRequest {
-  id: number;
+  id: string; // H128 hash ID as hex string
   marketId: number;
   requester: string;
   coverageStart: number;
@@ -86,7 +86,7 @@ export interface QuoteResult {
 
 // LP Token Types
 export interface LpHolding {
-  policyId: number;
+  policyId: string; // H128 hash ID as hex string
   holder: string;
   shares: bigint;
   lockedShares: bigint;
@@ -94,8 +94,8 @@ export interface LpHolding {
 
 // Orderbook Types
 export interface LpAskOrder {
-  orderId: number;
-  policyId: number;
+  orderId: string; // H128 hash ID as hex string
+  policyId: string; // H128 hash ID as hex string
   seller: string;
   priceUsdt: bigint;
   quantity: bigint;
@@ -107,7 +107,7 @@ export interface LpAskOrder {
 export interface LpTradeRecord {
   id: string;
   type: 'buy' | 'sell';
-  policyId: number;
+  policyId: string; // H128 hash ID as hex string
   marketName: string;
   shares: number;
   pricePerShare: number; // in USDT
@@ -120,7 +120,7 @@ export interface LpTradeRecord {
 
 // LP Position Outcome
 export interface LpPositionOutcome {
-  policyId: number;
+  policyId: string; // H128 hash ID as hex string
   marketId: number;
   marketName: string;
   sharesHeld: number;
@@ -200,7 +200,7 @@ export interface Notification {
 export type InvestmentStatus = 'NotInvested' | 'Invested' | 'Unwinding' | 'Settled' | 'Failed';
 
 export interface LpPosition {
-  policyId: number;
+  policyId: string; // H128 hash ID as hex string
   lpShares: bigint;
   principalUsdt: bigint;
 }

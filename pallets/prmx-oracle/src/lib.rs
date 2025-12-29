@@ -149,8 +149,8 @@ pub trait RainfallOracle {
 //                          PolicySettlement Trait
 // =============================================================================
 
-/// Policy ID type (must match pallet_prmx_policy::PolicyId)
-pub type PolicyId = u64;
+/// Policy ID type - re-exported from primitives
+pub use prmx_primitives::PolicyId;
 
 /// Trait for oracle to trigger automatic policy settlements
 pub trait PolicySettlement<AccountId> {
@@ -569,8 +569,10 @@ pub mod pallet {
     #[pallet::genesis_config]
     #[derive(frame_support::DefaultNoBound)]
     pub struct GenesisConfig<T: Config> {
-        /// Initial oracle providers (accounts authorized to submit rainfall data)
+        /// Initial oracle providers (accounts authorized to submit rainfall data via OCW)
         pub oracle_providers: Vec<T::AccountId>,
+        /// Initial V2 reporters (accounts authorized to submit V2 reports from off-chain oracle service)
+        pub v2_reporters: Vec<T::AccountId>,
         /// AccuWeather API key (stored in offchain index at genesis)
         pub accuweather_api_key: Vec<u8>,
     }
@@ -578,12 +580,21 @@ pub mod pallet {
     #[pallet::genesis_build]
     impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
         fn build(&self) {
-            // Register initial oracle providers
+            // Register initial oracle providers (for OCW)
             for account in &self.oracle_providers {
                 OracleProviders::<T>::insert(account, true);
                 log::info!(
                     target: "prmx-oracle",
                     "🔐 Genesis: Registered oracle provider"
+                );
+            }
+
+            // Register initial V2 reporters (for off-chain oracle service)
+            for account in &self.v2_reporters {
+                AuthorizedV2Reporters::<T>::insert(account, true);
+                log::info!(
+                    target: "prmx-oracle",
+                    "🔐 Genesis: Registered V2 reporter"
                 );
             }
             

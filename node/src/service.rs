@@ -21,13 +21,13 @@ const ORACLE_KEY_TYPE: sp_runtime::KeyTypeId = sp_runtime::KeyTypeId(*b"orcl");
 const QUOTE_KEY_TYPE: sp_runtime::KeyTypeId = sp_runtime::KeyTypeId(*b"quot");
 
 /// Insert oracle authority key into keystore for offchain worker transaction signing.
-/// In dev mode, this uses Alice's key.
+/// Uses dedicated Oracle account to avoid conflicts with admin operations.
 fn insert_oracle_authority_key(keystore: &KeystorePtr) -> Result<(), ServiceError> {
     use sp_keystore::Keystore;
     
-    // In dev mode, use Alice's seed (same as used in dev chain spec)
-    // This ensures the oracle key matches Alice's account which is an oracle provider
-    let seed = "//Alice";
+    // Use dedicated Oracle account to avoid transaction pool conflicts with Alice (sudo/admin)
+    // This ensures the OCW doesn't compete with test scripts or admin operations
+    let seed = "//Oracle";
     
     // Generate key from seed and insert into keystore
     keystore.sr25519_generate_new(
@@ -44,13 +44,13 @@ fn insert_oracle_authority_key(keystore: &KeystorePtr) -> Result<(), ServiceErro
 }
 
 /// Insert quote authority key into keystore for offchain worker transaction signing.
-/// In dev mode, this uses Alice's key.
+/// Uses dedicated Oracle account to avoid conflicts with admin operations.
 fn insert_quote_authority_key(keystore: &KeystorePtr) -> Result<(), ServiceError> {
     use sp_keystore::Keystore;
     
-    // In dev mode, use Alice's seed (same as used in dev chain spec)
-    // This ensures the quote key matches Alice's account which is a quote provider
-    let seed = "//Alice";
+    // Use dedicated Oracle account to avoid transaction pool conflicts with Alice (sudo/admin)
+    // This ensures the OCW doesn't compete with test scripts or admin operations
+    let seed = "//Oracle";
     
     // Generate key from seed and insert into keystore
     keystore.sr25519_generate_new(

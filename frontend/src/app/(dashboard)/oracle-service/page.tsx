@@ -109,11 +109,20 @@ export default function OracleV2Page() {
   };
 
   const fetchData = async () => {
+    // Check health independently - don't let other API failures affect this
     try {
-      const [monitorsData, statsData, health, policiesData] = await Promise.all([
+      const health = await api.checkV2OracleHealth();
+      setServiceHealthy(health);
+    } catch (err) {
+      console.error('Health check failed:', err);
+      setServiceHealthy(false);
+    }
+    
+    // Fetch data - failures here shouldn't affect health status
+    try {
+      const [monitorsData, statsData, policiesData] = await Promise.all([
         api.getV2Monitors(),
         api.getV2MonitorStats(),
-        api.checkV2OracleHealth(),
         api.getPolicies(),
       ]);
       setMonitors(monitorsData);
@@ -123,10 +132,9 @@ export default function OracleV2Page() {
       policiesData.forEach(p => policyMap.set(p.id, p));
       setPolicies(policyMap);
       setStats(statsData);
-      setServiceHealthy(health);
     } catch (err) {
       console.error('Failed to fetch V2 oracle data:', err);
-      setServiceHealthy(false);
+      // Don't set serviceHealthy to false here - health check is separate
     } finally {
       setLoading(false);
     }

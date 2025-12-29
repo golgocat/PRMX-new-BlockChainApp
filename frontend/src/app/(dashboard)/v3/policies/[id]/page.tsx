@@ -42,7 +42,7 @@ import {
 import { formatUSDT, formatDateTimeUTCCompact, formatTimeRemaining, formatAddress, cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 import * as apiV3 from '@/lib/api-v3';
-import { isV3PolicyId } from '@/lib/api-v3';
+import { formatId } from '@/lib/api-v3';
 import type { PolicyDefiInfo } from '@/types';
 import { useIsDao } from '@/stores/walletStore';
 import { Modal } from '@/components/ui/Modal';
@@ -177,26 +177,24 @@ function getAggStateLabel(aggState: V3AggState): string {
 export default function V3PolicyDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const policyId = params.id ? parseInt(params.id as string) : null;
+  // Policy ID is now an H128 hex string
+  const policyId = params.id ? String(params.id) : null;
   
   const { isConnected, selectedAccount } = useWalletStore();
   const { policy, loading: policyLoading, error, refresh: refreshPolicy } = useV3Policy(policyId);
   
-  // Check if legacy policy exists when V3 policy is not found - redirect if so
-  // Only needed for legacy V3 policy IDs (< 1,000,000) which may collide with V1/V2
+  // Check if V1/V2 policy exists when V3 policy is not found - redirect if so
+  // With hash-based IDs, policies are uniquely identified - no collision possible
   useEffect(() => {
     if (policyLoading || policy || policyId === null) return;
     
-    // New V3 policy IDs (>= 1,000,000) can't collide with V1/V2 - no need to check
-    if (isV3PolicyId(policyId)) return;
-    
-    // Legacy V3 policy ID not found, check if legacy V1/V2 policy exists
+    // V3 policy not found, check if V1/V2 policy exists
     const checkLegacyPolicy = async () => {
       try {
         const legacyPolicies = await api.getPolicies();
         const legacyPolicy = legacyPolicies.find(p => p.id === policyId);
         if (legacyPolicy) {
-          // Legacy policy exists - redirect to legacy page
+          // V1/V2 policy exists - redirect to legacy page
           router.push(`/policies/${policyId}`);
         }
       } catch (err) {

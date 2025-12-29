@@ -31,7 +31,7 @@ import { Input } from '@/components/ui/Input';
 import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useV3Request } from '@/hooks/useV3ChainData';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
-import { acceptV3Request, cancelV3Request, expireV3Request } from '@/lib/api-v3';
+import { acceptV3Request, cancelV3Request, expireV3Request, formatId } from '@/lib/api-v3';
 import { 
   V3RequestStatus,
   getEventTypeInfo, 
@@ -108,7 +108,8 @@ function getStatusConfig(status: V3RequestStatus, expiresAt: number) {
 export default function V3RequestDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const requestId = params.id ? parseInt(params.id as string) : null;
+  // V3 request IDs are H128 hex strings (e.g., "0x3a7f8b2c...")
+  const requestId = params.id ? (params.id as string) : null;
   
   const { isConnected, selectedAccount, getKeypair } = useWalletStore();
   const isDao = useIsDao();
@@ -378,7 +379,7 @@ export default function V3RequestDetailPage() {
               {isOwner && <Badge variant="cyan" className="text-xs">Your Request</Badge>}
             </div>
             <h1 className="text-2xl md:text-3xl font-bold">
-              Insurance Request #{request.id}
+              Insurance Request #{formatId(request.id)}
             </h1>
           </div>
         </div>
@@ -722,7 +723,7 @@ export default function V3RequestDetailPage() {
         <div className="space-y-6">
           {/* Accept Card (for non-owners) */}
           {!isOwner && (
-            <Card className="sticky top-6">
+            <Card className="sticky top-6 z-10 bg-background-primary">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Shield className="w-5 h-5 text-prmx-cyan" />
@@ -798,6 +799,20 @@ export default function V3RequestDetailPage() {
                     >
                       Accept {sharesToAccept} Share{sharesToAccept > 1 ? 's' : ''}
                     </Button>
+                    
+                    {/* Policy link if shares already filled */}
+                    {request.filledShares > 0 && (
+                      <div className="pt-4 border-t border-border-secondary mt-4">
+                        <p className="text-xs text-text-secondary mb-2">
+                          A policy exists with {request.filledShares} shares underwritten.
+                        </p>
+                        <Link href={`/v3/policies/${request.id}`}>
+                          <Button variant="ghost" size="sm" className="w-full" icon={<ExternalLink className="w-4 h-4" />}>
+                            View Policy Details
+                          </Button>
+                        </Link>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-6">
@@ -807,7 +822,12 @@ export default function V3RequestDetailPage() {
                           <CheckCircle2 className="w-8 h-8 text-success" />
                         </div>
                         <p className="font-semibold text-lg mb-2">Fully Underwritten</p>
-                        <p className="text-sm text-text-secondary">All shares have been accepted by underwriters</p>
+                        <p className="text-sm text-text-secondary mb-4">All shares have been accepted by underwriters</p>
+                        <Link href={`/v3/policies/${request.id}`}>
+                          <Button variant="secondary" className="w-full" icon={<ExternalLink className="w-4 h-4" />}>
+                            View Policy Details
+                          </Button>
+                        </Link>
                       </>
                     ) : isExpired ? (
                       <>
@@ -911,26 +931,6 @@ export default function V3RequestDetailPage() {
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          )}
-          
-          {/* View Policy Link if filled */}
-          {request.filledShares > 0 && !isOwner && (
-            <Card className="border-prmx-cyan/30 bg-prmx-cyan/5">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-3 mb-3">
-                  <Shield className="w-5 h-5 text-prmx-cyan" />
-                  <span className="font-semibold">Policy Created</span>
-                </div>
-                <p className="text-sm text-text-secondary mb-4">
-                  A V3 policy has been created with {request.filledShares} shares underwritten.
-                </p>
-                <Link href={`/v3/policies/${request.id}`}>
-                  <Button variant="secondary" className="w-full" icon={<ExternalLink className="w-4 h-4" />}>
-                    View Policy Details
-                  </Button>
-                </Link>
               </CardContent>
             </Card>
           )}

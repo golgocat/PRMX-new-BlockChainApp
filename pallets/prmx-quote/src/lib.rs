@@ -89,25 +89,28 @@ pub const TEST_R_PRICING_API_URL: &[u8] = b"http://34.51.195.144:19090/pricing";
 /// until proper actuarial models are developed.
 pub const FIXED_PROBABILITY_PPM: u32 = 10_000;
 
+/// Quote ID type - re-exported from primitives
+pub use prmx_primitives::QuoteId;
+
 /// Trait for accessing quote data from other pallets
 pub trait QuoteAccess<AccountId, Balance> {
     /// Get quote request by ID
-    fn get_quote_request(quote_id: u64) -> Option<QuoteRequestInfo<AccountId>>;
+    fn get_quote_request(quote_id: QuoteId) -> Option<QuoteRequestInfo<AccountId>>;
     
     /// Get quote result by ID
-    fn get_quote_result(quote_id: u64) -> Option<QuoteResultInfo<Balance>>;
+    fn get_quote_result(quote_id: QuoteId) -> Option<QuoteResultInfo<Balance>>;
     
     /// Mark a quote as consumed (used for policy creation)
-    fn consume_quote(quote_id: u64) -> Result<(), sp_runtime::DispatchError>;
+    fn consume_quote(quote_id: QuoteId) -> Result<(), sp_runtime::DispatchError>;
     
     /// Check if a quote is valid and ready to use
-    fn is_quote_ready(quote_id: u64) -> bool;
+    fn is_quote_ready(quote_id: QuoteId) -> bool;
 }
 
 /// Quote request info (generic version for trait)
 #[derive(codec::Encode, codec::Decode, Clone, PartialEq, Eq, Debug, scale_info::TypeInfo)]
 pub struct QuoteRequestInfo<AccountId> {
-    pub quote_id: u64,
+    pub quote_id: QuoteId,
     pub market_id: u64,
     pub requester: AccountId,
     pub coverage_start: u64,
@@ -150,7 +153,8 @@ pub mod pallet {
     //                                  Types
     // =========================================================================
 
-    pub type QuoteId = u64;
+    pub use prmx_primitives::QuoteId;
+    use prmx_primitives::generate_unique_id;
 
     /// Quote request from a user
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -238,10 +242,10 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
-    /// Next quote ID
+    /// Per-account nonce for unique quote ID generation
     #[pallet::storage]
-    #[pallet::getter(fn next_quote_id)]
-    pub type NextQuoteId<T> = StorageValue<_, QuoteId, ValueQuery>;
+    #[pallet::getter(fn account_nonce)]
+    pub type AccountNonce<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
     /// Quote requests by ID
     #[pallet::storage]
@@ -500,8 +504,12 @@ pub mod pallet {
                 now,
             ).map_err(|_| Error::<T>::InvalidCoverageWindow)?;
 
+            // Generate unique quote ID
+            let nonce = AccountNonce::<T>::get(&who);
+            let quote_id = generate_unique_id(b"QUOTE", &who, now, nonce);
+            AccountNonce::<T>::insert(&who, nonce + 1);
+            
             // Create quote request (V1 defaults)
-            let quote_id = NextQuoteId::<T>::get();
             let quote_request = QuoteRequest::<T> {
                 quote_id,
                 market_id,
@@ -523,7 +531,6 @@ pub mod pallet {
             // Store quote request
             QuoteRequests::<T>::insert(quote_id, quote_request);
             QuoteStatuses::<T>::insert(quote_id, QuoteStatus::Pending);
-            NextQuoteId::<T>::put(quote_id + 1);
 
             // Add to pending quotes for offchain worker
             PendingQuotes::<T>::mutate(|pending| {
@@ -713,8 +720,12 @@ pub mod pallet {
                 now,
             ).map_err(|_| Error::<T>::InvalidCoverageWindow)?;
 
+            // Generate unique quote ID
+            let nonce = AccountNonce::<T>::get(&who);
+            let quote_id = generate_unique_id(b"QUOTE", &who, now, nonce);
+            AccountNonce::<T>::insert(&who, nonce + 1);
+            
             // Create V2 quote request with custom strike
-            let quote_id = NextQuoteId::<T>::get();
             let quote_request = QuoteRequest::<T> {
                 quote_id,
                 market_id,
@@ -736,7 +747,6 @@ pub mod pallet {
             // Store quote request
             QuoteRequests::<T>::insert(quote_id, quote_request);
             QuoteStatuses::<T>::insert(quote_id, QuoteStatus::Pending);
-            NextQuoteId::<T>::put(quote_id + 1);
 
             // Add to pending quotes for offchain worker
             PendingQuotes::<T>::mutate(|pending| {
@@ -1309,7 +1319,7 @@ pub mod pallet {
     // =========================================================================
 
     impl<T: Config> QuoteAccess<T::AccountId, T::Balance> for Pallet<T> {
-        fn get_quote_request(quote_id: u64) -> Option<QuoteRequestInfo<T::AccountId>> {
+        fn get_quote_request(quote_id: QuoteId) -> Option<QuoteRequestInfo<T::AccountId>> {
             QuoteRequests::<T>::get(quote_id).map(|req| QuoteRequestInfo {
                 quote_id: req.quote_id,
                 market_id: req.market_id,
@@ -1328,7 +1338,7 @@ pub mod pallet {
             })
         }
 
-        fn get_quote_result(quote_id: u64) -> Option<QuoteResultInfo<T::Balance>> {
+        fn get_quote_result(quote_id: QuoteId) -> Option<QuoteResultInfo<T::Balance>> {
             QuoteResults::<T>::get(quote_id).map(|res| QuoteResultInfo {
                 probability_ppm: res.probability_ppm,
                 premium_per_share: res.premium_per_share,
@@ -1337,11 +1347,11 @@ pub mod pallet {
             })
         }
 
-        fn consume_quote(quote_id: u64) -> Result<(), sp_runtime::DispatchError> {
+        fn consume_quote(quote_id: QuoteId) -> Result<(), sp_runtime::DispatchError> {
             Pallet::<T>::do_consume_quote(quote_id)
         }
 
-        fn is_quote_ready(quote_id: u64) -> bool {
+        fn is_quote_ready(quote_id: QuoteId) -> bool {
             Pallet::<T>::is_quote_ready_and_valid(quote_id)
         }
     }

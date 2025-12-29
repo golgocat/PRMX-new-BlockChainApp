@@ -29,31 +29,25 @@ import type {
 export const V3_PAYOUT_PER_SHARE = BigInt(100_000_000); // $100 with 6 decimals
 
 /**
- * V3 Policy ID offset - V3 policies start from this ID to avoid collision
- * with V1/V2 policy IDs in shared prmxHoldings storage.
- * Must match V3_POLICY_ID_OFFSET in prmx-primitives.
+ * Format a policy/request ID for display.
+ * Truncates H128 hex strings for readability: "0x3a7f8b2c..." -> "0x3a7f...2c1d"
  */
-export const V3_POLICY_ID_OFFSET = 1_000_000;
-
-/**
- * Check if a policy ID belongs to a V3 policy.
- * V3 policies have IDs >= V3_POLICY_ID_OFFSET (1,000,000).
- * Note: Legacy V3 policies (created before the offset was introduced) may have
- * lower IDs and need special handling.
- */
-export function isV3PolicyId(policyId: number): boolean {
-  return policyId >= V3_POLICY_ID_OFFSET;
+export function formatId(id: string): string {
+  if (!id || id.length <= 12) return id;
+  return `${id.slice(0, 6)}...${id.slice(-4)}`;
 }
 
 /**
  * Derive the V3 policy pool account address.
  * This matches the on-chain derivation: PALLET_ID.into_sub_account_truncating(("policy", policy_id))
  * where PALLET_ID = *b"prmxplv3"
+ * 
+ * Note: policyId is now an H128 hex string (16 bytes)
  */
-export async function getV3PolicyPoolAccount(policyId: number): Promise<string> {
+export async function getV3PolicyPoolAccount(policyId: string): Promise<string> {
   try {
     const { encodeAddress } = await import('@polkadot/util-crypto');
-    const { u8aConcat, stringToU8a, compactToU8a } = await import('@polkadot/util');
+    const { u8aConcat, stringToU8a, compactToU8a, hexToU8a } = await import('@polkadot/util');
     
     // PalletId is "prmxplv3" (8 chars)
     const palletId = stringToU8a('prmxplv3');
@@ -64,9 +58,8 @@ export async function getV3PolicyPoolAccount(policyId: number): Promise<string> 
     const policyLenPrefix = compactToU8a(policyBytes.length); // SCALE compact encoding
     const seedPolicy = u8aConcat(policyLenPrefix, policyBytes);
     
-    // policy_id is a u32 in LE format
-    const seedPolicyId = new Uint8Array(4);
-    new DataView(seedPolicyId.buffer).setUint32(0, policyId, true); // LE
+    // policy_id is an H128 (16 bytes) - convert from hex string
+    const seedPolicyId = hexToU8a(policyId);
     
     // Full data: modl(4) + pallet_id(8) + SCALE("policy") + policy_id
     const seed = u8aConcat(seedPolicy, seedPolicyId);
@@ -240,9 +233,9 @@ export async function getV3OpenRequests(): Promise<V3Request[]> {
 }
 
 /**
- * Get a single request by ID
+ * Get a single request by ID (H128 hex string)
  */
-export async function getV3Request(requestId: number): Promise<V3Request | null> {
+export async function getV3Request(requestId: string): Promise<V3Request | null> {
   const api = await getApi();
   const result = await api.query.prmxMarketV3.underwriteRequests(requestId);
   
@@ -264,11 +257,12 @@ export async function getV3RequestsByRequester(address: string): Promise<V3Reque
 
 /**
  * Create a new underwrite request
+ * Returns the request ID as an H128 hex string
  */
 export async function createV3Request(
   keypair: KeyringPair,
   params: V3CreateRequestParams
-): Promise<number> {
+): Promise<string> {
   const api = await getApi();
   
   const eventSpec = {
@@ -292,10 +286,10 @@ export async function createV3Request(
   
   const events = await signAndWaitV3(tx, keypair);
   
-  // Find RequestCreated event
+  // Find RequestCreated event - request_id is H128 hex string
   for (const { event } of events) {
     if (event.section === 'prmxMarketV3' && event.method === 'RequestCreated') {
-      return event.data[0].toNumber();
+      return event.data[0].toHex();
     }
   }
   
@@ -307,7 +301,7 @@ export async function createV3Request(
  */
 export async function acceptV3Request(
   keypair: KeyringPair,
-  requestId: number,
+  requestId: string,
   shares: number
 ): Promise<void> {
   const api = await getApi();
@@ -325,7 +319,7 @@ export async function acceptV3Request(
  */
 export async function cancelV3Request(
   keypair: KeyringPair,
-  requestId: number
+  requestId: string
 ): Promise<bigint> {
   const api = await getApi();
   
@@ -349,7 +343,7 @@ export async function cancelV3Request(
  */
 export async function expireV3Request(
   keypair: KeyringPair,
-  requestId: number
+  requestId: string
 ): Promise<bigint> {
   const api = await getApi();
   
@@ -396,9 +390,9 @@ export async function getV3Policies(): Promise<V3Policy[]> {
 }
 
 /**
- * Get a single V3 policy by ID
+ * Get a single V3 policy by ID (H128 hex string)
  */
-export async function getV3Policy(policyId: number): Promise<V3Policy | null> {
+export async function getV3Policy(policyId: string): Promise<V3Policy | null> {
   const api = await getApi();
   const result = await api.query.prmxPolicyV3.policies(policyId);
   
@@ -423,9 +417,9 @@ export async function getV3PoliciesByHolder(address: string): Promise<V3Policy[]
 // =============================================================================
 
 /**
- * Get oracle state for a policy
+ * Get oracle state for a policy (H128 hex string ID)
  */
-export async function getV3OracleState(policyId: number): Promise<V3OracleState | null> {
+export async function getV3OracleState(policyId: string): Promise<V3OracleState | null> {
   const api = await getApi();
   const result = await api.query.prmxOracleV3.oracleStates(policyId);
   
@@ -449,9 +443,9 @@ export async function getV3OracleState(policyId: number): Promise<V3OracleState 
 // =============================================================================
 
 /**
- * Get V3 policy pool balance
+ * Get V3 policy pool balance (H128 hex string ID)
  */
-export async function getV3PolicyPoolBalance(policyId: number): Promise<bigint> {
+export async function getV3PolicyPoolBalance(policyId: string): Promise<bigint> {
   const api = await getApi();
   try {
     const balance = await api.query.prmxPolicyV3.policyPoolBalance(policyId);
@@ -467,7 +461,7 @@ export async function getV3PolicyPoolBalance(policyId: number): Promise<bigint> 
  */
 export interface V3Observation {
   _id: string;
-  policy_id: number;
+  policy_id: string; // H128 hex string
   epoch_time: number;
   location_key: string;
   event_type: string;
@@ -484,8 +478,9 @@ export interface V3Observation {
 
 /**
  * Fetch historical observations for a V3 policy from oracle service
+ * @param policyId H128 hex string ID
  */
-export async function getV3Observations(policyId: number): Promise<V3Observation[]> {
+export async function getV3Observations(policyId: string): Promise<V3Observation[]> {
   // Default to localhost for development, can be configured via env var
   const oracleServiceUrl = process.env.NEXT_PUBLIC_ORACLE_SERVICE_URL || 'http://localhost:3001';
   
@@ -557,7 +552,7 @@ export async function getV3LpHoldings(address: string): Promise<V3LpHolding[]> {
 /**
  * Get all LP holders for a V3 policy
  */
-export async function getV3PolicyLpHolders(policyId: number): Promise<V3LpHolding[]> {
+export async function getV3PolicyLpHolders(policyId: string): Promise<V3LpHolding[]> {
   const api = await getApi();
   const entries = await api.query.prmxHoldings.holdingsStorage.entries(policyId);
   const totalLp = await api.query.prmxHoldings.totalLpShares(policyId);
@@ -623,10 +618,12 @@ function parseRequest(req: any, locationMap: Map<number, V3Location>): V3Request
   // Parse event spec from human-readable format
   const eventSpecHuman = human.eventSpec || human.event_spec;
   
+  // Request ID is now H128 hex string
+  const requestIdRaw = req.requestId || req.request_id;
+  const requestId = typeof requestIdRaw === 'string' ? requestIdRaw : requestIdRaw.toHex();
+  
   return {
-    id: human.requestId 
-      ? parseInt(human.requestId.replace(/,/g, '')) 
-      : (req.requestId || req.request_id).toNumber(),
+    id: requestId,
     requester: human.requester || req.requester.toString(),
     locationId,
     location: locationMap.get(locationId),
@@ -724,10 +721,12 @@ function parsePolicy(policy: any, locationMap: Map<number, V3Location>): V3Polic
   const payoutPerShare = V3_PAYOUT_PER_SHARE; // $100
   const maxPayout = BigInt(totalShares) * payoutPerShare;
   
+  // Policy ID is now H128 hex string
+  const policyIdRaw = policy.policyId || policy.policy_id;
+  const policyId = typeof policyIdRaw === 'string' ? policyIdRaw : policyIdRaw.toHex();
+  
   return {
-    id: human.policyId 
-      ? parseInt(human.policyId.replace(/,/g, '')) 
-      : (policy.policyId || policy.policy_id).toNumber(),
+    id: policyId,
     holder: human.holder || policy.holder.toString(),
     locationId,
     location: locationMap.get(locationId),

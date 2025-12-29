@@ -8,23 +8,135 @@ use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 
 // ============================================================================
+// H128 Type Definition
+// ============================================================================
+
+/// 128-bit hash type for unique identifiers.
+/// This is a wrapper around [u8; 16] with proper codec and scale-info support.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Debug, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen)]
+pub struct H128(pub [u8; 16]);
+
+impl H128 {
+    /// Create a new H128 from a 16-byte array
+    pub fn from_slice(slice: &[u8]) -> Self {
+        let mut inner = [0u8; 16];
+        let len = core::cmp::min(slice.len(), 16);
+        inner[..len].copy_from_slice(&slice[..len]);
+        Self(inner)
+    }
+
+    /// Get the inner bytes
+    pub fn as_bytes(&self) -> &[u8; 16] {
+        &self.0
+    }
+
+    /// Get the inner bytes (alias for compatibility)
+    pub fn to_le_bytes(&self) -> [u8; 16] {
+        self.0
+    }
+
+    /// Create from a blake2_128 hash output
+    pub fn from_hash(hash: [u8; 16]) -> Self {
+        Self(hash)
+    }
+
+    /// Zero value
+    pub fn zero() -> Self {
+        Self([0u8; 16])
+    }
+}
+
+impl From<[u8; 16]> for H128 {
+    fn from(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+}
+
+impl From<H128> for [u8; 16] {
+    fn from(h: H128) -> [u8; 16] {
+        h.0
+    }
+}
+
+impl AsRef<[u8]> for H128 {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl core::fmt::Display for H128 {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "0x")?;
+        for byte in &self.0 {
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
+    }
+}
+
+// ============================================================================
 // Common ID Types
 // ============================================================================
 
 /// Market identifier
 pub type MarketId = u64;
 
-/// Policy identifier
-pub type PolicyId = u64;
+/// Policy identifier (H128 hash-based for collision resistance)
+pub type PolicyId = H128;
 
-/// Quote identifier
-pub type QuoteId = u64;
+/// Request identifier (same as PolicyId for V3, 1:1 mapping)
+pub type RequestId = H128;
 
-/// Order identifier (for LP orderbook)
-pub type OrderId = u64;
+/// Quote identifier (H128 hash-based for collision resistance)
+pub type QuoteId = H128;
+
+/// Order identifier (H128 hash-based for collision resistance)
+pub type OrderId = H128;
 
 /// Location identifier (alias for MarketId in oracle context)
 pub type LocationId = MarketId;
+
+// ============================================================================
+// ID Generation
+// ============================================================================
+
+/// Generate a unique H128 ID from version prefix, creator, timestamp, and nonce.
+/// 
+/// The version prefix ensures IDs from different systems never collide:
+/// - V1/V2 policies use b"V1V2"
+/// - V3 policies use b"V3"
+/// - Quotes use b"QUOTE"
+/// - Orders use b"ORDER"
+/// 
+/// # Arguments
+/// * `version_prefix` - Unique prefix for this ID type/system
+/// * `creator` - Account creating the entity
+/// * `timestamp` - Current timestamp
+/// * `nonce` - Per-account nonce for uniqueness
+#[cfg(feature = "std")]
+pub fn generate_unique_id<AccountId: Encode>(
+    version_prefix: &[u8],
+    creator: &AccountId,
+    timestamp: u64,
+    nonce: u64,
+) -> H128 {
+    use sp_core::hashing::blake2_128;
+    let data = (version_prefix, creator, timestamp, nonce).encode();
+    H128::from_hash(blake2_128(&data))
+}
+
+/// Generate a unique H128 ID (no_std version using sp_io)
+#[cfg(not(feature = "std"))]
+pub fn generate_unique_id<AccountId: Encode>(
+    version_prefix: &[u8],
+    creator: &AccountId,
+    timestamp: u64,
+    nonce: u64,
+) -> H128 {
+    use sp_io::hashing::blake2_128;
+    let data = (version_prefix, creator, timestamp, nonce).encode();
+    H128::from_hash(blake2_128(&data))
+}
 
 /// Rainfall measurement in tenths of millimeters (e.g., 255 = 25.5mm)
 pub type Millimeters = u32;
@@ -304,11 +416,4 @@ pub const V3_OBSERVATIONS_TTL_SECS: u64 = 30 * 24 * 3600;
 
 /// Snapshots TTL in seconds (90 days)
 pub const V3_SNAPSHOTS_TTL_SECS: u64 = 90 * 24 * 3600;
-
-/// Policy ID offset for V3 policies.
-/// V3 policy IDs start from this value to avoid collision with V1/V2 policy IDs.
-/// This ensures that when both systems share the prmxHoldings pallet, their IDs don't overlap.
-/// V1/V2 policies: 0 to 999,999
-/// V3 policies: 1,000,000+
-pub const V3_POLICY_ID_OFFSET: PolicyId = 1_000_000;
 

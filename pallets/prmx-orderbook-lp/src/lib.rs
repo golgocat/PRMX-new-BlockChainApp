@@ -19,8 +19,8 @@ use alloc::vec::Vec;
 use frame_support::traits::fungibles;
 use pallet_prmx_holdings::HoldingsApi;
 
-/// Policy ID type (matches pallet_prmx_policy)
-pub type PolicyId = u64;
+/// Policy ID type - re-exported from primitives
+pub use prmx_primitives::PolicyId;
 
 /// Trait for LP Orderbook API (implemented by this pallet, used by policy pallet)
 pub trait LpOrderbookApi<AccountId, Balance> {
@@ -46,7 +46,8 @@ pub mod pallet {
     //                                  Types
     // =========================================================================
 
-    pub type OrderId = u64;
+    pub use prmx_primitives::OrderId;
+    use prmx_primitives::generate_unique_id;
 
     /// LP Ask Order structure - now tracks policy_id instead of market_id
     #[derive(Encode, Decode, Clone, PartialEq, Eq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
@@ -110,10 +111,10 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
-    /// Next order ID
+    /// Per-account nonce for unique order ID generation
     #[pallet::storage]
-    #[pallet::getter(fn next_order_id)]
-    pub type NextOrderId<T> = StorageValue<_, OrderId, ValueQuery>;
+    #[pallet::getter(fn account_nonce)]
+    pub type AccountNonce<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
     /// Orders by ID
     #[pallet::storage]
@@ -432,9 +433,11 @@ pub mod pallet {
             T::HoldingsApi::lock_lp_tokens(policy_id, seller, quantity)
                 .map_err(|_| Error::<T>::InsufficientLpBalance)?;
 
-            // Create order
-            let order_id = NextOrderId::<T>::get();
+            // Generate unique order ID
             let now = Self::current_timestamp();
+            let nonce = AccountNonce::<T>::get(seller);
+            let order_id = generate_unique_id(b"ORDER", seller, now, nonce);
+            AccountNonce::<T>::insert(seller, nonce + 1);
             
             let order = LpAskOrder::<T> {
                 order_id,
@@ -448,7 +451,6 @@ pub mod pallet {
 
             // Store order
             Orders::<T>::insert(order_id, order);
-            NextOrderId::<T>::put(order_id + 1);
 
             // Add to ask book (keyed by policy_id)
             Self::add_to_ask_book(policy_id, price, order_id)?;

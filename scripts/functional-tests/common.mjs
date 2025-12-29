@@ -30,13 +30,25 @@ export function getKeyring() {
         charlie: keyring.addFromUri('//Charlie'),
         dave: keyring.addFromUri('//Dave'),
         eve: keyring.addFromUri('//Eve'),
+        dao: keyring.addFromUri('//DAO'),       // Dedicated DAO account
+        oracle: keyring.addFromUri('//Oracle'), // Dedicated Oracle account
     };
 }
 
 export async function getDaoAccount() {
     const { encodeAddress } = await import('@polkadot/util-crypto');
-    const daoAccountHex = '0x' + '00'.repeat(32);
+    // Dedicated DAO account (//DAO) - defined in runtime/src/lib.rs
+    // Address: 5EyKeA48QNY6LbD2QeN2JUuArTiyBTDN2BBYoLLCwz9rXdZS
+    const daoAccountHex = '0x8099b04502498ba2936833a5715a95dbcd367628a4dd4792222b7bcb4aa79959';
     return encodeAddress(daoAccountHex, 42);
+}
+
+export async function getOracleAccount() {
+    const { encodeAddress } = await import('@polkadot/util-crypto');
+    // Dedicated Oracle account (//Oracle) - used by offchain-oracle-service
+    // Address: 5ERNkbfECLx6hDuTwjVPrXgaGe7hE114d6rFz1d2LxcVFnbB
+    const oracleAccountHex = '0x683c4ef19d8fec497566bf7c24c5d6e3625edecde19d80c39281e4686961fa74';
+    return encodeAddress(oracleAccountHex, 42);
 }
 
 export async function getChainTime(api) {

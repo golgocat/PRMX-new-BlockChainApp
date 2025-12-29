@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/Input';
 import { useWalletStore } from '@/stores/walletStore';
 import { useV3Locations } from '@/hooks/useV3ChainData';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
-import { createV3Request } from '@/lib/api-v3';
+import { createV3Request, formatId } from '@/lib/api-v3';
 import { 
   V3_EVENT_TYPES, 
   V3EventType,
@@ -206,7 +206,7 @@ export default function NewV3RequestPage() {
         expiresAt: Math.floor(new Date(expiresAt).getTime() / 1000),
       });
       
-      toast.success(`Request #${requestId} created successfully!`);
+      toast.success(`Request ${formatId(requestId)} created successfully!`);
       router.push(`/v3/requests/${requestId}`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create request');

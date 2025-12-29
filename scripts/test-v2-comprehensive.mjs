@@ -58,7 +58,9 @@ function formatChange(before, after) {
 
 async function getDaoAccount() {
     const { encodeAddress } = await import('@polkadot/util-crypto');
-    const daoAccountHex = '0x' + '00'.repeat(32);
+    // Dedicated DAO account (//DAO) - defined in runtime/src/lib.rs
+    // Address: 5EyKeA48QNY6LbD2QeN2JUuArTiyBTDN2BBYoLLCwz9rXdZS
+    const daoAccountHex = '0x8099b04502498ba2936833a5715a95dbcd367628a4dd4792222b7bcb4aa79959';
     return encodeAddress(daoAccountHex, 42);
 }
 

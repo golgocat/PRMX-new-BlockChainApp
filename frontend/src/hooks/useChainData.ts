@@ -375,6 +375,7 @@ export function useRainfallData(marketId: number | null) {
 
 /**
  * Hook to get dashboard stats with automatic polling
+ * Includes both V1/V2 and V3 policies and orders
  * @param pollInterval - Polling interval in ms (default 15s, set to 0 to disable)
  */
 export function useDashboardStats(pollInterval: number = DEFAULT_POLL_INTERVAL) {
@@ -403,33 +404,83 @@ export function useDashboardStats(pollInterval: number = DEFAULT_POLL_INTERVAL) 
     }
     
     try {
+      // Fetch V1/V2 data
       const [markets, policies, orders] = await Promise.all([
         api.getMarkets(),
         api.getPolicies(),
         api.getLpOrders(),
       ]);
+      
+      // Fetch V3 data (in parallel, with graceful error handling)
+      let v3Policies: Awaited<ReturnType<typeof apiV3.getV3Policies>> = [];
+      let v3OpenRequests: Awaited<ReturnType<typeof apiV3.getV3OpenRequests>> = [];
+      let v3LpHoldings: Awaited<ReturnType<typeof apiV3.getV3LpHoldings>> = [];
+      
+      try {
+        const [v3P, v3R] = await Promise.all([
+          apiV3.getV3Policies(),
+          apiV3.getV3OpenRequests(),
+        ]);
+        v3Policies = v3P;
+        v3OpenRequests = v3R;
+      } catch (err) {
+        console.warn('Failed to fetch V3 data for dashboard:', err);
+      }
 
       const now = Math.floor(Date.now() / 1000);
-      const activePolicies = policies.filter(p => 
+      
+      // V1/V2 active policies
+      const v1v2ActivePolicies = policies.filter(p => 
+        p.status === 'Active' && p.coverageEnd > now
+      );
+      
+      // V3 active policies
+      const v3ActivePolicies = v3Policies.filter(p => 
         p.status === 'Active' && p.coverageEnd > now
       );
 
       let myPolicies: Policy[] = [];
+      let myV3Policies: typeof v3Policies = [];
       let myHoldings: LpHolding[] = [];
       
       if (selectedAccount) {
         myPolicies = policies.filter(p => p.holder === selectedAccount.address);
+        myV3Policies = v3Policies.filter(p => p.holder === selectedAccount.address);
+        
+        // Get V1/V2 LP holdings
         myHoldings = await api.getLpHoldings(selectedAccount.address);
+        
+        // Get V3 LP holdings
+        try {
+          v3LpHoldings = await apiV3.getV3LpHoldings(selectedAccount.address);
+        } catch (err) {
+          console.warn('Failed to fetch V3 LP holdings:', err);
+        }
       }
+
+      // Combined stats
+      const totalPolicies = policies.length + v3Policies.length;
+      const activePolicies = v1v2ActivePolicies.length + v3ActivePolicies.length;
+      const myTotalPolicies = myPolicies.length + myV3Policies.length;
+      const myActivePolicies = myPolicies.filter(p => p.status === 'Active' && p.coverageEnd > now).length +
+                               myV3Policies.filter(p => p.status === 'Active' && p.coverageEnd > now).length;
+      
+      // LP Orders: V1/V2 orders with remaining > 0 + V3 open requests (pending underwriting)
+      const v1v2OpenOrders = orders.filter(o => o.remaining > BigInt(0)).length;
+      const v3OpenRequestCount = v3OpenRequests.length;
+      const totalLpOrders = v1v2OpenOrders + v3OpenRequestCount;
+      
+      // LP Holdings: V1/V2 + V3
+      const totalHoldings = myHoldings.length + v3LpHoldings.length;
 
       const newStats = {
         totalMarkets: markets.length,
-        totalPolicies: policies.length,
-        activePolicies: activePolicies.length,
-        myPolicies: myPolicies.length,
-        myActivePolicies: myPolicies.filter(p => p.status === 'Active').length,
-        totalLpOrders: orders.filter(o => o.remaining > BigInt(0)).length,
-        myLpHoldings: myHoldings.length,
+        totalPolicies,
+        activePolicies,
+        myPolicies: myTotalPolicies,
+        myActivePolicies,
+        totalLpOrders,
+        myLpHoldings: totalHoldings,
       };
 
       // Use transition for smoother updates during polling

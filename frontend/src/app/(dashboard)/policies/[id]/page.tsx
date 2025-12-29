@@ -33,7 +33,7 @@ import { useWalletStore, useIsDao } from '@/stores/walletStore';
 import { useMarkets } from '@/hooks/useChainData';
 import * as api from '@/lib/api';
 import * as apiV3 from '@/lib/api-v3';
-import { isV3PolicyId } from '@/lib/api-v3';
+import { formatId } from '@/lib/api-v3';
 import { formatUSDT, formatDate, formatDateTimeUTC, formatAddress, formatCoordinates, formatTimeRemaining, cn } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import type { Policy, Market, PolicyDefiInfo, V2Monitor, LpHolding } from '@/types';
@@ -42,7 +42,8 @@ import type { SettlementResult } from '@/lib/api';
 export default function PolicyDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const policyId = Number(params.id);
+  // Policy ID is now an H128 hex string
+  const policyId = String(params.id);
   
   const { isConnected } = useWalletStore();
   const isDao = useIsDao();
@@ -75,16 +76,11 @@ export default function PolicyDetailPage() {
       setLoading(true);
     }
     try {
-      // New V3 policies have IDs >= 1,000,000 - redirect immediately
-      if (isV3PolicyId(policyId)) {
-        router.push(`/v3/policies/${policyId}`);
-        return;
-      }
-      
+      // With hash-based IDs, try to load V1/V2 policy first
       const policies = await api.getPolicies();
       const found = policies.find(p => p.id === policyId);
       
-      // If legacy policy not found, check if V3 policy exists (legacy IDs < 1,000,000) and redirect
+      // If V1/V2 policy not found, check if V3 policy exists and redirect
       if (!found) {
         try {
           const v3Policy = await apiV3.getV3Policy(policyId);

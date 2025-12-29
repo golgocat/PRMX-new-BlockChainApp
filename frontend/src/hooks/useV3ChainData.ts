@@ -207,16 +207,16 @@ export function useV3OpenRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) 
 }
 
 /**
- * Hook to fetch a single V3 request by ID
+ * Hook to fetch a single V3 request by ID (H128 hex string)
  */
-export function useV3Request(requestId: number | null, pollInterval: number = FAST_POLL_INTERVAL) {
+export function useV3Request(requestId: string | null, pollInterval: number = FAST_POLL_INTERVAL) {
   const { isChainConnected } = useWalletStore();
   const [request, setRequest] = useState<V3Request | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (silent = false) => {
-    if (!isChainConnected || requestId === null) return;
+    if (!isChainConnected || !requestId) return;
     
     if (!silent) setLoading(true);
     setError(null);
@@ -237,7 +237,7 @@ export function useV3Request(requestId: number | null, pollInterval: number = FA
 
   // Auto-polling for real-time updates
   useEffect(() => {
-    if (!isChainConnected || requestId === null || pollInterval <= 0) return;
+    if (!isChainConnected || !requestId || pollInterval <= 0) return;
     
     const interval = setInterval(() => refresh(true), pollInterval);
     return () => clearInterval(interval);
@@ -360,16 +360,16 @@ export function useV3Policies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
 }
 
 /**
- * Hook to fetch a single V3 policy by ID
+ * Hook to fetch a single V3 policy by ID (H128 hex string)
  */
-export function useV3Policy(policyId: number | null) {
+export function useV3Policy(policyId: string | null) {
   const { isChainConnected } = useWalletStore();
   const [policy, setPolicy] = useState<V3Policy | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!isChainConnected || policyId === null) return;
+    if (!isChainConnected || !policyId) return;
     
     setLoading(true);
     setError(null);
@@ -436,16 +436,16 @@ export function useV3MyPolicies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
 // =============================================================================
 
 /**
- * Hook to fetch oracle state for a V3 policy
+ * Hook to fetch oracle state for a V3 policy (H128 hex string)
  */
-export function useV3OracleState(policyId: number | null, pollInterval: number = DEFAULT_POLL_INTERVAL) {
+export function useV3OracleState(policyId: string | null, pollInterval: number = DEFAULT_POLL_INTERVAL) {
   const { isChainConnected } = useWalletStore();
   const [oracleState, setOracleState] = useState<V3OracleState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (silent = false) => {
-    if (!isChainConnected || policyId === null) return;
+    if (!isChainConnected || !policyId) return;
     
     if (!silent) setLoading(true);
     setError(null);
@@ -466,7 +466,7 @@ export function useV3OracleState(policyId: number | null, pollInterval: number =
 
   // Auto-polling
   useEffect(() => {
-    if (!isChainConnected || policyId === null || pollInterval <= 0) return;
+    if (!isChainConnected || !policyId || pollInterval <= 0) return;
     
     const interval = setInterval(() => refresh(true), pollInterval);
     return () => clearInterval(interval);
@@ -480,16 +480,16 @@ export function useV3OracleState(policyId: number | null, pollInterval: number =
 // =============================================================================
 
 /**
- * Hook to fetch historical observations for a V3 policy
+ * Hook to fetch historical observations for a V3 policy (H128 hex string)
  */
-export function useV3Observations(policyId: number | null) {
+export function useV3Observations(policyId: string | null) {
   const { isChainConnected } = useWalletStore();
   const [observations, setObservations] = useState<V3Observation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!isChainConnected || policyId === null) {
+    if (!isChainConnected || !policyId) {
       setObservations([]);
       setLoading(false);
       return;
@@ -568,16 +568,16 @@ export function useV3MyLpHoldings(pollInterval: number = DEFAULT_POLL_INTERVAL) 
 }
 
 /**
- * Hook to fetch all LP holders for a specific V3 policy
+ * Hook to fetch all LP holders for a specific V3 policy (H128 hex string)
  */
-export function useV3PolicyLpHolders(policyId: number | null) {
+export function useV3PolicyLpHolders(policyId: string | null) {
   const { isChainConnected } = useWalletStore();
   const [holders, setHolders] = useState<V3LpHolding[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
-    if (!isChainConnected || policyId === null) return;
+    if (!isChainConnected || !policyId) return;
     
     setLoading(true);
     setError(null);

@@ -23,7 +23,7 @@ use frame_support::traits::{Get, Time};
 use frame_system::pallet_prelude::*;
 use prmx_primitives::{
     EventSpecV3, PolicyId, RequestStatusV3, V3_MIN_SHARES_PER_ACCEPT, V3_PAYOUT_PER_SHARE,
-    V3_POLICY_ID_OFFSET,
+    generate_unique_id, RequestId,
 };
 use sp_runtime::traits::{AccountIdConversion, Saturating, Zero};
 
@@ -36,9 +36,6 @@ pub const V3_EXPIRY_CHECK_INTERVAL_SECS: u64 = 300;
 
 /// Pallet ID for generating derived accounts
 pub const PALLET_ID: frame_support::PalletId = frame_support::PalletId(*b"prmxmkv3");
-
-/// Request ID type (= Policy ID, 1:1 mapping)
-pub type RequestId = PolicyId;
 
 /// Location ID type
 pub type LocationId = u64;
@@ -279,27 +276,17 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
-    /// Default value for NextRequestId - starts at V3_POLICY_ID_OFFSET
-    /// to avoid collision with V1/V2 policy IDs in shared prmxHoldings pallet.
-    pub struct NextRequestIdDefault;
-    impl frame_support::traits::Get<RequestId> for NextRequestIdDefault {
-        fn get() -> RequestId {
-            V3_POLICY_ID_OFFSET
-        }
-    }
-
-    /// Underwrite requests by ID
+    /// Underwrite requests by ID (H128 hash-based)
     #[pallet::storage]
     #[pallet::getter(fn underwrite_requests)]
     pub type UnderwriteRequests<T: Config> =
         StorageMap<_, Blake2_128Concat, RequestId, UnderwriteRequest<T>, OptionQuery>;
 
-    /// Next request ID
-    /// Initialized to V3_POLICY_ID_OFFSET to avoid collision with V1/V2 policy IDs
-    /// in the shared prmxHoldings pallet.
+    /// Per-account nonce for unique request ID generation
     #[pallet::storage]
-    #[pallet::getter(fn next_request_id)]
-    pub type NextRequestId<T: Config> = StorageValue<_, RequestId, ValueQuery, NextRequestIdDefault>;
+    #[pallet::getter(fn account_nonce)]
+    pub type AccountNonce<T: Config> =
+        StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
     /// Premium held in escrow per request (unfilled portion)
     #[pallet::storage]
@@ -312,34 +299,7 @@ pub mod pallet {
     // =========================================================================
 
     #[pallet::hooks]
-    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-        fn on_runtime_upgrade() -> Weight {
-            // Migrate NextRequestId to use V3_POLICY_ID_OFFSET if it's below the offset
-            let current_id = NextRequestId::<T>::get();
-            if current_id < V3_POLICY_ID_OFFSET {
-                // If there are existing requests, we need to preserve their count
-                // by adding the offset to the current value
-                let new_id = V3_POLICY_ID_OFFSET + current_id;
-                NextRequestId::<T>::put(new_id);
-                log::info!(
-                    target: "pallet-market-v3",
-                    "🔄 Migrated NextRequestId from {} to {} (added V3_POLICY_ID_OFFSET)",
-                    current_id,
-                    new_id
-                );
-                // Return weight for one storage read and one storage write
-                T::DbWeight::get().reads_writes(1, 1)
-            } else {
-                log::info!(
-                    target: "pallet-market-v3",
-                    "✓ NextRequestId ({}) already >= V3_POLICY_ID_OFFSET, no migration needed",
-                    current_id
-                );
-                // Just one read
-                T::DbWeight::get().reads(1)
-            }
-        }
-    }
+    impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
     // =========================================================================
     //                                  Events
@@ -483,8 +443,11 @@ pub mod pallet {
             )
             .map_err(|_| Error::<T>::InsufficientFunds)?;
 
-            // Create request
-            let request_id = NextRequestId::<T>::get();
+            // Generate unique request ID using hash-based approach
+            let nonce = AccountNonce::<T>::get(&requester);
+            let request_id = generate_unique_id(b"V3", &requester, now, nonce);
+            AccountNonce::<T>::insert(&requester, nonce + 1);
+            
             let payout_per_share: T::Balance = V3_PAYOUT_PER_SHARE.into();
 
             let request = UnderwriteRequest {
@@ -505,7 +468,6 @@ pub mod pallet {
 
             UnderwriteRequests::<T>::insert(request_id, request);
             EscrowBalance::<T>::insert(request_id, total_premium);
-            NextRequestId::<T>::put(request_id + 1);
 
             Self::deposit_event(Event::RequestCreated {
                 request_id,

@@ -27,8 +27,9 @@ use sp_runtime::DispatchError;
 
 use pallet_prmx_orderbook_lp::LpOrderbookApi;
 
-// Re-export PolicyId for external use
-pub type PolicyId = u64;
+// Re-export PolicyId from primitives
+pub use prmx_primitives::PolicyId;
+use prmx_primitives::generate_unique_id;
 
 // =============================================================================
 //                              Traits
@@ -129,7 +130,7 @@ pub struct StubLpOrderbook<AccountId, Balance>(
 
 impl<AccountId, Balance> LpOrderbookApi<AccountId, Balance> for StubLpOrderbook<AccountId, Balance> {
     fn place_dao_lp_ask(
-        _market_id: u64,
+        _policy_id: PolicyId,
         _seller: &AccountId,
         _price_per_share: Balance,
         _quantity: u128,
@@ -284,10 +285,10 @@ pub mod pallet {
     #[pallet::pallet]
     pub struct Pallet<T>(_);
 
-    /// Next policy ID
+    /// Per-account nonce for unique policy ID generation
     #[pallet::storage]
-    #[pallet::getter(fn next_policy_id)]
-    pub type NextPolicyId<T> = StorageValue<_, PolicyId, ValueQuery>;
+    #[pallet::getter(fn account_nonce)]
+    pub type AccountNonce<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, u64, ValueQuery>;
 
     /// Policies by ID
     #[pallet::storage]
@@ -474,7 +475,7 @@ pub mod pallet {
         #[pallet::weight(100_000)]
         pub fn apply_coverage_with_quote(
             origin: OriginFor<T>,
-            quote_id: u64,
+            quote_id: prmx_primitives::QuoteId,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
 
@@ -515,12 +516,14 @@ pub mod pallet {
                 .saturating_sub(premium_per_share_u128);
             let required_capital_per_share: T::Balance = required_capital_per_share_u128.into();
 
-            // Create policy
-            let policy_id = NextPolicyId::<T>::get();
+            // Create policy with hash-based ID
             let now = Self::current_timestamp();
+            let nonce = AccountNonce::<T>::get(&who);
+            let policy_id = generate_unique_id(b"V1V2", &who, now, nonce);
+            AccountNonce::<T>::insert(&who, nonce + 1);
 
-            // Generate policy label using global policy ID (e.g., "manila-1" for policy_id=0)
-            let policy_label = Self::generate_policy_label(req.market_id, policy_id);
+            // Generate policy label using nonce (e.g., "manila-1" for nonce=0)
+            let policy_label = Self::generate_policy_label(req.market_id, nonce);
 
             // Get strike value for V2 policies:
             // - Use custom strike from quote if provided
@@ -585,7 +588,6 @@ pub mod pallet {
 
             // Store policy
             Policies::<T>::insert(policy_id, policy);
-            NextPolicyId::<T>::put(policy_id + 1);
 
             // Add to market index
             PoliciesByMarket::<T>::mutate(req.market_id, |policies| {
@@ -907,9 +909,9 @@ pub mod pallet {
         }
 
         /// Generate a human-readable policy label like "manila-0", "tokyo-1".
-        /// Uses global policy_id directly for consistent 0-indexed numbering.
-        /// e.g., policy_id=0 -> "manila-0", policy_id=3 -> "manila-3"
-        fn generate_policy_label(market_id: MarketId, policy_id: PolicyId) -> BoundedVec<u8, ConstU32<32>> {
+        /// Uses account nonce for consistent numbering per account.
+        /// e.g., nonce=0 -> "manila-0", nonce=3 -> "manila-3"
+        fn generate_policy_label(market_id: MarketId, nonce: u64) -> BoundedVec<u8, ConstU32<32>> {
             // Get market name from MarketsApi
             let market_name_bytes = T::MarketsApi::market_name(market_id)
                 .unwrap_or_else(|_| b"unknown".to_vec());
@@ -918,8 +920,8 @@ pub mod pallet {
             let market_name = core::str::from_utf8(&market_name_bytes)
                 .unwrap_or("unknown");
             
-            // Use global policy_id directly (0-indexed for consistency with Monitor ID)
-            let policy_number = policy_id;
+            // Use nonce for policy numbering
+            let policy_number = nonce;
 
             // Generate label: "manila-1", "tokyo-2", etc.
             let label_string = alloc::format!(
@@ -1140,13 +1142,12 @@ impl<T: Config> pallet_prmx_oracle::PolicySettlement<T::AccountId> for Pallet<T>
     }
     
     fn get_expired_policies(current_time: u64) -> Vec<pallet_prmx_oracle::PolicyId> {
-        let next_id = pallet::NextPolicyId::<T>::get();
-        (0..next_id)
-            .filter(|&policy_id| {
-                if let Some(policy) = pallet::Policies::<T>::get(policy_id) {
-                    policy.status == pallet::PolicyStatus::Active && current_time > policy.coverage_end
+        pallet::Policies::<T>::iter()
+            .filter_map(|(policy_id, policy)| {
+                if policy.status == pallet::PolicyStatus::Active && current_time > policy.coverage_end {
+                    Some(policy_id)
                 } else {
-                    false
+                    None
                 }
             })
             .collect()

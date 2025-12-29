@@ -24,6 +24,7 @@ frame-benchmarking = { git = "https://github.com/paritytech/polkadot-sdk.git", t
 # Local dependencies
 pallet-prmx-markets = { path = "../prmx-markets", default-features = false }
 pallet-prmx-holdings = { path = "../prmx-holdings", default-features = false }
+prmx-primitives = { path = "../../primitives", default-features = false }
 
 [dev-dependencies]
 sp-core = { git = "https://github.com/paritytech/polkadot-sdk.git", tag = "polkadot-stable2506-2" }
@@ -42,6 +43,7 @@ std = [
     "frame-benchmarking?/std",
     "pallet-prmx-markets/std",
     "pallet-prmx-holdings/std",
+    "prmx-primitives/std",
 ]
 runtime-benchmarks = [
     "frame-benchmarking/runtime-benchmarks",

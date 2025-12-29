@@ -55,10 +55,18 @@ export function getAccounts() {
   return accounts;
 }
 
-// DAO account (deterministic zero address)
+// Dedicated DAO account (//DAO) - defined in runtime/src/lib.rs
+// Address: 5EyKeA48QNY6LbD2QeN2JUuArTiyBTDN2BBYoLLCwz9rXdZS
 export function getDaoAddress() {
-  const daoAccountHex = '0x' + '00'.repeat(32);
+  const daoAccountHex = '0x8099b04502498ba2936833a5715a95dbcd367628a4dd4792222b7bcb4aa79959';
   return encodeAddress(daoAccountHex, 42);
+}
+
+// Dedicated Oracle account (//Oracle) - used by offchain-oracle-service
+// Address: 5ERNkbfECLx6hDuTwjVPrXgaGe7hE114d6rFz1d2LxcVFnbB
+export function getOracleAddress() {
+  const oracleAccountHex = '0x683c4ef19d8fec497566bf7c24c5d6e3625edecde19d80c39281e4686961fa74';
+  return encodeAddress(oracleAccountHex, 42);
 }
 
 // Get all LP investor accounts (excluding Alice who is policy holder)

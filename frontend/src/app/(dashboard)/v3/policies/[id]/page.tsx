@@ -508,10 +508,10 @@ export default function V3PolicyDetailPage() {
                     </div>
                   </div>
                   
-                  {/* Progress to trigger (visual) */}
+                  {/* Threshold proximity (visual) */}
                   <div>
                     <div className="flex justify-between text-sm mb-2">
-                      <span className="text-text-secondary">Progress to Trigger</span>
+                      <span className="text-text-secondary">Threshold Proximity</span>
                     </div>
                     <div className="h-4 bg-background-tertiary rounded-full overflow-hidden relative">
                       {/* Calculate progress based on agg state vs threshold */}
@@ -523,7 +523,7 @@ export default function V3PolicyDetailPage() {
                             : 'bg-gradient-to-r from-success via-warning to-error'
                         )}
                         style={{ 
-                          width: `${Math.min(100, getProgressToTrigger(oracleState.aggState, policy.eventSpec.threshold.value))}%` 
+                          width: `${Math.min(100, getThresholdProximity(oracleState.aggState, policy.eventSpec.threshold.value))}%` 
                         }}
                       />
                       <div 
@@ -796,8 +796,8 @@ export default function V3PolicyDetailPage() {
   );
 }
 
-// Helper function to calculate progress to trigger
-function getProgressToTrigger(aggState: V3AggState, threshold: number): number {
+// Helper function to calculate threshold proximity percentage
+function getThresholdProximity(aggState: V3AggState, threshold: number): number {
   // Sentinel values for uninitialized aggregation state
   const I64_MIN_APPROX = -9223372036854775000;
   const I64_MAX_APPROX = 9223372036854775000;

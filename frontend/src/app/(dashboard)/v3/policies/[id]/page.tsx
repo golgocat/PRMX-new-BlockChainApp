@@ -26,7 +26,8 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
 import { useWalletStore } from '@/stores/walletStore';
-import { useV3Policy, useV3OracleState, useV3PolicyLpHolders } from '@/hooks/useV3ChainData';
+import { useV3Policy, useV3OracleState, useV3PolicyLpHolders, useV3Observations } from '@/hooks/useV3ChainData';
+import { WeatherHistoryChart } from '@/components/features/WeatherHistoryChart';
 import { WalletConnectionModal } from '@/components/features/WalletConnectionModal';
 import { 
   V3PolicyStatus,
@@ -170,6 +171,7 @@ export default function V3PolicyDetailPage() {
   const { policy, loading: policyLoading, error, refresh: refreshPolicy } = useV3Policy(policyId);
   const { oracleState, loading: oracleLoading, refresh: refreshOracle } = useV3OracleState(policyId);
   const { holders: lpHolders, loading: holdersLoading, refresh: refreshHolders } = useV3PolicyLpHolders(policyId);
+  const { observations, loading: observationsLoading, refresh: refreshObservations } = useV3Observations(policyId);
   
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -192,7 +194,7 @@ export default function V3PolicyDetailPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([refreshPolicy(), refreshOracle(), refreshHolders()]);
+      await Promise.all([refreshPolicy(), refreshOracle(), refreshHolders(), refreshObservations()]);
     } finally {
       // Ensure animation is visible for at least 500ms
       setTimeout(() => setIsRefreshing(false), 500);
@@ -596,6 +598,19 @@ export default function V3PolicyDetailPage() {
               )}
             </CardContent>
           </Card>
+          
+          {/* Weather History Chart */}
+          {policy && (
+            <WeatherHistoryChart
+              observations={observations}
+              eventType={policy.eventSpec.eventType}
+              threshold={policy.eventSpec.threshold.value}
+              thresholdUnit={policy.eventSpec.threshold.unit}
+              coverageStart={policy.coverageStart}
+              coverageEnd={policy.coverageEnd}
+              loading={observationsLoading}
+            />
+          )}
           
           {/* Settlement Outcome - Only show for settled policies */}
           {(policy.status === 'Triggered' || policy.status === 'Matured' || policy.status === 'Settled') && (

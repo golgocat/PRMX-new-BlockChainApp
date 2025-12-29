@@ -390,6 +390,54 @@ export async function getV3OracleState(policyId: number): Promise<V3OracleState 
 }
 
 // =============================================================================
+// Historical Observations
+// =============================================================================
+
+/**
+ * V3 Observation from oracle service
+ */
+export interface V3Observation {
+  _id: string;
+  policy_id: number;
+  epoch_time: number;
+  location_key: string;
+  event_type: string;
+  fields: {
+    precip_1h_mm_x1000?: number;
+    temp_c_x1000?: number;
+    wind_gust_mps_x1000?: number;
+    precip_type_mask?: number;
+  };
+  sample_hash: string;
+  commitment_after: string;
+  inserted_at: string;
+}
+
+/**
+ * Fetch historical observations for a V3 policy from oracle service
+ */
+export async function getV3Observations(policyId: number): Promise<V3Observation[]> {
+  // Default to localhost for development, can be configured via env var
+  const oracleServiceUrl = process.env.NEXT_PUBLIC_ORACLE_SERVICE_URL || 'http://localhost:3001';
+  
+  try {
+    const response = await fetch(`${oracleServiceUrl}/ingest/observations/${policyId}`);
+    if (!response.ok) {
+      if (response.status === 404) {
+        return []; // No observations yet
+      }
+      throw new Error(`Failed to fetch observations: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.success ? data.data : [];
+  } catch (error) {
+    console.error('Error fetching V3 observations:', error);
+    return []; // Return empty array on error
+  }
+}
+
+// =============================================================================
 // LP Holdings
 // =============================================================================
 

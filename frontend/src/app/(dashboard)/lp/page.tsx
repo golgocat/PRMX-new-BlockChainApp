@@ -304,20 +304,11 @@ export default function LpTradingPage() {
     try {
       await api.placeLpAsk(keypair, selectedPolicy.id, BigInt(quantity), BigInt(priceUsdt));
       
-      // Record sell order placement in trade history
-      const market = getMarketById(selectedPolicy.marketId);
-      addTrade({
-        type: 'sell',
-        policyId: selectedPolicy.id,
-        marketName: market?.name || `Market ${selectedPolicy.marketId}`,
-        shares: quantity,
-        pricePerShare: parseFloat(sellPrice),
-        totalAmount: quantity * parseFloat(sellPrice),
-        timestamp: Date.now(),
-        counterparty: 'Order placed',
-      });
+      // Note: We don't add to trade history here because placing an order is not a trade.
+      // Trade history only records actual trades (when orders are filled).
+      // The order will appear in the orderbook until someone fills it.
       
-      toast.success('Sell order placed successfully!');
+      toast.success('Sell order listed on orderbook!');
       setShowSellModal(false);
       handleRefresh();
     } catch (err) {

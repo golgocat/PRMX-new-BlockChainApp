@@ -14,6 +14,7 @@ import type {
   V3OracleState, 
   V3LpHolding 
 } from '@/types/v3';
+import type { V3Observation } from '@/lib/api-v3';
 
 // Polling intervals
 const DEFAULT_POLL_INTERVAL = 15000; // 15 seconds
@@ -472,6 +473,46 @@ export function useV3OracleState(policyId: number | null, pollInterval: number =
   }, [isChainConnected, policyId, pollInterval, refresh]);
 
   return { oracleState, loading, error, refresh: () => refresh(false) };
+}
+
+// =============================================================================
+// Historical Observations Hook
+// =============================================================================
+
+/**
+ * Hook to fetch historical observations for a V3 policy
+ */
+export function useV3Observations(policyId: number | null) {
+  const { isChainConnected } = useWalletStore();
+  const [observations, setObservations] = useState<V3Observation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!isChainConnected || policyId === null) {
+      setObservations([]);
+      setLoading(false);
+      return;
+    }
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const data = await apiV3.getV3Observations(policyId);
+      setObservations(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch observations');
+    } finally {
+      setLoading(false);
+    }
+  }, [isChainConnected, policyId]);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
+  return { observations, loading, error, refresh };
 }
 
 // =============================================================================

@@ -579,14 +579,14 @@ export default function LpTradingPage() {
             ) : (
               <div className="rounded-xl border border-border-secondary bg-background-secondary dark:bg-background-tertiary/30 overflow-hidden">
                 {/* List Header */}
-                <div className="hidden lg:grid lg:grid-cols-16 gap-3 px-4 py-3 bg-background-tertiary/50 dark:bg-background-tertiary/20 border-b border-border-secondary text-xs font-medium text-text-tertiary uppercase tracking-wider">
-                  <div className="col-span-3">Policy</div>
-                  <div className="col-span-2 text-center">Shares</div>
-                  <div className="col-span-2 text-center">Max Payout</div>
-                  <div className="col-span-2 text-center">Coverage Start</div>
-                  <div className="col-span-2 text-center">Coverage End</div>
-                  <div className="col-span-2 text-center">DeFi</div>
-                  <div className="col-span-3 text-center">Status</div>
+                <div className="hidden lg:flex items-center gap-4 px-4 py-3 bg-background-tertiary/50 dark:bg-background-tertiary/20 border-b border-border-secondary text-xs font-medium text-text-tertiary uppercase tracking-wider">
+                  <div className="w-[200px] flex-shrink-0">Policy</div>
+                  <div className="w-[80px] text-center flex-shrink-0">Shares</div>
+                  <div className="w-[100px] text-center flex-shrink-0">Max Payout</div>
+                  <div className="w-[100px] text-center flex-shrink-0">Start</div>
+                  <div className="w-[100px] text-center flex-shrink-0">End</div>
+                  <div className="w-[100px] text-center flex-shrink-0">DeFi</div>
+                  <div className="flex-1 text-center">Status</div>
                 </div>
                 
                 {/* List Items */}
@@ -615,9 +615,9 @@ export default function LpTradingPage() {
                         className="group cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] px-4 py-4"
                       >
                         {/* Desktop Layout */}
-                        <div className="hidden lg:grid lg:grid-cols-16 gap-3 items-center">
+                        <div className="hidden lg:flex items-center gap-4">
                           {/* Policy Info */}
-                          <div className="col-span-3 flex items-center gap-3">
+                          <div className="w-[200px] flex-shrink-0 flex items-center gap-3">
                             <div className="relative">
                               <div 
                                 className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-mono text-xs font-bold shadow-sm"
@@ -657,19 +657,19 @@ export default function LpTradingPage() {
                           </div>
                           
                           {/* Shares */}
-                          <div className="col-span-2 text-center">
+                          <div className="w-[80px] flex-shrink-0 text-center">
                             <p className="text-base font-bold text-text-primary">{holding.shares.toString()}</p>
                             <p className="text-xs text-text-tertiary">{ownershipPct}%</p>
                           </div>
                           
                           {/* Max Payout */}
-                          <div className="col-span-2 text-center">
+                          <div className="w-[100px] flex-shrink-0 text-center">
                             <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
                             <p className="text-xs text-text-tertiary">if no event</p>
                           </div>
                           
                           {/* Coverage Start */}
-                          <div className="col-span-2 text-center">
+                          <div className="w-[100px] flex-shrink-0 text-center">
                             <p className="text-sm font-medium text-text-primary">
                               {policy?.coverageStart ? new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                             </p>
@@ -679,7 +679,7 @@ export default function LpTradingPage() {
                           </div>
                           
                           {/* Coverage End */}
-                          <div className="col-span-2 text-center">
+                          <div className="w-[100px] flex-shrink-0 text-center">
                             <p className="text-sm font-medium text-text-primary">
                               {policy?.coverageEnd ? new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
                             </p>
@@ -689,7 +689,7 @@ export default function LpTradingPage() {
                           </div>
                           
                           {/* DeFi */}
-                          <div className="col-span-2 text-center">
+                          <div className="w-[100px] flex-shrink-0 text-center">
                             {defiInfo?.isAllocatedToDefi && defiInfo.position ? (
                               <>
                                 <p className="text-base font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
@@ -701,7 +701,7 @@ export default function LpTradingPage() {
                           </div>
                           
                           {/* Status */}
-                          <div className="col-span-3 flex items-center justify-center gap-2">
+                          <div className="flex-1 flex items-center justify-center gap-2">
                             <span className={cn(
                               "px-2.5 py-1 rounded-full text-xs font-medium",
                               isEnded 

@@ -577,38 +577,48 @@ export default function LpTradingPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {holdings.filter(h => h.shares > 0).map((holding, index) => {
-                  const policyVersionHint = (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined;
-                  const policy = getPolicyForHolding(holding.policyId, holding.shares, selectedAccount?.address, policyVersionHint);
-                  const market = policy ? getMarketById(policy.marketId) : null;
-                  const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
-                  const potentialPayout = holding.shares * (market?.payoutPerShare || BigInt(100_000_000));
-                  const defiInfo = policyDefiInfoMap.get(holding.policyId);
-                  const isExpiringSoon = daysRemaining <= 3 && daysRemaining > 0;
-                  const isEnded = daysRemaining <= 0;
-                  const totalShares = policy?.capitalPool?.totalShares || Number(holding.shares);
-                  const ownershipPct = (Number(holding.shares) / totalShares * 100).toFixed(1);
-                  
-                  // Format short policy ID
-                  const shortId = typeof holding.policyId === 'string' && holding.policyId.startsWith('0x') 
-                    ? holding.policyId.slice(2, 10) 
-                    : String(holding.policyId).slice(0, 8);
-                  
-                  return (
-                    <Card
-                      key={index}
-                      onClick={() => handleOpenHoldingModal(holding.policyId)}
-                      className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:border-prmx-cyan/30 dark:hover:border-prmx-cyan/20"
-                    >
-                      <CardContent className="p-5">
-                        {/* Header: Identity + Status */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            {/* Dynamic gradient avatar */}
+              <div className="rounded-xl border border-border-secondary bg-background-secondary dark:bg-background-tertiary/30 overflow-hidden">
+                {/* List Header */}
+                <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-3 bg-background-tertiary/50 dark:bg-background-tertiary/20 border-b border-border-secondary text-xs font-medium text-text-tertiary uppercase tracking-wider">
+                  <div className="col-span-4">Policy</div>
+                  <div className="col-span-2 text-center">Shares</div>
+                  <div className="col-span-2 text-center">Max Payout</div>
+                  <div className="col-span-2 text-center">DeFi</div>
+                  <div className="col-span-2 text-center">Status</div>
+                </div>
+                
+                {/* List Items */}
+                <div className="divide-y divide-border-secondary">
+                  {holdings.filter(h => h.shares > 0).map((holding, index) => {
+                    const policyVersionHint = (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined;
+                    const policy = getPolicyForHolding(holding.policyId, holding.shares, selectedAccount?.address, policyVersionHint);
+                    const market = policy ? getMarketById(policy.marketId) : null;
+                    const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
+                    const potentialPayout = holding.shares * (market?.payoutPerShare || BigInt(100_000_000));
+                    const defiInfo = policyDefiInfoMap.get(holding.policyId);
+                    const isExpiringSoon = daysRemaining <= 3 && daysRemaining > 0;
+                    const isEnded = daysRemaining <= 0;
+                    const totalShares = policy?.capitalPool?.totalShares || Number(holding.shares);
+                    const ownershipPct = (Number(holding.shares) / totalShares * 100).toFixed(1);
+                    
+                    // Format short policy ID
+                    const shortId = typeof holding.policyId === 'string' && holding.policyId.startsWith('0x') 
+                      ? holding.policyId.slice(2, 10) 
+                      : String(holding.policyId).slice(0, 8);
+                    
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => handleOpenHoldingModal(holding.policyId)}
+                        className="group cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] px-4 py-4"
+                      >
+                        {/* Desktop Layout */}
+                        <div className="hidden md:grid md:grid-cols-12 gap-4 items-center">
+                          {/* Policy Info */}
+                          <div className="col-span-4 flex items-center gap-3">
                             <div className="relative">
                               <div 
-                                className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-mono text-sm font-bold shadow-lg"
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-mono text-xs font-bold shadow-sm"
                                 style={{
                                   background: `linear-gradient(135deg, 
                                     hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
@@ -618,17 +628,16 @@ export default function LpTradingPage() {
                                 {shortId.slice(0, 4)}
                               </div>
                               {defiInfo?.isAllocatedToDefi && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-background-secondary flex items-center justify-center">
-                                  <TrendingUp className="w-3 h-3 text-white" />
+                                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white dark:border-background-secondary flex items-center justify-center">
+                                  <TrendingUp className="w-2 h-2 text-white" />
                                 </div>
                               )}
                             </div>
-                            
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <span className="font-mono text-base font-semibold text-text-primary">{shortId}...</span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-sm font-medium text-text-primary">{shortId}...</span>
                                 <span className={cn(
-                                  "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
+                                  "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
                                   policy?.policyVersion === 'V3' 
                                     ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
                                     : policy?.policyVersion === 'V2' 
@@ -638,66 +647,114 @@ export default function LpTradingPage() {
                                   {policy?.policyVersion || 'V1'}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 text-text-tertiary" />
-                                <span className="text-sm text-text-secondary">{market?.name || policy?.locationName || 'Unknown'}</span>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <MapPin className="w-3 h-3 text-text-tertiary flex-shrink-0" />
+                                <span className="text-xs text-text-tertiary truncate">{market?.name || policy?.locationName || 'Unknown'}</span>
                               </div>
                             </div>
                           </div>
                           
-                          {/* Time remaining badge */}
-                          <div className={cn(
-                            "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5",
-                            isEnded 
-                              ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400" 
-                              : isExpiringSoon 
-                                ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" 
-                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
-                          )}>
-                            <Clock className="w-3.5 h-3.5" />
-                            {isEnded ? 'Ended' : `${daysRemaining}d left`}
+                          {/* Shares */}
+                          <div className="col-span-2 text-center">
+                            <p className="text-lg font-bold text-text-primary">{holding.shares.toString()}</p>
+                            <p className="text-xs text-text-tertiary">{ownershipPct}%</p>
                           </div>
-                        </div>
-                        
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-3 gap-3 pt-4 border-t border-border-secondary">
-                          <div className="text-center">
-                            <p className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1">Shares</p>
-                            <p className="text-xl font-bold text-text-primary">{holding.shares.toString()}</p>
-                            <p className="text-xs text-text-tertiary">{ownershipPct}% owned</p>
-                          </div>
-                          <div className="text-center">
-                            <p className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1">Max Payout</p>
-                            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
+                          
+                          {/* Max Payout */}
+                          <div className="col-span-2 text-center">
+                            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
                             <p className="text-xs text-text-tertiary">if no event</p>
                           </div>
-                          <div className="text-center">
-                            <p className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1">
-                              {defiInfo?.isAllocatedToDefi ? 'In DeFi' : 'Status'}
-                            </p>
+                          
+                          {/* DeFi */}
+                          <div className="col-span-2 text-center">
                             {defiInfo?.isAllocatedToDefi && defiInfo.position ? (
                               <>
-                                <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
-                                <p className="text-xs text-purple-600/60 dark:text-purple-400/60">earning yield</p>
+                                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
+                                <p className="text-xs text-purple-500/70">earning</p>
                               </>
                             ) : (
-                              <>
-                                <p className="text-xl font-bold text-text-secondary">{policy?.status || 'Active'}</p>
-                                <p className="text-xs text-text-tertiary">in pool</p>
-                              </>
+                              <span className="text-sm text-text-tertiary">—</span>
                             )}
+                          </div>
+                          
+                          {/* Status */}
+                          <div className="col-span-2 flex items-center justify-center gap-2">
+                            <span className={cn(
+                              "px-2.5 py-1 rounded-full text-xs font-medium",
+                              isEnded 
+                                ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400" 
+                                : isExpiringSoon 
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" 
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                            )}>
+                              {isEnded ? 'Ended' : `${daysRemaining}d left`}
+                            </span>
+                            <ChevronRight className="w-4 h-4 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-0.5 transition-all" />
                           </div>
                         </div>
                         
-                        {/* Click hint */}
-                        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-text-tertiary group-hover:text-prmx-cyan transition-colors">
-                          <span>View details</span>
-                          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                        {/* Mobile Layout */}
+                        <div className="md:hidden">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-mono text-xs font-bold"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
+                                }}
+                              >
+                                {shortId.slice(0, 4)}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm font-medium">{shortId}...</span>
+                                  <span className={cn(
+                                    "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                                    policy?.policyVersion === 'V3' 
+                                      ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
+                                      : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                                  )}>
+                                    {policy?.policyVersion || 'V1'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-text-tertiary">{market?.name || policy?.locationName || 'Unknown'}</p>
+                              </div>
+                            </div>
+                            <span className={cn(
+                              "px-2 py-1 rounded-full text-xs font-medium",
+                              isEnded 
+                                ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400" 
+                                : isExpiringSoon 
+                                  ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" 
+                                  : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                            )}>
+                              {isEnded ? 'Ended' : `${daysRemaining}d`}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            <div>
+                              <p className="text-xs text-text-tertiary">Shares</p>
+                              <p className="font-bold">{holding.shares.toString()}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-text-tertiary">Payout</p>
+                              <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-text-tertiary">DeFi</p>
+                              <p className="font-bold text-purple-600 dark:text-purple-400">
+                                {defiInfo?.isAllocatedToDefi ? formatUSDT(defiInfo.position?.principalUsdt || BigInt(0)) : '—'}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>

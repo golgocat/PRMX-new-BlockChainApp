@@ -97,9 +97,11 @@ export function ServiceStatusGrid({ services }: ServiceStatusGridProps) {
         service={services.oracle_v3}
         icon={Activity}
         metric={
-          services.oracle_v3.snapshots_24h !== undefined || services.oracle_v3.observations_24h !== undefined
-            ? `${services.oracle_v3.snapshots_24h || 0} snapshots, ${services.oracle_v3.observations_24h || 0} obs (24h)`
-            : undefined
+          services.oracle_v3.policies_monitored !== undefined
+            ? `${services.oracle_v3.policies_monitored} policies, ${services.oracle_v3.snapshots_24h || 0} snaps, ${services.oracle_v3.observations_24h || 0} obs`
+            : services.oracle_v3.snapshots_24h !== undefined || services.oracle_v3.observations_24h !== undefined
+              ? `${services.oracle_v3.snapshots_24h || 0} snapshots, ${services.oracle_v3.observations_24h || 0} obs`
+              : undefined
         }
       />
       <ServiceCard

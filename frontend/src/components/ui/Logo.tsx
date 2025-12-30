@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { useThemeStore } from '@/stores/themeStore';
 
@@ -9,93 +10,28 @@ interface LogoProps {
   className?: string;
 }
 
-export function Logo({ size = 'md', showText = true, className }: LogoProps) {
+export function Logo({ size = 'md', showText = false, className }: LogoProps) {
   const { theme } = useThemeStore();
-  const sizeClasses = {
-    sm: 'w-8 h-8',
-    md: 'w-10 h-10',
-    lg: 'w-14 h-14',
-    xl: 'w-20 h-20',
+  
+  const sizeConfig = {
+    sm: { width: 100, height: 30, heightClass: 'h-7' },
+    md: { width: 140, height: 42, heightClass: 'h-10' },
+    lg: { width: 180, height: 54, heightClass: 'h-14' },
+    xl: { width: 220, height: 66, heightClass: 'h-16' },
   };
 
-  const textSizeClasses = {
-    sm: 'text-lg',
-    md: 'text-xl',
-    lg: 'text-2xl',
-    xl: 'text-4xl',
-  };
+  const logoSrc = theme === 'light' ? '/logo_black.png' : '/logo_white.png';
 
   return (
-    <div className={cn('flex items-center gap-3', className)}>
-      {/* Hexagonal Logo Icon */}
-      <div className={cn('relative', sizeClasses[size])}>
-        <svg
-          viewBox="0 0 100 100"
-          className="w-full h-full"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            {/* Gradient definitions matching the brand */}
-            <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#00E5FF" />
-              <stop offset="50%" stopColor="#2196F3" />
-              <stop offset="100%" stopColor="#9C27B0" />
-            </linearGradient>
-            <linearGradient id="grad2" x1="100%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#E040FB" />
-              <stop offset="50%" stopColor="#9C27B0" />
-              <stop offset="100%" stopColor="#2196F3" />
-            </linearGradient>
-            <linearGradient id="grad3" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#00E5FF" />
-              <stop offset="50%" stopColor="#5EFEEC" />
-              <stop offset="100%" stopColor="#2196F3" />
-            </linearGradient>
-            <linearGradient id="grad4" x1="50%" y1="0%" x2="50%" y2="100%">
-              <stop offset="0%" stopColor="#BA68C8" />
-              <stop offset="100%" stopColor="#E040FB" />
-            </linearGradient>
-          </defs>
-
-          {/* Outer hexagon shape - left panel */}
-          <path
-            d="M15 35 L50 15 L50 50 L15 35 Z"
-            fill="url(#grad1)"
-            opacity="0.9"
-          />
-          {/* Top right panel */}
-          <path
-            d="M50 15 L85 35 L50 50 L50 15 Z"
-            fill="url(#grad4)"
-            opacity="0.9"
-          />
-          {/* Bottom right panel */}
-          <path
-            d="M85 35 L85 65 L50 85 L50 50 L85 35 Z"
-            fill="url(#grad2)"
-            opacity="0.9"
-          />
-          {/* Bottom left panel */}
-          <path
-            d="M15 65 L50 85 L50 50 L15 35 L15 65 Z"
-            fill="url(#grad3)"
-            opacity="0.9"
-          />
-          
-          {/* Inner hexagon cutout (theme-aware) */}
-          <path
-            d="M35 42 L50 33 L65 42 L65 58 L50 67 L35 58 Z"
-            fill={theme === 'light' ? '#f1f8ff' : '#0A0E17'}
-          />
-        </svg>
-      </div>
-
-      {/* Brand Text */}
-      {showText && (
-        <span className={cn('font-bold tracking-tight', textSizeClasses[size])}>
-          PRMX
-        </span>
-      )}
+    <div className={cn('flex items-center', className)}>
+      <Image 
+        src={logoSrc}
+        alt="PRMX" 
+        width={sizeConfig[size].width}
+        height={sizeConfig[size].height}
+        className={cn(sizeConfig[size].heightClass, 'w-auto object-contain')}
+        priority
+      />
     </div>
   );
 }

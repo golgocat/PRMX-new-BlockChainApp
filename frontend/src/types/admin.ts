@@ -18,6 +18,7 @@ export interface OracleV2Health extends ServiceHealth {
 export interface OracleV3Health extends ServiceHealth {
   observations_24h?: number;
   snapshots_24h?: number;
+  policies_monitored?: number;
 }
 
 export interface OcwHealthData {

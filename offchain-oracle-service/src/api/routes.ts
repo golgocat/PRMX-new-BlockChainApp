@@ -953,40 +953,80 @@ export function setupRoutes(app: Application): void {
       chain: { status: 'offline', last_check: now },
     };
 
-    // Check Oracle V2 (monitoring service)
+    // Check Oracle V2 (monitoring service + on-chain policies)
     try {
       const monitors = getMonitors();
-      const monitoringCount = await monitors.countDocuments({ state: 'monitoring' });
+      const dbMonitoringCount = await monitors.countDocuments({ state: 'monitoring' });
+      
+      // Also check on-chain V1/V2 policies
+      let onChainV2Count = 0;
+      try {
+        const chainApi = getApi();
+        const v2Policies = await chainApi.query.prmxPolicy.policies.entries();
+        // Count active (non-settled) policies
+        onChainV2Count = v2Policies.filter(([_, value]) => {
+          const policy = (value as any).toJSON();
+          return policy.status === 'Active';
+        }).length;
+      } catch (e) {
+        console.error('Error fetching on-chain V2 policies:', e);
+      }
+      
       services.oracle_v2 = {
         status: 'online',
         last_check: now,
-        policies_monitored: monitoringCount,
+        policies_monitored: Math.max(dbMonitoringCount, onChainV2Count),
       };
     } catch (error) {
       console.error('Oracle V2 health check failed:', error);
       services.oracle_v2.status = 'offline';
     }
 
-    // Check Oracle V3 (ingest service)
+    // Check Oracle V3 (on-chain policies and oracle states)
     try {
-      const observations = getObservationsV3();
-      const snapshots = getSnapshotsV3();
+      const chainApi = getApi();
       
-      const [obsCount24h, snapCount24h] = await Promise.all([
-        observations.countDocuments({
-          inserted_at: { $gte: new Date(oneDayAgo) }
-        }),
-        snapshots.countDocuments({
-          inserted_at: { $gte: new Date(oneDayAgo) }
-        }),
+      // Query on-chain V3 policies and oracle states
+      const [v3Policies, v3OracleStates] = await Promise.all([
+        chainApi.query.prmxPolicyV3.policies.entries(),
+        chainApi.query.prmxOracleV3.oracleStates.entries(),
       ]);
+      
+      // Count active V3 policies
+      const activeV3Policies = v3Policies.filter(([_, value]) => {
+        const policy = (value as any).toJSON();
+        return policy.status === 'Active';
+      }).length;
+      
+      // Count policies with snapshots (lastSnapshotBlock > 0)
+      let snapshotCount = 0;
+      const oneDayAgoBlock = Math.max(0, (await chainApi.rpc.chain.getHeader()).number.toNumber() - 14400); // ~24h at 6s blocks
+      
+      for (const [_, value] of v3OracleStates) {
+        const state = (value as any).toJSON();
+        if (state.lastSnapshotBlock && state.lastSnapshotBlock > 0) {
+          snapshotCount++;
+        }
+      }
+      
+      // Also get DB observation count for completeness
+      let obsCount24h = 0;
+      try {
+        const observations = getObservationsV3();
+        obsCount24h = await observations.countDocuments({
+          inserted_at: { $gte: new Date(oneDayAgo) }
+        });
+      } catch (e) {
+        console.error('Error counting observations:', e);
+      }
 
       services.oracle_v3 = {
         status: 'online',
         last_check: now,
         observations_24h: obsCount24h,
-        snapshots_24h: snapCount24h,
-      };
+        snapshots_24h: snapshotCount,
+        policies_monitored: activeV3Policies,
+      } as any;
     } catch (error) {
       console.error('Oracle V3 health check failed:', error);
       services.oracle_v3.status = 'offline';
@@ -1030,14 +1070,12 @@ export function setupRoutes(app: Application): void {
     let lastSuccessfulOperation = 0;
 
     try {
-      // Count active V2 monitors
-      const monitors = getMonitors();
-      const v2Active = await monitors.countDocuments({ state: 'monitoring' });
+      // Use on-chain policy counts from the services checks above
+      const v2Monitored = services.oracle_v2.policies_monitored || 0;
+      const v3Monitored = (services.oracle_v3 as any).policies_monitored || 0;
       
-      // Count active V3 policies (we need to query chain for this, but for now use snapshot count as proxy)
-      // In a full implementation, we'd query the chain, but for health check we'll use available data
-      
-      policiesMonitored = v2Active; // Will be enhanced when we can query V3 policies from chain
+      // Total policies monitored = V2 + V3
+      policiesMonitored = v2Monitored + v3Monitored;
 
       snapshotsLast24h = services.oracle_v3.snapshots_24h || 0;
       observationsLast24h = services.oracle_v3.observations_24h || 0;

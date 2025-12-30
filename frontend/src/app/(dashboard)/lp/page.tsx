@@ -95,8 +95,8 @@ export default function LpTradingPage() {
   const { outcomes, loading: outcomesLoading, refresh: refreshOutcomes } = useLpPositionOutcomes();
   const [showWalletModal, setShowWalletModal] = useState(false);
   
-  // Active tab state
-  const [activeTab, setActiveTab] = useState<'orderbook' | 'history'>('orderbook');
+  // Active tab state - Portfolio is default
+  const [activeTab, setActiveTab] = useState<'portfolio' | 'orderbook' | 'history'>('portfolio');
 
   // Format V3 policy to compatible structure
   const formatV3Policy = (v3Policy: typeof v3Policies[0]) => ({
@@ -493,8 +493,13 @@ export default function LpTradingPage() {
       </div>
 
       {/* Tabs Navigation */}
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'orderbook' | 'history')}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'portfolio' | 'orderbook' | 'history')}>
         <TabsList className="mb-6">
+          <TabsTrigger value="portfolio">
+            <Wallet className="w-4 h-4 mr-2" />
+            My Portfolio
+            <Badge variant="purple" className="ml-2">{holdings.filter(h => h.shares > 0).length}</Badge>
+          </TabsTrigger>
           <TabsTrigger value="orderbook">
             <TrendingUp className="w-4 h-4 mr-2" />
             Orderbook
@@ -503,16 +508,203 @@ export default function LpTradingPage() {
           <TabsTrigger value="history">
             <History className="w-4 h-4 mr-2" />
             History
-            <Badge variant={trades.length > 0 ? "purple" : "default"} className="ml-2">{trades.length}</Badge>
+            <Badge variant={trades.length > 0 ? "default" : "default"} className="ml-2">{trades.length}</Badge>
           </TabsTrigger>
         </TabsList>
 
+        {/* Portfolio Tab (Default) */}
+        <TabsContent value="portfolio">
+          <div className="space-y-6">
+            {/* Portfolio Header */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 dark:from-emerald-500/20 dark:to-cyan-500/20 flex items-center justify-center backdrop-blur-sm border border-emerald-500/30 dark:border-emerald-500/20">
+                  <Wallet className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-text-primary">My LP Holdings</h2>
+                  <p className="text-sm text-text-secondary">
+                    {holdings.filter(h => h.shares > 0).length} position{holdings.filter(h => h.shares > 0).length !== 1 ? 's' : ''} in your portfolio
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-text-tertiary uppercase tracking-wider">USDT Balance</p>
+                <p className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-cyan-600 dark:from-emerald-400 dark:to-cyan-400 bg-clip-text text-transparent">
+                  {usdtFormatted}
+                </p>
+              </div>
+            </div>
+
+            {/* Solvency Warning */}
+            {solvencyInfo && !solvencyInfo.isSolvent && holdings.filter(h => h.shares > 0).length > 0 && (
+              <div className="px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <p className="text-sm text-amber-800 dark:text-amber-200/80">
+                    <span className="font-medium text-amber-700 dark:text-amber-300">Solvency alert:</span> DAO coverage may be limited. Consider reducing exposure.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Holdings Grid */}
+            {holdingsLoading ? (
+              <div className="flex items-center justify-center py-24">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full border-3 border-emerald-200 dark:border-emerald-500/20 border-t-emerald-500 dark:border-t-emerald-400 animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-500/20 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            ) : holdings.filter(h => h.shares > 0).length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="text-center py-16">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center border border-slate-200 dark:border-white/5">
+                    <Wallet className="w-10 h-10 text-slate-400 dark:text-slate-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-text-primary mb-2">No LP Holdings Yet</h3>
+                  <p className="text-text-secondary mb-6 max-w-md mx-auto">
+                    Start earning from policy premiums by purchasing LP tokens from the orderbook.
+                  </p>
+                  <Button onClick={() => setActiveTab('orderbook')}>
+                    <TrendingUp className="w-4 h-4 mr-2" />
+                    Browse Orderbook
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {holdings.filter(h => h.shares > 0).map((holding, index) => {
+                  const policyVersionHint = (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined;
+                  const policy = getPolicyForHolding(holding.policyId, holding.shares, selectedAccount?.address, policyVersionHint);
+                  const market = policy ? getMarketById(policy.marketId) : null;
+                  const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
+                  const potentialPayout = holding.shares * (market?.payoutPerShare || BigInt(100_000_000));
+                  const defiInfo = policyDefiInfoMap.get(holding.policyId);
+                  const isExpiringSoon = daysRemaining <= 3 && daysRemaining > 0;
+                  const isEnded = daysRemaining <= 0;
+                  const totalShares = policy?.capitalPool?.totalShares || Number(holding.shares);
+                  const ownershipPct = (Number(holding.shares) / totalShares * 100).toFixed(1);
+                  
+                  // Format short policy ID
+                  const shortId = typeof holding.policyId === 'string' && holding.policyId.startsWith('0x') 
+                    ? holding.policyId.slice(2, 10) 
+                    : String(holding.policyId).slice(0, 8);
+                  
+                  return (
+                    <Card
+                      key={index}
+                      onClick={() => handleOpenHoldingModal(holding.policyId)}
+                      className="group cursor-pointer transition-all duration-300 hover:shadow-lg hover:border-prmx-cyan/30 dark:hover:border-prmx-cyan/20"
+                    >
+                      <CardContent className="p-5">
+                        {/* Header: Identity + Status */}
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            {/* Dynamic gradient avatar */}
+                            <div className="relative">
+                              <div 
+                                className="w-14 h-14 rounded-xl flex items-center justify-center text-white font-mono text-sm font-bold shadow-lg"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
+                                }}
+                              >
+                                {shortId.slice(0, 4)}
+                              </div>
+                              {defiInfo?.isAllocatedToDefi && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-white dark:border-background-secondary flex items-center justify-center">
+                                  <TrendingUp className="w-3 h-3 text-white" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-mono text-base font-semibold text-text-primary">{shortId}...</span>
+                                <span className={cn(
+                                  "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
+                                  policy?.policyVersion === 'V3' 
+                                    ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
+                                    : policy?.policyVersion === 'V2' 
+                                      ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" 
+                                      : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                                )}>
+                                  {policy?.policyVersion || 'V1'}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-text-tertiary" />
+                                <span className="text-sm text-text-secondary">{market?.name || policy?.locationName || 'Unknown'}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Time remaining badge */}
+                          <div className={cn(
+                            "px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5",
+                            isEnded 
+                              ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400" 
+                              : isExpiringSoon 
+                                ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" 
+                                : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
+                          )}>
+                            <Clock className="w-3.5 h-3.5" />
+                            {isEnded ? 'Ended' : `${daysRemaining}d left`}
+                          </div>
+                        </div>
+                        
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-3 gap-3 pt-4 border-t border-border-secondary">
+                          <div className="text-center">
+                            <p className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1">Shares</p>
+                            <p className="text-xl font-bold text-text-primary">{holding.shares.toString()}</p>
+                            <p className="text-xs text-text-tertiary">{ownershipPct}% owned</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1">Max Payout</p>
+                            <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
+                            <p className="text-xs text-text-tertiary">if no event</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[10px] uppercase tracking-wider text-text-tertiary mb-1">
+                              {defiInfo?.isAllocatedToDefi ? 'In DeFi' : 'Status'}
+                            </p>
+                            {defiInfo?.isAllocatedToDefi && defiInfo.position ? (
+                              <>
+                                <p className="text-xl font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
+                                <p className="text-xs text-purple-600/60 dark:text-purple-400/60">earning yield</p>
+                              </>
+                            ) : (
+                              <>
+                                <p className="text-xl font-bold text-text-secondary">{policy?.status || 'Active'}</p>
+                                <p className="text-xs text-text-tertiary">in pool</p>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Click hint */}
+                        <div className="mt-4 flex items-center justify-center gap-2 text-xs text-text-tertiary group-hover:text-prmx-cyan transition-colors">
+                          <span>View details</span>
+                          <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
         {/* Orderbook Tab */}
         <TabsContent value="orderbook">
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Orderbook */}
-        <div className="lg:col-span-2">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between mb-3">
@@ -789,193 +981,6 @@ export default function LpTradingPage() {
               )}
             </CardContent>
           </Card>
-        </div>
-
-        {/* My LP Holdings & Actions - Theme-aware */}
-        <div className="space-y-4">
-          {/* Holdings Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 dark:from-emerald-500/20 dark:to-cyan-500/20 flex items-center justify-center backdrop-blur-sm border border-emerald-500/30 dark:border-emerald-500/20">
-                <Wallet className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg text-text-primary">My Portfolio</h3>
-                <p className="text-xs text-text-tertiary">
-                  {holdings.filter(h => h.shares > 0).length} position{holdings.filter(h => h.shares > 0).length !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-text-tertiary uppercase tracking-wider">Balance</p>
-              <p className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-cyan-600 dark:from-emerald-400 dark:to-cyan-400 bg-clip-text text-transparent">
-                {usdtFormatted}
-              </p>
-            </div>
-          </div>
-          
-          {/* Holdings Container */}
-          <div className="relative">
-            <div className="relative rounded-2xl border border-border-secondary bg-background-secondary dark:bg-background-tertiary/50 overflow-hidden shadow-sm">
-              {/* Solvency Warning */}
-              {solvencyInfo && !solvencyInfo.isSolvent && holdings.filter(h => h.shares > 0).length > 0 && (
-                <div className="px-4 py-3 bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/20">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <p className="text-xs text-amber-800 dark:text-amber-200/80">
-                      <span className="font-medium text-amber-700 dark:text-amber-300">Solvency alert:</span> DAO coverage may be limited
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {holdingsLoading ? (
-                <div className="flex items-center justify-center py-16">
-                  <div className="relative">
-                    <div className="w-12 h-12 rounded-full border-2 border-emerald-200 dark:border-emerald-500/20 border-t-emerald-500 dark:border-t-emerald-400 animate-spin" />
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/20 animate-pulse" />
-                    </div>
-                  </div>
-                </div>
-              ) : holdings.filter(h => h.shares > 0).length === 0 ? (
-                <div className="text-center py-16 px-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center border border-slate-200 dark:border-white/5">
-                    <Wallet className="w-8 h-8 text-slate-400 dark:text-slate-500" />
-                  </div>
-                  <p className="text-text-secondary font-medium">No holdings yet</p>
-                  <p className="text-xs text-text-tertiary mt-1 max-w-[200px] mx-auto">
-                    Fill orders from the orderbook to start earning
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-y divide-border-secondary">
-                  {holdings.filter(h => h.shares > 0).map((holding, index) => {
-                    const policyVersionHint = (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined;
-                    const policy = getPolicyForHolding(holding.policyId, holding.shares, selectedAccount?.address, policyVersionHint);
-                    const market = policy ? getMarketById(policy.marketId) : null;
-                    const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
-                    const potentialPayout = holding.shares * (market?.payoutPerShare || BigInt(100_000_000));
-                    const defiInfo = policyDefiInfoMap.get(holding.policyId);
-                    const isExpiringSoon = daysRemaining <= 3 && daysRemaining > 0;
-                    const isEnded = daysRemaining <= 0;
-                    const totalShares = policy?.capitalPool?.totalShares || Number(holding.shares);
-                    const ownershipPct = (Number(holding.shares) / totalShares * 100).toFixed(1);
-                    
-                    // Format short policy ID
-                    const shortId = typeof holding.policyId === 'string' && holding.policyId.startsWith('0x') 
-                      ? holding.policyId.slice(2, 10) 
-                      : String(holding.policyId).slice(0, 8);
-                    
-                    return (
-                      <div
-                        key={index}
-                        onClick={() => handleOpenHoldingModal(holding.policyId)}
-                        className="group cursor-pointer transition-all duration-300 hover:bg-slate-50 dark:hover:bg-white/[0.02]"
-                      >
-                        <div className="p-4">
-                          {/* Top row: Identity + Arrow */}
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                              {/* Dynamic gradient avatar */}
-                              <div className="relative">
-                                <div 
-                                  className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-mono text-xs font-bold shadow-md"
-                                  style={{
-                                    background: `linear-gradient(135deg, 
-                                      hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
-                                      hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
-                                  }}
-                                >
-                                  {shortId.slice(0, 4)}
-                                </div>
-                                {defiInfo?.isAllocatedToDefi && (
-                                  <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 border-2 border-white dark:border-background-secondary flex items-center justify-center">
-                                    <TrendingUp className="w-2.5 h-2.5 text-white" />
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-sm text-text-secondary">{shortId}...</span>
-                                  <span className={cn(
-                                    "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
-                                    policy?.policyVersion === 'V3' 
-                                      ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
-                                      : policy?.policyVersion === 'V2' 
-                                        ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" 
-                                        : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
-                                  )}>
-                                    {policy?.policyVersion || 'V1'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                  <MapPin className="w-3 h-3 text-text-tertiary" />
-                                  <span className="text-xs text-text-tertiary">{market?.name || policy?.locationName || 'Unknown'}</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-2">
-                              <div className={cn(
-                                "px-2.5 py-1 rounded-lg text-xs font-medium",
-                                isEnded 
-                                  ? "bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-400" 
-                                  : isExpiringSoon 
-                                    ? "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400" 
-                                    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400"
-                              )}>
-                                {isEnded ? 'Ended' : `${daysRemaining}d left`}
-                              </div>
-                              <ChevronRight className="w-5 h-5 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-0.5 transition-all" />
-                            </div>
-                          </div>
-                          
-                          {/* Stats row */}
-                          <div className="grid grid-cols-3 gap-4">
-                            <div className="space-y-1">
-                              <p className="text-[10px] uppercase tracking-wider text-text-tertiary">Shares</p>
-                              <p className="text-lg font-bold text-text-primary">{holding.shares.toString()}</p>
-                              <p className="text-[10px] text-text-tertiary">{ownershipPct}% owned</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] uppercase tracking-wider text-text-tertiary">Max Payout</p>
-                              <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
-                              <p className="text-[10px] text-text-tertiary">if no event</p>
-                            </div>
-                            <div className="space-y-1">
-                              <p className="text-[10px] uppercase tracking-wider text-text-tertiary">
-                                {defiInfo?.isAllocatedToDefi ? 'In DeFi' : 'Status'}
-                              </p>
-                              {defiInfo?.isAllocatedToDefi && defiInfo.position ? (
-                                <>
-                                  <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
-                                  <p className="text-[10px] text-purple-600/60 dark:text-purple-400/60">earning yield</p>
-                                </>
-                              ) : (
-                                <>
-                                  <p className="text-lg font-bold text-text-secondary">{policy?.status || 'Active'}</p>
-                                  <p className="text-[10px] text-text-tertiary">in pool</p>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Hover indicator bar */}
-                        <div className="h-0.5 bg-gradient-to-r from-transparent via-prmx-cyan/0 to-transparent group-hover:via-prmx-cyan/50 transition-all duration-500" />
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
         </TabsContent>
 
         {/* History Tab */}

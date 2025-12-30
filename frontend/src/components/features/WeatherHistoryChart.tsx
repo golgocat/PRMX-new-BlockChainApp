@@ -186,10 +186,11 @@ export function WeatherHistoryChart({
           pointBorderColor: '#fff',
           pointBorderWidth: 2,
         },
-        // Threshold line
+        // Threshold line - divide by 1000 to match observation values
+        // (threshold is stored as value * 1000 to avoid decimals on-chain)
         {
           label: 'Threshold',
-          data: filteredObservations.map(() => threshold),
+          data: filteredObservations.map(() => threshold / 1000),
           borderColor: colors.threshold,
           backgroundColor: 'transparent',
           borderWidth: 2,
@@ -245,15 +246,11 @@ export function WeatherHistoryChart({
             return '';
           },
           label: function(context: any) {
-            if (context.datasetIndex === 0) {
-              const value = context.parsed.y;
-              if (value === null) return 'No data';
-              const unit = getUnitLabel(eventType);
-              return `${context.dataset.label}: ${value.toFixed(1)} ${unit}`;
-            } else {
-              const unit = getUnitLabel(eventType);
-              return `Threshold: ${context.parsed.y.toFixed(1)} ${unit}`;
-            }
+            const value = context.parsed.y;
+            if (value === null) return 'No data';
+            const unit = getUnitLabel(eventType);
+            // Both datasets now use the same scale (divided by 1000)
+            return `${context.dataset.label}: ${value.toFixed(1)} ${unit}`;
           },
         },
       },

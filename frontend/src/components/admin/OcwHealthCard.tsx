@@ -140,6 +140,7 @@ export function OcwHealthCard({ healthData, loading }: OcwHealthCardProps) {
               <p className="text-xs text-text-secondary">Policies Monitored</p>
             </div>
             <p className="text-2xl font-bold">{healthData.metrics.policies_monitored}</p>
+            <p className="text-[10px] text-text-tertiary mt-1">V2 + V3 combined</p>
           </div>
 
           <div className="p-4 rounded-lg bg-background-tertiary/50">
@@ -148,6 +149,7 @@ export function OcwHealthCard({ healthData, loading }: OcwHealthCardProps) {
               <p className="text-xs text-text-secondary">Snapshots (24h)</p>
             </div>
             <p className="text-2xl font-bold">{healthData.metrics.snapshots_last_24h}</p>
+            <p className="text-[10px] text-text-tertiary mt-1">On-chain count</p>
           </div>
 
           <div className="p-4 rounded-lg bg-background-tertiary/50">
@@ -156,6 +158,7 @@ export function OcwHealthCard({ healthData, loading }: OcwHealthCardProps) {
               <p className="text-xs text-text-secondary">Observations (24h)</p>
             </div>
             <p className="text-2xl font-bold">{healthData.metrics.observations_last_24h}</p>
+            <p className="text-[10px] text-text-tertiary mt-1">Database records</p>
           </div>
 
           <div className="p-4 rounded-lg bg-background-tertiary/50">
@@ -166,6 +169,7 @@ export function OcwHealthCard({ healthData, loading }: OcwHealthCardProps) {
             <p className="text-sm font-medium">
               {formatTimestamp(healthData.metrics.last_successful_operation)}
             </p>
+            <p className="text-[10px] text-text-tertiary mt-1">On-chain timestamp</p>
           </div>
         </div>
 

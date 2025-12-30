@@ -579,12 +579,14 @@ export default function LpTradingPage() {
             ) : (
               <div className="rounded-xl border border-border-secondary bg-background-secondary dark:bg-background-tertiary/30 overflow-hidden">
                 {/* List Header */}
-                <div className="hidden md:grid md:grid-cols-12 gap-4 px-4 py-3 bg-background-tertiary/50 dark:bg-background-tertiary/20 border-b border-border-secondary text-xs font-medium text-text-tertiary uppercase tracking-wider">
-                  <div className="col-span-4">Policy</div>
+                <div className="hidden lg:grid lg:grid-cols-16 gap-3 px-4 py-3 bg-background-tertiary/50 dark:bg-background-tertiary/20 border-b border-border-secondary text-xs font-medium text-text-tertiary uppercase tracking-wider">
+                  <div className="col-span-3">Policy</div>
                   <div className="col-span-2 text-center">Shares</div>
                   <div className="col-span-2 text-center">Max Payout</div>
+                  <div className="col-span-2 text-center">Coverage Start</div>
+                  <div className="col-span-2 text-center">Coverage End</div>
                   <div className="col-span-2 text-center">DeFi</div>
-                  <div className="col-span-2 text-center">Status</div>
+                  <div className="col-span-3 text-center">Status</div>
                 </div>
                 
                 {/* List Items */}
@@ -613,9 +615,9 @@ export default function LpTradingPage() {
                         className="group cursor-pointer transition-all duration-200 hover:bg-slate-50 dark:hover:bg-white/[0.02] px-4 py-4"
                       >
                         {/* Desktop Layout */}
-                        <div className="hidden md:grid md:grid-cols-12 gap-4 items-center">
+                        <div className="hidden lg:grid lg:grid-cols-16 gap-3 items-center">
                           {/* Policy Info */}
-                          <div className="col-span-4 flex items-center gap-3">
+                          <div className="col-span-3 flex items-center gap-3">
                             <div className="relative">
                               <div 
                                 className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-mono text-xs font-bold shadow-sm"
@@ -656,21 +658,41 @@ export default function LpTradingPage() {
                           
                           {/* Shares */}
                           <div className="col-span-2 text-center">
-                            <p className="text-lg font-bold text-text-primary">{holding.shares.toString()}</p>
+                            <p className="text-base font-bold text-text-primary">{holding.shares.toString()}</p>
                             <p className="text-xs text-text-tertiary">{ownershipPct}%</p>
                           </div>
                           
                           {/* Max Payout */}
                           <div className="col-span-2 text-center">
-                            <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
+                            <p className="text-base font-bold text-emerald-600 dark:text-emerald-400">{formatUSDT(potentialPayout)}</p>
                             <p className="text-xs text-text-tertiary">if no event</p>
+                          </div>
+                          
+                          {/* Coverage Start */}
+                          <div className="col-span-2 text-center">
+                            <p className="text-sm font-medium text-text-primary">
+                              {policy?.coverageStart ? new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                            </p>
+                            <p className="text-xs text-text-tertiary">
+                              {policy?.coverageStart ? new Date(policy.coverageStart * 1000).getFullYear() : ''}
+                            </p>
+                          </div>
+                          
+                          {/* Coverage End */}
+                          <div className="col-span-2 text-center">
+                            <p className="text-sm font-medium text-text-primary">
+                              {policy?.coverageEnd ? new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                            </p>
+                            <p className="text-xs text-text-tertiary">
+                              {policy?.coverageEnd ? new Date(policy.coverageEnd * 1000).getFullYear() : ''}
+                            </p>
                           </div>
                           
                           {/* DeFi */}
                           <div className="col-span-2 text-center">
                             {defiInfo?.isAllocatedToDefi && defiInfo.position ? (
                               <>
-                                <p className="text-lg font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
+                                <p className="text-base font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
                                 <p className="text-xs text-purple-500/70">earning</p>
                               </>
                             ) : (
@@ -679,7 +701,7 @@ export default function LpTradingPage() {
                           </div>
                           
                           {/* Status */}
-                          <div className="col-span-2 flex items-center justify-center gap-2">
+                          <div className="col-span-3 flex items-center justify-center gap-2">
                             <span className={cn(
                               "px-2.5 py-1 rounded-full text-xs font-medium",
                               isEnded 
@@ -694,8 +716,8 @@ export default function LpTradingPage() {
                           </div>
                         </div>
                         
-                        {/* Mobile Layout */}
-                        <div className="md:hidden">
+                        {/* Mobile/Tablet Layout */}
+                        <div className="lg:hidden">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <div 
@@ -733,6 +755,17 @@ export default function LpTradingPage() {
                             )}>
                               {isEnded ? 'Ended' : `${daysRemaining}d`}
                             </span>
+                          </div>
+                          {/* Coverage dates row */}
+                          <div className="flex items-center gap-4 mb-3 text-xs text-text-secondary">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-text-tertiary" />
+                              <span>
+                                {policy?.coverageStart ? new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                                {' → '}
+                                {policy?.coverageEnd ? new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                              </span>
+                            </div>
                           </div>
                           <div className="grid grid-cols-3 gap-2 text-center">
                             <div>
@@ -1814,6 +1847,60 @@ export default function LpTradingPage() {
                 </div>
                 <p className="text-xs text-text-tertiary">Total Pool</p>
                 <p className="text-lg font-bold text-text-primary">{totalShares} shares</p>
+              </div>
+            </div>
+
+            {/* Coverage Period - Theme-aware */}
+            <div className="rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-white/5 overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200 dark:border-white/5 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-text-tertiary" />
+                <span className="text-sm font-medium text-text-primary">Coverage Period</span>
+              </div>
+              <div className="p-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-text-tertiary uppercase tracking-wider mb-1">Start Date</p>
+                    <p className="text-base font-semibold text-text-primary">
+                      {policy?.coverageStart 
+                        ? new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          }) 
+                        : '—'}
+                    </p>
+                    <p className="text-xs text-text-tertiary mt-0.5">
+                      {policy?.coverageStart 
+                        ? new Date(policy.coverageStart * 1000).toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            timeZoneName: 'short'
+                          }) 
+                        : ''}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-text-tertiary uppercase tracking-wider mb-1">End Date</p>
+                    <p className="text-base font-semibold text-text-primary">
+                      {policy?.coverageEnd 
+                        ? new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { 
+                            month: 'long', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          }) 
+                        : '—'}
+                    </p>
+                    <p className="text-xs text-text-tertiary mt-0.5">
+                      {policy?.coverageEnd 
+                        ? new Date(policy.coverageEnd * 1000).toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit',
+                            timeZoneName: 'short'
+                          }) 
+                        : ''}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 

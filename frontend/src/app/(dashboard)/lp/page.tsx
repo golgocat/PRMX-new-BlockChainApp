@@ -691,10 +691,9 @@ export default function LpTradingPage() {
                           {/* DeFi */}
                           <div className="w-[100px] flex-shrink-0 text-center">
                             {defiInfo?.isAllocatedToDefi && defiInfo.position ? (
-                              <>
-                                <p className="text-base font-bold text-purple-600 dark:text-purple-400">{formatUSDT(defiInfo.position.principalUsdt)}</p>
-                                <p className="text-xs text-purple-500/70">earning</p>
-                              </>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 text-xs font-medium">
+                                <span>✨</span> Earning
+                              </span>
                             ) : (
                               <span className="text-sm text-text-tertiary">—</span>
                             )}
@@ -779,7 +778,7 @@ export default function LpTradingPage() {
                             <div>
                               <p className="text-xs text-text-tertiary">DeFi</p>
                               <p className="font-bold text-purple-600 dark:text-purple-400">
-                                {defiInfo?.isAllocatedToDefi ? formatUSDT(defiInfo.position?.principalUsdt || BigInt(0)) : '—'}
+                                {defiInfo?.isAllocatedToDefi ? '✨ Earning' : '—'}
                               </p>
                             </div>
                           </div>

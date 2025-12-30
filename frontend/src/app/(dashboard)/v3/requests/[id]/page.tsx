@@ -366,32 +366,75 @@ export default function V3RequestDetailPage() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pt-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/v3/requests">
-            <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
-              Back
-            </Button>
-          </Link>
-          <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <Badge variant="purple" className="text-xs">V3 P2P</Badge>
-              {isOwner && <Badge variant="cyan" className="text-xs">Your Request</Badge>}
+      {(() => {
+        // Format short request ID for avatar
+        const shortId = typeof request.id === 'string' && request.id.startsWith('0x') 
+          ? request.id.slice(2, 10) 
+          : String(request.id).slice(0, 8);
+        const displayId = typeof request.id === 'string' && request.id.startsWith('0x')
+          ? request.id.slice(2, 14) + '...'
+          : String(request.id);
+        
+        return (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/v3/requests">
+                <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
+                  Back
+                </Button>
+              </Link>
+              
+              {/* Dynamic gradient avatar */}
+              <div 
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-lg flex-shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, 
+                    hsl(${(parseInt(shortId, 16) % 60) + 30}, 70%, 50%) 0%, 
+                    hsl(${(parseInt(shortId, 16) % 60) + 60}, 80%, 40%) 100%)`
+                }}
+              >
+                {shortId.slice(0, 4).toUpperCase()}
+              </div>
+              
+              <div>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 uppercase">
+                    Request
+                  </span>
+                  {isOwner && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 uppercase">
+                      Your Request
+                    </span>
+                  )}
+                  {request.location && (
+                    <span className="text-xs text-text-secondary flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {request.location.name}
+                    </span>
+                  )}
+                </div>
+                <h1 className="text-2xl font-bold font-mono text-text-primary">
+                  {displayId}
+                </h1>
+                <p className="text-sm text-text-tertiary mt-0.5">
+                  {getEventTypeInfo(request.eventSpec.eventType)?.label} ≥ {formatThresholdValue(
+                    request.eventSpec.threshold.value,
+                    request.eventSpec.threshold.unit
+                  )}
+                </p>
+              </div>
             </div>
-            <h1 className="text-2xl md:text-3xl font-bold">
-              Insurance Request #{formatId(request.id)}
-            </h1>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />}
+              onClick={handleRefresh}
+            >
+              Refresh
+            </Button>
           </div>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />}
-          onClick={handleRefresh}
-        >
-          Refresh
-        </Button>
-      </div>
+        );
+      })()}
       
       {/* Hero Card - Event Overview */}
       <Card className={cn('overflow-hidden border-2', statusConfig.borderColor)}>

@@ -294,37 +294,67 @@ export default function PolicyDetailPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/policies">
-            <Button variant="ghost" icon={<ChevronLeft className="w-5 h-5" />}>
-              Back
-            </Button>
-          </Link>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">Policy {policy.label}</h1>
-              <Badge 
-                variant={policy.policyVersion === 'V2' ? 'cyan' : 'default'}
-                className="text-sm"
+      {(() => {
+        // Format short policy ID for avatar
+        const shortId = typeof policy.id === 'string' && policy.id.startsWith('0x') 
+          ? policy.id.slice(2, 10) 
+          : String(policy.id).slice(0, 8);
+        const displayId = typeof policy.id === 'string' && policy.id.startsWith('0x')
+          ? policy.id.slice(2, 14) + '...'
+          : String(policy.id);
+        
+        return (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/policies">
+                <Button variant="ghost" icon={<ChevronLeft className="w-5 h-5" />}>
+                  Back
+                </Button>
+              </Link>
+              
+              {/* Dynamic gradient avatar */}
+              <div 
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-lg flex-shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, 
+                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
+                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
+                }}
               >
-                {policy.policyVersion || 'V1'}
-              </Badge>
-              <StatusBadge status={policy.status} />
+                {shortId.slice(0, 4).toUpperCase()}
+              </div>
+              
+              <div>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className={cn(
+                    "text-[10px] font-bold px-2 py-0.5 rounded uppercase",
+                    policy.policyVersion === 'V2' 
+                      ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" 
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                  )}>
+                    {policy.policyVersion || 'V1'}
+                  </span>
+                  <StatusBadge status={policy.status} />
+                  <span className="text-xs text-text-secondary flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {market?.name || `Market #${policy.marketId}`}
+                  </span>
+                </div>
+                <h1 className="text-2xl font-bold font-mono text-text-primary">
+                  {displayId}
+                </h1>
+              </div>
             </div>
-            <p className="text-text-secondary mt-1">
-              {market?.name || `Market #${policy.marketId}`} Coverage
-            </p>
+            <Button 
+              variant="secondary" 
+              onClick={handleRefresh}
+              icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
+            >
+              Refresh
+            </Button>
           </div>
-        </div>
-        <Button 
-          variant="secondary" 
-          onClick={handleRefresh}
-          icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
-        >
-          Refresh
-        </Button>
-      </div>
+        );
+      })()}
 
       {/* Main Info Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

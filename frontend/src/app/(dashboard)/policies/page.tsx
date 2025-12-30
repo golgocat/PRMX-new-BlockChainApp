@@ -253,7 +253,6 @@ export default function PoliciesPage() {
             <TableHead>
               <TableRow>
                 <TableHeaderCell>Policy</TableHeaderCell>
-                <TableHeaderCell>Version</TableHeaderCell>
                 <TableHeaderCell>Holder</TableHeaderCell>
                 <TableHeaderCell>Coverage Period</TableHeaderCell>
                 <TableHeaderCell>Shares</TableHeaderCell>
@@ -267,14 +266,13 @@ export default function PoliciesPage() {
                 <>
                   {[1, 2, 3, 4, 5].map((i) => (
                     <TableRow key={i} className="animate-pulse">
-                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-10 w-40 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-24 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-28 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-4 w-12 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-6 w-16 bg-background-tertiary/50 rounded-full" /></TableCell>
-                      <TableCell><div className="h-8 w-20 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-8 w-8 bg-background-tertiary/50 rounded" /></TableCell>
                     </TableRow>
                   ))}
                 </>
@@ -303,23 +301,40 @@ export default function PoliciesPage() {
                       onClick={() => router.push(`/policies/${policy.id}`)}
                     >
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                            <Shield className="w-4 h-4 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{policy.label}</p>
-                            <p className="text-xs text-text-tertiary">{getMarketName(policy.marketId)}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge 
-                          variant={policy.policyVersion === 'V2' ? 'cyan' : 'default'}
-                          className="text-xs"
-                        >
-                          {policy.policyVersion || 'V1'}
-                        </Badge>
+                        {(() => {
+                          // Format short policy ID for avatar
+                          const shortId = typeof policy.id === 'string' && policy.id.startsWith('0x') 
+                            ? policy.id.slice(2, 10) 
+                            : String(policy.id).slice(0, 8);
+                          return (
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-mono text-xs font-bold shadow-sm flex-shrink-0"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
+                                }}
+                              >
+                                {shortId.slice(0, 4)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm font-medium text-text-primary">{shortId}...</span>
+                                  <span className={cn(
+                                    "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                                    policy.policyVersion === 'V2' 
+                                      ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300" 
+                                      : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                                  )}>
+                                    {policy.policyVersion || 'V1'}
+                                  </span>
+                                </div>
+                                <p className="text-xs text-text-tertiary">{getMarketName(policy.marketId)}</p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div>

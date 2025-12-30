@@ -219,7 +219,7 @@ export default function V3RequestsPage() {
                     onClick={() => setSortOrder(s => s === 'asc' ? 'desc' : 'asc')}
                     className="flex items-center gap-1 hover:text-prmx-cyan transition-colors"
                   >
-                    #
+                    Request
                     {sortOrder === 'asc' ? (
                       <ArrowUp className="w-3 h-3" />
                     ) : (
@@ -227,7 +227,6 @@ export default function V3RequestsPage() {
                     )}
                   </button>
                 </TableHeaderCell>
-                <TableHeaderCell>Event Type</TableHeaderCell>
                 <TableHeaderCell>Location</TableHeaderCell>
                 <TableHeaderCell>Coverage</TableHeaderCell>
                 <TableHeaderCell>Shares</TableHeaderCell>
@@ -242,8 +241,7 @@ export default function V3RequestsPage() {
                 <>
                   {[1, 2, 3, 4, 5].map((i) => (
                     <TableRow key={i} className="animate-pulse">
-                      <TableCell><div className="h-4 w-8 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-24 bg-background-tertiary/50 rounded" /></TableCell>
+                      <TableCell><div className="h-10 w-40 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-20 bg-background-tertiary/50 rounded" /></TableCell>
                       <TableCell><div className="h-4 w-12 bg-background-tertiary/50 rounded" /></TableCell>
@@ -282,23 +280,40 @@ export default function V3RequestsPage() {
                   return (
                     <TableRow key={request.id} className={cn(isRefreshing && 'opacity-50')}>
                       <TableCell>
-                        <Link href={`/v3/requests/${request.id}`} className="font-mono text-sm font-medium text-prmx-cyan hover:underline">
-                          #{formatId(request.id)}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{eventInfo?.icon || '🌡️'}</span>
-                          <div>
-                            <p className="font-medium text-sm">{eventInfo?.label || request.eventSpec.eventType}</p>
-                            <p className="text-xs text-text-tertiary">
-                              ≥ {formatThresholdValue(
-                                request.eventSpec.threshold.value, 
-                                request.eventSpec.threshold.unit
-                              )}
-                            </p>
-                          </div>
-                        </div>
+                        {(() => {
+                          // Format short request ID for avatar
+                          const shortId = typeof request.id === 'string' && request.id.startsWith('0x') 
+                            ? request.id.slice(2, 10) 
+                            : String(request.id).slice(0, 8);
+                          return (
+                            <Link href={`/v3/requests/${request.id}`} className="flex items-center gap-3 group">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-mono text-xs font-bold shadow-sm flex-shrink-0"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 30}, 70%, 50%) 0%, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 60}, 80%, 40%) 100%)`
+                                }}
+                              >
+                                {shortId.slice(0, 4)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm font-medium text-text-primary group-hover:text-prmx-cyan transition-colors">{shortId}...</span>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 uppercase">
+                                    REQ
+                                  </span>
+                                </div>
+                                <p className="text-xs text-text-tertiary">
+                                  {eventInfo?.label} ≥ {formatThresholdValue(
+                                    request.eventSpec.threshold.value, 
+                                    request.eventSpec.threshold.unit
+                                  )}
+                                </p>
+                              </div>
+                            </Link>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">

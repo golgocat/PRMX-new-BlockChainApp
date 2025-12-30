@@ -307,18 +307,40 @@ export default function V3PoliciesPage() {
                       onClick={() => router.push(`/v3/policies/${policy.id}`)}
                     >
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg">{eventInfo?.icon || '🌡️'}</span>
-                          <div>
-                            <p className="font-medium text-sm">Policy #{policy.id}</p>
-                            <p className="text-xs text-text-tertiary">
-                              {eventInfo?.label} ≥ {formatThresholdValue(
-                                policy.eventSpec.threshold.value, 
-                                policy.eventSpec.threshold.unit
-                              )}
-                            </p>
-                          </div>
-                        </div>
+                        {(() => {
+                          // Format short policy ID for avatar
+                          const shortId = typeof policy.id === 'string' && policy.id.startsWith('0x') 
+                            ? policy.id.slice(2, 10) 
+                            : String(policy.id).slice(0, 8);
+                          return (
+                            <div className="flex items-center gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-mono text-xs font-bold shadow-sm flex-shrink-0"
+                                style={{
+                                  background: `linear-gradient(135deg, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
+                                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
+                                }}
+                              >
+                                {shortId.slice(0, 4)}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-sm font-medium text-text-primary">{shortId}...</span>
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300 uppercase">
+                                    V3
+                                  </span>
+                                </div>
+                                <p className="text-xs text-text-tertiary">
+                                  {eventInfo?.label} ≥ {formatThresholdValue(
+                                    policy.eventSpec.threshold.value, 
+                                    policy.eventSpec.threshold.unit
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1">

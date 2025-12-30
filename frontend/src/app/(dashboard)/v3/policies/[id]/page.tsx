@@ -518,41 +518,78 @@ export default function V3PolicyDetailPage() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pt-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link href="/v3/policies">
-            <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
-              Back
-            </Button>
-          </Link>
-          <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <Badge variant="purple" className="text-xs">V3 P2P</Badge>
-              {isHolder && <Badge variant="cyan" className="text-xs">Your Policy</Badge>}
-              {myLpHolding && !isHolder && <Badge variant="purple" className="text-xs">LP Holder</Badge>}
-              {getHeaderStatusBadge(policy.status, policy.coverageEnd)}
-              {policy.location && (
-                <Badge variant="default" className="text-xs flex items-center gap-1">
-                  <MapPin className="w-3 h-3" />
-                  {policy.location.name}
-                </Badge>
-              )}
+      {(() => {
+        // Format short policy ID for avatar
+        const shortId = typeof policy.id === 'string' && policy.id.startsWith('0x') 
+          ? policy.id.slice(2, 10) 
+          : String(policy.id).slice(0, 8);
+        const displayId = typeof policy.id === 'string' && policy.id.startsWith('0x')
+          ? policy.id.slice(2, 14) + '...'
+          : String(policy.id);
+        
+        return (
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/v3/policies">
+                <Button variant="ghost" size="sm" icon={<ArrowLeft className="w-4 h-4" />}>
+                  Back
+                </Button>
+              </Link>
+              
+              {/* Dynamic gradient avatar */}
+              <div 
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-lg flex-shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, 
+                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
+                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
+                }}
+              >
+                {shortId.slice(0, 4).toUpperCase()}
+              </div>
+              
+              <div>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300 uppercase">
+                    V3
+                  </span>
+                  {isHolder && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 uppercase">
+                      Your Policy
+                    </span>
+                  )}
+                  {myLpHolding && !isHolder && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300 uppercase">
+                      LP Holder
+                    </span>
+                  )}
+                  {getHeaderStatusBadge(policy.status, policy.coverageEnd)}
+                  {policy.location && (
+                    <span className="text-xs text-text-secondary flex items-center gap-1">
+                      <MapPin className="w-3 h-3" />
+                      {policy.location.name}
+                    </span>
+                  )}
+                </div>
+                <h1 className="text-2xl font-bold font-mono text-text-primary">
+                  {displayId}
+                </h1>
+                <p className="text-sm text-text-tertiary mt-0.5">
+                  {eventInfo?.label} ≥ {formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)}
+                </p>
+              </div>
             </div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <span className="text-4xl">{eventInfo?.icon}</span>
-              Policy #{policy.id}
-            </h1>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />}
+              onClick={handleRefresh}
+            >
+              Refresh
+            </Button>
           </div>
-        </div>
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />}
-          onClick={handleRefresh}
-        >
-          Refresh
-        </Button>
-      </div>
+        );
+      })()}
       
       <div className="grid md:grid-cols-3 gap-6">
         {/* Main Content */}

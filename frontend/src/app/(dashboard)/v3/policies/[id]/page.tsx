@@ -860,13 +860,13 @@ export default function V3PolicyDetailPage() {
                         <div className="flex items-center justify-between">
                           <span className="text-text-secondary">Returned to LPs</span>
                           <span className="text-2xl font-bold text-prmx-cyan">
-                            {formatUSDT(policy.maxPayout + policy.premiumPaid, false)}
+                            {formatUSDT(policy.maxPayout, false)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-text-tertiary">Breakdown</span>
                           <span className="text-text-secondary">
-                            {formatUSDT(policy.maxPayout, false)} collateral + {formatUSDT(policy.premiumPaid, false)} premium
+                            {formatUSDT(policy.maxPayout - policy.premiumPaid, false)} collateral + {formatUSDT(policy.premiumPaid, false)} premium
                           </span>
                         </div>
                       </div>

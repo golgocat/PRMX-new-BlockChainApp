@@ -524,17 +524,21 @@ pub mod pallet {
         }
 
         /// Internal implementation of allocate_to_defi with explicit pool account
-        /// This is used by V3 which has its own policy pool derivation
+        /// This is used by V3 which has its own policy pool derivation.
+        /// Supports incremental allocation - can be called multiple times to add to existing position.
         pub fn do_allocate_to_defi_with_account(
             policy_id: PolicyId,
             amount: T::Balance,
             pool_account: T::AccountId,
         ) -> Result<(), DispatchError> {
-            // Check current status
+            // Check current status - allow incremental additions if already invested
             let status = PolicyInvestmentStatus::<T>::get(policy_id);
+            let is_incremental = status == InvestmentStatus::Invested;
+            
+            // Block if unwinding or settled
             ensure!(
-                status == InvestmentStatus::NotInvested,
-                Error::<T>::AlreadyInvested
+                status == InvestmentStatus::NotInvested || status == InvestmentStatus::Invested,
+                Error::<T>::PositionUnwinding
             );
 
             // Verify pool has enough funds
@@ -648,15 +652,45 @@ pub mod pallet {
             let minted_shares = T::XcmStrategyInterface::enter_strategy(amount)
                 .map_err(|_| Error::<T>::StrategyEntryFailed)?;
 
-            // Store position
-            PolicyLpPositions::<T>::insert(
-                policy_id,
-                PolicyLpPosition {
+            // Store or update position (supports incremental allocation)
+            if is_incremental {
+                // Add to existing position
+                PolicyLpPositions::<T>::mutate(policy_id, |maybe_pos| {
+                    if let Some(pos) = maybe_pos {
+                        pos.lp_shares = pos.lp_shares.saturating_add(minted_shares);
+                        pos.principal_usdt = pos.principal_usdt.saturating_add(amount);
+                    }
+                });
+                
+                log::info!(
+                    target: "prmx-xcm-capital",
+                    "📈 Incremental allocation: +{} USDT to DeFi for policy {}, +{} LP shares",
+                    amount.into(),
                     policy_id,
-                    lp_shares: minted_shares,
-                    principal_usdt: amount,
-                },
-            );
+                    minted_shares
+                );
+            } else {
+                // Create new position
+                PolicyLpPositions::<T>::insert(
+                    policy_id,
+                    PolicyLpPosition {
+                        policy_id,
+                        lp_shares: minted_shares,
+                        principal_usdt: amount,
+                    },
+                );
+                
+                // Update status only on first allocation
+                PolicyInvestmentStatus::<T>::insert(policy_id, InvestmentStatus::Invested);
+                
+                log::info!(
+                    target: "prmx-xcm-capital",
+                    "📈 Allocated {} USDT to DeFi (Pool 102) for policy {}, received {} LP shares",
+                    amount.into(),
+                    policy_id,
+                    minted_shares
+                );
+            }
 
             // Update total shares
             TotalLpShares::<T>::mutate(|total| {
@@ -667,17 +701,6 @@ pub mod pallet {
             TotalAllocatedCapital::<T>::mutate(|total| {
                 *total = total.saturating_add(amount);
             });
-
-            // Update status
-            PolicyInvestmentStatus::<T>::insert(policy_id, InvestmentStatus::Invested);
-
-            log::info!(
-                target: "prmx-xcm-capital",
-                "📈 Allocated {} USDT to DeFi (Pool 102) for policy {}, received {} LP shares",
-                amount.into(),
-                policy_id,
-                minted_shares
-            );
 
             Self::deposit_event(Event::CapitalAllocated {
                 policy_id,

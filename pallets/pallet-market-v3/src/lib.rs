@@ -670,9 +670,10 @@ pub mod pallet {
                 is_first_acceptance,
             });
 
-            // Allocate collateral to DeFi incrementally (after each acceptance)
-            // This ensures all collateral is allocated, not just what's in pool when fully filled
-            if let Err(e) = T::PolicyApi::allocate_to_defi(policy_id, total_collateral) {
+            // Allocate collateral + premium to DeFi incrementally (after each acceptance)
+            // This ensures 100% of pool funds are allocated to maximize yield
+            let total_to_allocate = total_collateral.saturating_add(premium_for_shares);
+            if let Err(e) = T::PolicyApi::allocate_to_defi(policy_id, total_to_allocate) {
                 log::warn!(
                     target: "pallet-market-v3",
                     "⚠️ Incremental DeFi allocation failed for policy {}: {:?}",

@@ -17,7 +17,6 @@ import {
   DollarSign,
   Zap,
   ChevronRight,
-  Sparkles,
   MapPin
 } from 'lucide-react';
 import Link from 'next/link';
@@ -31,7 +30,7 @@ import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 import type { DaoSolvencyInfo } from '@/types';
 
-// Animated stat card component
+// Stat card component with subtle styling
 function AnimatedStatCard({ 
   title, 
   value, 
@@ -51,28 +50,25 @@ function AnimatedStatCard({
     <div 
       onClick={onClick}
       className={cn(
-        'group relative overflow-hidden rounded-2xl p-5 transition-all duration-300',
-        'hover:scale-[1.02] hover:shadow-lg hover:shadow-prmx-cyan/10',
+        'group relative overflow-hidden rounded-xl p-5 transition-all duration-200',
+        'hover:border-prmx-cyan/40',
         onClick && 'cursor-pointer',
         gradient
       )}
     >
-      {/* Background glow effect */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-      
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-3">
-          <div className="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
-            <Icon className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-lg bg-background-tertiary/80 flex items-center justify-center">
+            <Icon className="w-5 h-5 text-prmx-cyan" />
           </div>
           {onClick && (
-            <ChevronRight className="w-5 h-5 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+            <ChevronRight className="w-5 h-5 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-1 transition-all" />
           )}
         </div>
-        <p className="text-white/70 text-sm font-medium mb-1">{title}</p>
-        <p className="text-white text-2xl font-bold tracking-tight">{value}</p>
+        <p className="text-text-secondary text-sm font-medium mb-1">{title}</p>
+        <p className="text-text-primary text-2xl font-bold tracking-tight">{value}</p>
         {subtitle && (
-          <p className="text-white/50 text-xs mt-1">{subtitle}</p>
+          <p className="text-text-tertiary text-xs mt-1">{subtitle}</p>
         )}
       </div>
     </div>
@@ -292,11 +288,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-prmx-purple via-prmx-cyan/80 to-prmx-magenta p-8">
-        {/* Animated background pattern */}
-        <div className="absolute inset-0 opacity-30">
-          <div className="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-pulse" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-prmx-cyan/20 rounded-full blur-3xl animate-pulse delay-700" />
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 border border-border-secondary">
+        {/* Subtle background accent */}
+        <div className="absolute inset-0 opacity-50">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-prmx-cyan/10 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-prmx-purple/10 rounded-full blur-3xl" />
         </div>
         
         <div className="relative z-10">
@@ -304,20 +300,19 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 {isConnected && selectedAccount && (
-                  <Badge variant="cyan" className="bg-white/20 border-0">
-                    <Sparkles className="w-3 h-3 mr-1" />
+                  <Badge variant="cyan">
                     {selectedAccount.role}
                   </Badge>
                 )}
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-text-primary mb-2">
                 {isConnected && selectedAccount ? (
-                  <>Welcome back, {selectedAccount.name}</>
+                  <>Welcome back, <span className="text-prmx-cyan">{selectedAccount.name}</span></>
                 ) : (
                   'PRMX Dashboard'
                 )}
               </h1>
-              <p className="text-white/70 max-w-md">
+              <p className="text-text-secondary max-w-md">
                 {isDao 
                   ? 'Manage markets, monitor protocol health, and oversee platform operations'
                   : selectedAccount?.role === 'Customer'
@@ -328,7 +323,6 @@ export default function DashboardPage() {
             <div className="hidden md:flex items-center gap-3">
               <Button
                 variant="secondary"
-                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
                 icon={<RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />}
                 onClick={handleRefreshAll}
                 disabled={isRefreshing || isLoading}
@@ -337,13 +331,13 @@ export default function DashboardPage() {
               </Button>
               {isDao ? (
                 <Link href="/markets">
-                  <Button className="bg-white text-prmx-purple hover:bg-white/90" icon={<Plus className="w-5 h-5" />}>
+                  <Button icon={<Plus className="w-5 h-5" />}>
                     Create Market
                   </Button>
                 </Link>
               ) : (
                 <Link href="/policies/new">
-                  <Button className="bg-white text-prmx-purple hover:bg-white/90" icon={<Shield className="w-5 h-5" />}>
+                  <Button icon={<Shield className="w-5 h-5" />}>
                     Get Coverage
                   </Button>
                 </Link>
@@ -353,13 +347,13 @@ export default function DashboardPage() {
           
           {/* Balance Card */}
           {isConnected && selectedAccount && (
-            <div className="inline-flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl px-5 py-3 border border-white/20">
-              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-white" />
+            <div className="inline-flex items-center gap-4 bg-background-tertiary/50 rounded-xl px-5 py-3 border border-border-secondary">
+              <div className="w-10 h-10 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-prmx-cyan" />
               </div>
               <div>
-                <p className="text-white/60 text-sm">Available Balance</p>
-                <p className="text-white text-xl font-bold">{usdtFormatted}</p>
+                <p className="text-text-tertiary text-sm">Available Balance</p>
+                <p className="text-text-primary text-xl font-bold">{usdtFormatted}</p>
               </div>
             </div>
           )}
@@ -372,14 +366,14 @@ export default function DashboardPage() {
           title="Active Markets"
           value={isLoading ? '...' : stats.totalMarkets}
           icon={Globe2}
-          gradient="bg-gradient-to-br from-indigo-500 to-purple-600"
+          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600/50"
           onClick={() => window.location.href = '/markets'}
         />
         <AnimatedStatCard
           title="Total Policies"
           value={isLoading ? '...' : stats.totalPolicies}
           icon={Shield}
-          gradient="bg-gradient-to-br from-prmx-cyan to-teal-500"
+          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/20"
           subtitle={`${stats.activePolicies} active`}
           onClick={() => window.location.href = '/policies'}
         />
@@ -387,14 +381,14 @@ export default function DashboardPage() {
           title={isDao ? 'Platform LP Orders' : 'My LP Holdings'}
           value={isLoading ? '...' : isDao ? stats.totalLpOrders : stats.myLpHoldings}
           icon={Wallet}
-          gradient="bg-gradient-to-br from-emerald-500 to-green-600"
+          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-emerald-500/20"
           onClick={() => window.location.href = '/lp'}
         />
         <AnimatedStatCard
           title="Current Block"
           value={`#${currentBlock}`}
           icon={Activity}
-          gradient="bg-gradient-to-br from-prmx-purple to-prmx-magenta"
+          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-purple/20"
           subtitle={isChainConnected ? '● Synced' : '○ Disconnected'}
         />
       </div>

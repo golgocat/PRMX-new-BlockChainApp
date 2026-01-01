@@ -379,6 +379,8 @@ pub mod pallet {
         ArithmeticOverflow,
         /// Request not expired yet
         RequestNotExpired,
+        /// Request has expired
+        RequestExpired,
         /// Request has active policy
         RequestHasActivePolicy,
     }
@@ -566,6 +568,10 @@ pub mod pallet {
                     || request.status == RequestStatusV3::PartiallyFilled,
                 Error::<T>::RequestNotAcceptable
             );
+
+            // Check request has not expired
+            let now = Self::current_timestamp();
+            ensure!(now < request.expires_at, Error::<T>::RequestExpired);
 
             let remaining_shares = request
                 .total_shares

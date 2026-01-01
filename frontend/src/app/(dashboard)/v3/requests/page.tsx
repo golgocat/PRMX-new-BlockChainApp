@@ -280,11 +280,12 @@ export default function V3RequestsPage() {
                   const isOwner = request.requester === selectedAccount?.address;
                   const canAccept = isRequestAcceptable(request) && !isOwner && remainingShares > 0;
                   
-                  // For requests with policies (filled or partial+expired), show locked collateral
+                  // For requests with policies (filled or expired with shares), show locked collateral
                   // For open requests, show collateral needed for remaining shares
                   const now = Math.floor(Date.now() / 1000);
+                  const isExpired = request.expiresAt <= now || request.status === 'Expired';
                   const hasPolicy = request.status === 'FullyFilled' || 
-                    (request.filledShares > 0 && request.expiresAt <= now);
+                    (request.filledShares > 0 && isExpired);
                   const collateralToShow = hasPolicy
                     ? calculateCollateral(request.filledShares)
                     : calculateCollateral(remainingShares);
@@ -373,8 +374,7 @@ export default function V3RequestsPage() {
                       </TableCell>
                       <TableCell>
                         {/* If policy was created (filled or partially filled + expired), link to policy */}
-                        {(request.status === 'FullyFilled' || 
-                          (request.filledShares > 0 && (request.status === 'Expired' || request.expiresAt <= Math.floor(Date.now() / 1000)))) ? (
+                        {hasPolicy ? (
                           <Link 
                             href={`/v3/policies/${request.id}`}
                             className="group flex items-center gap-1 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors"

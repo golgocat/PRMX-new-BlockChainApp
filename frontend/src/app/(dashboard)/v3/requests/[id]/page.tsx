@@ -273,15 +273,15 @@ export default function V3RequestDetailPage() {
         </div>
         
         <Card>
-          <CardContent className="py-16 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary flex items-center justify-center">
-              <Wallet className="w-10 h-10 text-gray-400 dark:text-text-tertiary" />
+          <CardContent className="py-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+              <Wallet className="w-6 h-6 text-text-tertiary" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Connect Your Wallet</h3>
-            <p className="text-text-secondary mb-8 max-w-md mx-auto">
-              Connect your wallet to view request details and participate in the P2P marketplace
+            <h3 className="text-lg font-semibold mb-1">Connect Your Wallet</h3>
+            <p className="text-sm text-text-tertiary mb-6 max-w-sm mx-auto">
+              Connect to view request details and participate in P2P marketplace
             </p>
-            <Button size="lg" onClick={() => setShowWalletModal(true)}>
+            <Button onClick={() => setShowWalletModal(true)}>
               Connect Wallet
             </Button>
             <WalletConnectionModal 
@@ -311,13 +311,13 @@ export default function V3RequestDetailPage() {
         
         {/* Skeleton loading */}
         <div className="animate-pulse space-y-6">
-          <div className="h-48 bg-background-tertiary/30 rounded-2xl" />
+          <div className="h-40 bg-background-tertiary/50 rounded-lg" />
           <div className="grid md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-6">
-              <div className="h-64 bg-background-tertiary/30 rounded-2xl" />
-              <div className="h-48 bg-background-tertiary/30 rounded-2xl" />
+              <div className="h-52 bg-background-tertiary/50 rounded-lg" />
+              <div className="h-40 bg-background-tertiary/50 rounded-lg" />
             </div>
-            <div className="h-96 bg-background-tertiary/30 rounded-2xl" />
+            <div className="h-80 bg-background-tertiary/50 rounded-lg" />
           </div>
         </div>
       </div>
@@ -340,13 +340,13 @@ export default function V3RequestDetailPage() {
         </div>
         
         <Card>
-          <CardContent className="py-16 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-error/10 flex items-center justify-center">
-              <XCircle className="w-10 h-10 text-error" />
+          <CardContent className="py-12 text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-rose-500/10 flex items-center justify-center">
+              <XCircle className="w-6 h-6 text-rose-500" />
             </div>
-            <h3 className="text-xl font-semibold mb-2">Request Not Found</h3>
-            <p className="text-text-secondary mb-8">
-              {error || 'The request you are looking for does not exist or has been removed'}
+            <h3 className="text-lg font-semibold mb-1">Request Not Found</h3>
+            <p className="text-sm text-text-tertiary mb-6">
+              {error || 'The request does not exist or has been removed'}
             </p>
             <Link href="/v3/requests">
               <Button>Browse All Requests</Button>
@@ -384,9 +384,9 @@ export default function V3RequestDetailPage() {
                 </Button>
               </Link>
               
-              {/* Subtle gradient avatar */}
+              {/* Subtle avatar */}
               <div 
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-sm flex-shrink-0 bg-gradient-to-br from-gray-600 to-gray-700 dark:from-slate-600 dark:to-slate-700 border border-gray-500/30"
+                className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-mono text-sm font-bold flex-shrink-0 bg-gradient-to-br from-slate-600 to-slate-700"
               >
                 {shortId.slice(0, 4).toUpperCase()}
               </div>
@@ -432,91 +432,95 @@ export default function V3RequestDetailPage() {
       })()}
       
       {/* Hero Card - Event Overview */}
-      <Card className={cn('overflow-hidden border-2', statusConfig.borderColor)}>
-        <div className={cn('px-6 py-4', statusConfig.bgColor)}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <StatusIcon className={cn('w-5 h-5', statusConfig.color)} />
-              <span className={cn('font-semibold', statusConfig.color)}>{statusConfig.label}</span>
-            </div>
-            {!isExpired && (request.status === 'Pending' || request.status === 'PartiallyFilled') && (
-              <div className="flex items-center gap-2 text-sm text-text-secondary">
-                <Clock className="w-4 h-4" />
-                <span>Expires in {formatTimeRemaining(request.expiresAt)}</span>
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          {/* Status Header */}
+          <div className="px-5 py-4 border-b border-border-primary/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', statusConfig.bgColor)}>
+                  <StatusIcon className={cn('w-4 h-4', statusConfig.color)} />
+                </div>
+                <span className={cn('font-semibold', statusConfig.color)}>{statusConfig.label}</span>
               </div>
-            )}
+              {!isExpired && (request.status === 'Pending' || request.status === 'PartiallyFilled') && (
+                <div className="flex items-center gap-1.5 text-xs text-text-tertiary">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Expires in {formatTimeRemaining(request.expiresAt)}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Event Icon & Type */}
-            <div className="flex-shrink-0">
-              <div className="w-24 h-24 rounded-2xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary flex items-center justify-center text-5xl">
-                {eventInfo?.icon || '📋'}
-              </div>
-            </div>
-            
-            {/* Event Details */}
-            <div className="flex-1 space-y-4">
-              <div>
-                <h2 className="text-2xl font-bold mb-1">
-                  {eventInfo?.label || request.eventSpec.eventType}
-                </h2>
-                <p className="text-text-secondary">
-                  {eventInfo?.description || 'Climate risk insurance coverage'}
-                </p>
+          
+          {/* Content */}
+          <div className="p-5">
+            <div className="flex flex-col md:flex-row gap-5">
+              {/* Event Icon & Type */}
+              <div className="flex-shrink-0">
+                <div className="w-16 h-16 rounded-lg bg-background-tertiary/50 flex items-center justify-center text-3xl">
+                  {eventInfo?.icon || '📋'}
+                </div>
               </div>
               
-              <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-transparent">
-                  <MapPin className="w-4 h-4 text-gray-500 dark:text-text-secondary" />
-                  <span className="font-medium">{request.location?.name || `Location #${request.locationId}`}</span>
-                </div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-transparent">
-                  <Target className="w-4 h-4 text-gray-500 dark:text-text-secondary" />
-                  <span className="font-medium">
+              {/* Event Details */}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold mb-1">
+                  {eventInfo?.label || request.eventSpec.eventType}
+                </h2>
+                <p className="text-sm text-text-secondary mb-3">
+                  {eventInfo?.description || 'Climate risk insurance coverage'}
+                </p>
+                
+                <div className="flex flex-wrap items-center gap-3 text-xs text-text-tertiary">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {request.location?.name || `Location #${request.locationId}`}
+                  </span>
+                  <span>•</span>
+                  <span className="flex items-center gap-1">
+                    <Target className="w-3 h-3" />
                     Trigger: {formatThresholdValue(request.eventSpec.threshold.value, request.eventSpec.threshold.unit)}
                   </span>
                 </div>
               </div>
+              
+              {/* Key Financial Summary */}
+              <div className="flex-shrink-0">
+                <div className="px-4 py-3 rounded-lg bg-background-tertiary/30">
+                  <p className="text-xs text-text-tertiary mb-1">Max Payout</p>
+                  <p className="text-xl font-bold text-prmx-cyan">
+                    {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare, false)}
+                  </p>
+                </div>
+              </div>
             </div>
             
-            {/* Key Financial Summary */}
-            <div className="flex-shrink-0 md:text-right">
-              <div className="inline-block px-4 py-3 rounded-xl bg-background-tertiary">
-                <p className="text-sm text-text-secondary mb-1">Max Payout</p>
-                <p className="text-2xl font-bold text-prmx-cyan">
-                  {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare, false)}
+            {/* Fill Progress */}
+            <div className="mt-5 pt-4 border-t border-border-primary/30">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Users className="w-3.5 h-3.5 text-text-tertiary" />
+                  <span className="text-xs text-text-tertiary">Underwriting Progress</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-sm">
+                  <span className="font-bold">{request.filledShares}</span>
+                  <span className="text-text-tertiary">/</span>
+                  <span className="text-text-secondary">{request.totalShares} shares</span>
+                </div>
+              </div>
+              <div className="relative h-1.5 bg-background-tertiary rounded-full overflow-hidden">
+                <div 
+                  className="absolute inset-y-0 left-0 bg-prmx-cyan transition-all duration-500 ease-out"
+                  style={{ width: `${fillPercentage}%` }}
+                />
+              </div>
+              {remainingShares > 0 && !isExpired && (
+                <p className="text-xs text-text-tertiary mt-2">
+                  <Zap className="w-3 h-3 inline mr-1 text-amber-500" />
+                  {remainingShares} share{remainingShares > 1 ? 's' : ''} available
                 </p>
-              </div>
+              )}
             </div>
-          </div>
-          
-          {/* Fill Progress */}
-          <div className="mt-6 pt-6 border-t border-border-secondary">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-text-secondary" />
-                <span className="text-sm text-text-secondary">Underwriting Progress</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-lg font-bold">{request.filledShares}</span>
-                <span className="text-text-secondary">/</span>
-                <span className="text-lg font-medium text-text-secondary">{request.totalShares} shares</span>
-              </div>
-            </div>
-            <div className="relative h-3 bg-gray-200 dark:bg-background-tertiary rounded-full overflow-hidden">
-              <div 
-                className="absolute inset-y-0 left-0 bg-prmx-cyan transition-all duration-500 ease-out"
-                style={{ width: `${fillPercentage}%` }}
-              />
-            </div>
-            {remainingShares > 0 && !isExpired && (
-              <p className="text-sm text-text-secondary mt-2">
-                <Zap className="w-4 h-4 inline mr-1 text-warning" />
-                {remainingShares} share{remainingShares > 1 ? 's' : ''} available for underwriting
-              </p>
-            )}
           </div>
         </CardContent>
       </Card>
@@ -679,76 +683,77 @@ export default function V3RequestDetailPage() {
           </Card>
           
           {/* Financial Terms */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-success" />
-                <h3 className="text-lg font-semibold">Financial Terms</h3>
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <h3 className="text-base font-semibold">Financial Terms</h3>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Per Share Terms */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
-                    Per Share
-                  </h4>
+              
+              {/* Content */}
+              <div className="p-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* Per Share Terms */}
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary/50">
-                      <span className="text-text-secondary">Premium / share</span>
-                      <span className="font-bold text-success text-lg">{formatUSDT(request.premiumPerShare, false)}</span>
+                    <h4 className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide">Per Share</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                        <span className="text-sm text-text-secondary">Premium</span>
+                        <span className="text-sm font-semibold text-emerald-500">{formatUSDT(request.premiumPerShare, false)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                        <span className="text-sm text-text-secondary">Payout</span>
+                        <span className="text-sm font-semibold">{formatUSDT(request.payoutPerShare, false)}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                        <span className="text-sm text-text-secondary">Collateral</span>
+                        <span className="text-sm font-semibold">{formatUSDT(calculateCollateral(1), false)}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary/50">
-                      <span className="text-text-secondary">Payout / share</span>
-                      <span className="font-bold text-lg">{formatUSDT(request.payoutPerShare, false)}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary/50">
-                      <span className="text-text-secondary">Collateral / share</span>
-                      <span className="font-bold text-lg">{formatUSDT(calculateCollateral(1), false)}</span>
+                  </div>
+                  
+                  {/* Total Values */}
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wide">Totals</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                        <span className="text-sm text-text-secondary">Total Shares</span>
+                        <span className="text-sm font-semibold">{request.totalShares}</span>
+                      </div>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                        <span className="text-sm text-text-secondary">Total Premium</span>
+                        <span className="text-sm font-semibold text-emerald-500">
+                          {formatUSDT(BigInt(request.totalShares) * request.premiumPerShare, false)}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gradient-to-r from-emerald-500/5 to-transparent">
+                        <span className="text-sm text-text-secondary">Max Payout</span>
+                        <span className="text-base font-bold">
+                          {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare, false)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
                 
-                {/* Total Values */}
-                <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
-                    Totals
-                  </h4>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary/50">
-                      <span className="text-text-secondary">Total Shares</span>
-                      <span className="font-bold text-lg">{request.totalShares}</span>
+                {/* ROI Indicator */}
+                <div className="mt-4 pt-4 border-t border-border-primary/30">
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                        <TrendingUp className="w-3.5 h-3.5 text-emerald-500" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Underwriter ROI</p>
+                        <p className="text-xs text-text-tertiary">If no event occurs</p>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary/50">
-                      <span className="text-text-secondary">Total Premium</span>
-                      <span className="font-bold text-success text-lg">
-                        {formatUSDT(BigInt(request.totalShares) * request.premiumPerShare, false)}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary">
-                      <span className="text-text-secondary">Max Payout</span>
-                      <span className="font-bold text-text-primary text-xl">
-                        {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare, false)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* ROI Indicator */}
-              <div className="mt-6 p-4 rounded-xl bg-gray-50 dark:bg-background-tertiary/50 border border-gray-200 dark:border-border-secondary">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-                    <div>
-                      <p className="font-medium">Underwriter Return on Collateral</p>
-                      <p className="text-sm text-text-secondary">If no event occurs during coverage period</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">+{roiPercentage.toFixed(1)}%</p>
+                    <span className="text-xl font-bold text-emerald-500">+{roiPercentage.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
@@ -756,35 +761,47 @@ export default function V3RequestDetailPage() {
           </Card>
           
           {/* Requester Info */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-prmx-purple" />
-                <h3 className="text-lg font-semibold">Requester</h3>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary flex items-center justify-center">
-                    <Users className="w-6 h-6 text-gray-500 dark:text-text-secondary" />
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-prmx-purple" />
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <code className="text-sm font-mono">{formatAddress(request.requester)}</code>
-                      {isOwner && <Badge variant="cyan">You</Badge>}
-                    </div>
-                    <p className="text-sm text-text-secondary mt-1">Policy Holder</p>
-                  </div>
+                  <h3 className="text-base font-semibold">Requester</h3>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  icon={copiedAddress ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                  onClick={() => handleCopyAddress(request.requester)}
-                >
-                  {copiedAddress ? 'Copied' : 'Copy'}
-                </Button>
+              </div>
+              
+              {/* Content */}
+              <div className="p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                      <Users className="w-5 h-5 text-text-tertiary" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <code className="text-sm font-mono font-medium">{formatAddress(request.requester)}</code>
+                        {isOwner && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-prmx-cyan/10 text-prmx-cyan uppercase">You</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-text-tertiary mt-0.5">Policy Holder</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleCopyAddress(request.requester)}
+                    className="p-2 rounded-lg hover:bg-background-tertiary/50 transition-colors"
+                    title="Copy address"
+                  >
+                    {copiedAddress ? (
+                      <Check className="w-4 h-4 text-emerald-500" />
+                    ) : (
+                      <Copy className="w-4 h-4 text-text-tertiary hover:text-prmx-cyan" />
+                    )}
+                  </button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -794,241 +811,268 @@ export default function V3RequestDetailPage() {
         <div className="space-y-6">
           {/* Accept Card (for non-owners) */}
           {!isOwner && (
-            <Card className="sticky top-6 z-10 bg-background-primary">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-prmx-cyan" />
-                  <h3 className="text-lg font-semibold">Become an Underwriter</h3>
+            <Card className="sticky top-6 z-10 bg-background-primary overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                      <Shield className="w-4 h-4 text-prmx-cyan" />
+                    </div>
+                    <h3 className="text-base font-semibold">Become an Underwriter</h3>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6">
-                {canAccept ? (
-                  <div className="space-y-5">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Shares to Accept
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          value={sharesToAccept}
-                          onChange={(e) => setSharesToAccept(Math.max(1, Math.min(remainingShares, parseInt(e.target.value) || 1)))}
-                          min={1}
-                          max={remainingShares}
-                          className="text-center text-lg font-bold"
-                        />
-                        <Button
-                          variant="secondary"
-                          size="sm"
-                          onClick={() => setSharesToAccept(remainingShares)}
-                        >
-                          Max
-                        </Button>
-                      </div>
-                      <p className="text-xs text-text-tertiary mt-2 text-center">
-                        {remainingShares} available
-                      </p>
-                    </div>
-                    
-                    {/* Cost Breakdown */}
-                    <div className="p-4 rounded-xl bg-background-tertiary/50 space-y-3">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">Collateral Required</span>
-                        <span className="font-medium">{formatUSDT(collateralNeeded, false)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span className="text-text-secondary">Premium Earned</span>
-                        <span className="font-medium text-success">−{formatUSDT(premiumToEarn, false)}</span>
-                      </div>
-                      <hr className="border-border-secondary" />
-                      <div className="flex justify-between">
-                        <span className="font-medium">Net Investment</span>
-                        <span className="font-bold text-lg">{formatUSDT(collateralNeeded - premiumToEarn, false)}</span>
-                      </div>
-                    </div>
-                    
-                    {/* What You Get */}
-                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-background-tertiary/50 border border-gray-200 dark:border-border-secondary space-y-2">
-                      <p className="font-medium text-sm flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-text-secondary" />
-                        What you get:
-                      </p>
-                      <ul className="text-xs text-text-secondary space-y-1 ml-6">
-                        <li>• {sharesToAccept} LP token{sharesToAccept > 1 ? 's' : ''}</li>
-                        <li>• Premium: {formatUSDT(premiumToEarn, false)} (upfront)</li>
-                        <li>• If no event: keep collateral + premium</li>
-                        <li>• If event: payout to policyholder</li>
-                      </ul>
-                    </div>
-                    
-                    <Button
-                      className="w-full"
-                      size="lg"
-                      onClick={handleAccept}
-                      loading={isAccepting}
-                      icon={<CheckCircle2 className="w-5 h-5" />}
-                    >
-                      Accept {sharesToAccept} Share{sharesToAccept > 1 ? 's' : ''}
-                    </Button>
-                    
-                    {/* Policy link if shares already filled */}
-                    {request.filledShares > 0 && (
-                      <div className="pt-4 border-t border-border-secondary mt-4">
-                        <p className="text-xs text-text-secondary mb-2">
-                          A policy exists with {request.filledShares} shares underwritten.
+                
+                {/* Content */}
+                <div className="p-5">
+                  {canAccept ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-xs text-text-tertiary uppercase tracking-wide mb-2">
+                          Shares to Accept
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            value={sharesToAccept}
+                            onChange={(e) => setSharesToAccept(Math.max(1, Math.min(remainingShares, parseInt(e.target.value) || 1)))}
+                            min={1}
+                            max={remainingShares}
+                            className="text-center text-lg font-bold"
+                          />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setSharesToAccept(remainingShares)}
+                          >
+                            Max
+                          </Button>
+                        </div>
+                        <p className="text-xs text-text-tertiary mt-1.5 text-center">
+                          {remainingShares} available
                         </p>
-                        <Link href={`/v3/policies/${request.id}`}>
-                          <Button variant="ghost" size="sm" className="w-full" icon={<ExternalLink className="w-4 h-4" />}>
-                            View Policy Details
-                          </Button>
-                        </Link>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-6">
-                    {request.status === 'FullyFilled' ? (
-                      <>
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-success/10 flex items-center justify-center">
-                          <CheckCircle2 className="w-8 h-8 text-success" />
+                      
+                      {/* Cost Breakdown */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                          <span className="text-sm text-text-secondary">Collateral</span>
+                          <span className="text-sm font-medium">{formatUSDT(collateralNeeded, false)}</span>
                         </div>
-                        <p className="font-semibold text-lg mb-2">Fully Underwritten</p>
-                        <p className="text-sm text-text-secondary mb-4">All shares have been accepted by underwriters</p>
-                        <Link href={`/v3/policies/${request.id}`}>
-                          <Button variant="secondary" className="w-full" icon={<ExternalLink className="w-4 h-4" />}>
-                            View Policy Details
-                          </Button>
-                        </Link>
-                      </>
-                    ) : isExpired ? (
-                      <>
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-error/10 flex items-center justify-center">
-                          <Clock className="w-8 h-8 text-error" />
+                        <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                          <span className="text-sm text-text-secondary">Premium</span>
+                          <span className="text-sm font-medium text-emerald-500">−{formatUSDT(premiumToEarn, false)}</span>
                         </div>
-                        <p className="font-semibold text-lg mb-2">Request Expired</p>
-                        <p className="text-sm text-text-secondary">This request is no longer accepting underwriters</p>
-                      </>
-                    ) : request.status === 'Cancelled' ? (
-                      <>
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-background-tertiary flex items-center justify-center">
-                          <XCircle className="w-8 h-8 text-text-tertiary" />
+                        <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-gradient-to-r from-prmx-cyan/5 to-transparent">
+                          <span className="text-sm font-medium">Net Investment</span>
+                          <span className="text-base font-bold">{formatUSDT(collateralNeeded - premiumToEarn, false)}</span>
                         </div>
-                        <p className="font-semibold text-lg mb-2">Request Cancelled</p>
-                        <p className="text-sm text-text-secondary">The requester cancelled this request</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-warning/10 flex items-center justify-center">
-                          <AlertCircle className="w-8 h-8 text-warning" />
+                      </div>
+                      
+                      {/* What You Get */}
+                      <div className="pt-3 border-t border-border-primary/30">
+                        <p className="text-xs text-text-tertiary mb-2">What you get:</p>
+                        <ul className="text-xs text-text-secondary space-y-1">
+                          <li className="flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full bg-prmx-cyan" />
+                            {sharesToAccept} LP token{sharesToAccept > 1 ? 's' : ''}
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                            Premium: {formatUSDT(premiumToEarn, false)} upfront
+                          </li>
+                          <li className="flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full bg-text-tertiary" />
+                            No event: keep collateral + premium
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        onClick={handleAccept}
+                        loading={isAccepting}
+                        icon={<CheckCircle2 className="w-4 h-4" />}
+                      >
+                        Accept {sharesToAccept} Share{sharesToAccept > 1 ? 's' : ''}
+                      </Button>
+                      
+                      {/* Policy link if shares already filled */}
+                      {request.filledShares > 0 && (
+                        <div className="pt-3 border-t border-border-primary/30">
+                          <p className="text-xs text-text-tertiary mb-2">
+                            Policy exists with {request.filledShares} shares underwritten.
+                          </p>
+                          <Link href={`/v3/policies/${request.id}`}>
+                            <Button variant="ghost" size="sm" className="w-full" icon={<ExternalLink className="w-3.5 h-3.5" />}>
+                              View Policy
+                            </Button>
+                          </Link>
                         </div>
-                        <p className="font-semibold text-lg mb-2">Cannot Accept</p>
-                        <p className="text-sm text-text-secondary">You cannot accept this request</p>
-                      </>
-                    )}
-                  </div>
-                )}
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      {request.status === 'FullyFilled' ? (
+                        <>
+                          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          </div>
+                          <p className="font-semibold mb-1">Fully Underwritten</p>
+                          <p className="text-xs text-text-tertiary mb-4">All shares accepted</p>
+                          <Link href={`/v3/policies/${request.id}`}>
+                            <Button variant="secondary" size="sm" className="w-full" icon={<ExternalLink className="w-3.5 h-3.5" />}>
+                              View Policy
+                            </Button>
+                          </Link>
+                        </>
+                      ) : isExpired ? (
+                        <>
+                          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                            <Clock className="w-5 h-5 text-rose-500" />
+                          </div>
+                          <p className="font-semibold mb-1">Request Expired</p>
+                          <p className="text-xs text-text-tertiary">No longer accepting underwriters</p>
+                        </>
+                      ) : request.status === 'Cancelled' ? (
+                        <>
+                          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                            <XCircle className="w-5 h-5 text-text-tertiary" />
+                          </div>
+                          <p className="font-semibold mb-1">Request Cancelled</p>
+                          <p className="text-xs text-text-tertiary">Cancelled by requester</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                            <AlertCircle className="w-5 h-5 text-amber-500" />
+                          </div>
+                          <p className="font-semibold mb-1">Cannot Accept</p>
+                          <p className="text-xs text-text-tertiary">You cannot accept this request</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
           
           {/* Owner Actions */}
           {isOwner && (
-            <Card>
-              <CardHeader>
-                <h3 className="text-lg font-semibold">Manage Your Request</h3>
-              </CardHeader>
-              <CardContent className="p-6">
-                {canCancel ? (
-                  <div className="space-y-4">
-                    <div className="p-4 rounded-xl bg-warning/10 border border-warning/30">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-medium text-sm">Cancel unfilled shares</p>
-                          <p className="text-xs text-text-secondary mt-1">
-                            Cancelling will refund the premium for {remainingShares} remaining shares ({formatUSDT(BigInt(remainingShares) * request.premiumPerShare, false)})
-                          </p>
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                      <Users className="w-4 h-4 text-prmx-purple" />
+                    </div>
+                    <h3 className="text-base font-semibold">Manage Request</h3>
+                  </div>
+                </div>
+                
+                {/* Content */}
+                <div className="p-5">
+                  {canCancel ? (
+                    <div className="space-y-4">
+                      <div className="py-2 px-3 rounded-lg bg-amber-500/5">
+                        <div className="flex items-start gap-2.5">
+                          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium">Cancel unfilled shares</p>
+                            <p className="text-xs text-text-tertiary mt-0.5">
+                              Refund: {formatUSDT(BigInt(remainingShares) * request.premiumPerShare, false)} ({remainingShares} shares)
+                            </p>
+                          </div>
                         </div>
                       </div>
+                      
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={handleCancel}
+                        loading={isCancelling}
+                        icon={<XCircle className="w-4 h-4" />}
+                      >
+                        Cancel Remaining
+                      </Button>
                     </div>
-                    
-                    <Button
-                      variant="secondary"
-                      className="w-full"
-                      onClick={handleCancel}
-                      loading={isCancelling}
-                      icon={<XCircle className="w-4 h-4" />}
-                    >
-                      Cancel Remaining Shares
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    {request.status === 'FullyFilled' ? (
-                      <>
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-success/10 flex items-center justify-center">
-                          <CheckCircle2 className="w-8 h-8 text-success" />
-                        </div>
-                        <p className="font-semibold text-lg mb-2">Request Fulfilled!</p>
-                        <p className="text-sm text-text-secondary mb-4">
-                          All shares have been accepted. Your policy is now active.
-                        </p>
-                        <Link href={`/v3/policies/${request.id}`}>
-                          <Button className="w-full" icon={<ArrowRight className="w-4 h-4" />}>
-                            View Policy
-                          </Button>
-                        </Link>
-                      </>
-                    ) : request.status === 'Cancelled' ? (
-                      <>
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-background-tertiary flex items-center justify-center">
-                          <XCircle className="w-8 h-8 text-text-tertiary" />
-                        </div>
-                        <p className="font-semibold text-lg mb-2">Request Cancelled</p>
-                        <p className="text-sm text-text-secondary">Premium has been refunded</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-16 h-16 mx-auto mb-4 rounded-xl bg-background-tertiary flex items-center justify-center">
-                          <Clock className="w-8 h-8 text-text-tertiary" />
-                        </div>
-                        <p className="font-semibold text-lg mb-2">Request Expired</p>
-                        <p className="text-sm text-text-secondary">
-                          {request.filledShares > 0 
-                            ? 'Partially filled - a policy was created with filled shares'
-                            : 'Premium has been refunded'}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                )}
+                  ) : (
+                    <div className="text-center py-4">
+                      {request.status === 'FullyFilled' ? (
+                        <>
+                          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                          </div>
+                          <p className="font-semibold mb-1">Request Fulfilled!</p>
+                          <p className="text-xs text-text-tertiary mb-4">Policy is now active</p>
+                          <Link href={`/v3/policies/${request.id}`}>
+                            <Button size="sm" className="w-full" icon={<ArrowRight className="w-3.5 h-3.5" />}>
+                              View Policy
+                            </Button>
+                          </Link>
+                        </>
+                      ) : request.status === 'Cancelled' ? (
+                        <>
+                          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                            <XCircle className="w-5 h-5 text-text-tertiary" />
+                          </div>
+                          <p className="font-semibold mb-1">Request Cancelled</p>
+                          <p className="text-xs text-text-tertiary">Premium refunded</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                            <Clock className="w-5 h-5 text-text-tertiary" />
+                          </div>
+                          <p className="font-semibold mb-1">Request Expired</p>
+                          <p className="text-xs text-text-tertiary">
+                            {request.filledShares > 0 
+                              ? 'Policy created with filled shares'
+                              : 'Premium refunded'}
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}
           
           {/* DAO Expire Action */}
           {canExpire && (
-            <Card className="border-warning/30 bg-warning/5">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-warning" />
-                  <h3 className="font-semibold">DAO Action</h3>
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                      <Clock className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold">DAO Action</h3>
+                      <p className="text-xs text-text-tertiary">Request expired</p>
+                    </div>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  <p className="text-sm text-text-secondary">
-                    This request has passed its expiry time. Trigger expiry to refund the unfilled premium to the requester.
+                
+                {/* Content */}
+                <div className="p-5 space-y-4">
+                  <p className="text-xs text-text-tertiary">
+                    Trigger expiry to refund unfilled premium to requester.
                   </p>
                   
-                  <div className="p-3 rounded-lg bg-background-tertiary/50 space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">Unfilled Shares</span>
-                      <span className="font-medium">{remainingShares}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                      <span className="text-sm text-text-secondary">Unfilled Shares</span>
+                      <span className="text-sm font-medium">{remainingShares}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-text-secondary">Refund Amount</span>
-                      <span className="font-medium">
+                    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                      <span className="text-sm text-text-secondary">Refund Amount</span>
+                      <span className="text-sm font-medium">
                         {formatUSDT(BigInt(remainingShares) * request.premiumPerShare, false)}
                       </span>
                     </div>

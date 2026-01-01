@@ -368,11 +368,11 @@ export default function PolicyDetailPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Market Info */}
-            <div className="p-4 rounded-xl bg-background-tertiary/50">
+            <div className="p-4 rounded-xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-border-secondary">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                    <MapPin className="w-6 h-6 text-prmx-cyan" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-lg">{market?.name || `Market #${policy.marketId}`}</h3>

@@ -952,8 +952,8 @@ export default function LpTradingPage() {
                         {/* Header Row */}
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                              <Shield className="w-5 h-5 text-white" />
+                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                              <Shield className="w-5 h-5 text-prmx-cyan" />
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
@@ -1381,10 +1381,10 @@ export default function LpTradingPage() {
           <div className="space-y-4">
             {/* Market Info Card */}
             {market && (
-              <div className="p-4 rounded-xl bg-gradient-to-r from-prmx-purple/10 to-prmx-cyan/10 border border-prmx-purple/20">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border border-prmx-purple/20">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-purple/30 flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-prmx-purple-light" />
                   </div>
                   <div>
                     <h4 className="font-semibold">{selectedPolicy.label}</h4>
@@ -1526,10 +1526,10 @@ export default function LpTradingPage() {
           <div className="space-y-4">
             {/* Market Info Card */}
             {market && (
-              <div className="p-4 rounded-xl bg-gradient-to-r from-prmx-cyan/10 to-prmx-purple/10 border border-prmx-cyan/20">
+              <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border border-prmx-cyan/20">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-prmx-cyan" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -2096,8 +2096,8 @@ export default function LpTradingPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between pb-3 border-b border-border-secondary">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center shrink-0">
-                        <Shield className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center shrink-0">
+                        <Shield className="w-5 h-5 text-prmx-cyan" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -2279,8 +2279,8 @@ export default function LpTradingPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between pb-3 border-b border-border-secondary">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center shrink-0">
-                        <Shield className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center shrink-0">
+                        <Shield className="w-5 h-5 text-prmx-cyan" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -2448,9 +2448,9 @@ export default function LpTradingPage() {
           return (
             <div className="space-y-5">
               {/* Header */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-prmx-gradient/10 border border-prmx-cyan/20">
-                <div className="w-14 h-14 rounded-xl bg-prmx-gradient flex items-center justify-center shrink-0">
-                  <Shield className="w-7 h-7 text-white" />
+              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border border-prmx-cyan/20">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center shrink-0">
+                  <Shield className="w-7 h-7 text-prmx-cyan" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -2525,8 +2525,8 @@ export default function LpTradingPage() {
               <div className="p-4 rounded-xl bg-background-tertiary/30 border border-border-secondary">
                 <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Seller</p>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-prmx-gradient flex items-center justify-center">
-                    <Users className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                    <Users className="w-5 h-5 text-prmx-cyan" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium">

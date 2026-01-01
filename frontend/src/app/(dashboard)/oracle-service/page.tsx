@@ -248,11 +248,11 @@ export default function OracleV2Page() {
       )}
 
       {/* Info Card */}
-      <Card className="bg-gradient-to-r from-prmx-purple/5 to-prmx-cyan/5 border-prmx-purple/20">
+      <Card className="bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border-prmx-purple/20">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-prmx-gradient flex items-center justify-center flex-shrink-0">
-              <Activity className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-purple/30 flex items-center justify-center flex-shrink-0">
+              <Activity className="w-6 h-6 text-prmx-purple-light" />
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-2">V2 Oracle Service</h3>
@@ -343,7 +343,7 @@ export default function OracleV2Page() {
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "w-10 h-10 rounded-lg flex items-center justify-center",
-                          isTriggered ? "bg-success/20" : "bg-prmx-gradient"
+                          isTriggered ? "bg-success/20" : "bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30"
                         )}>
                           {isTriggered ? (
                             <Zap className="w-5 h-5 text-success" />

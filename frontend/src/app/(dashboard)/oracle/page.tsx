@@ -440,11 +440,11 @@ export default function OraclePage() {
       )}
 
       {/* Oracle Info */}
-      <Card className="bg-gradient-to-r from-prmx-cyan/5 to-prmx-purple/5 border-prmx-cyan/20">
+      <Card className="bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border-prmx-cyan/20">
         <CardContent className="p-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-prmx-gradient flex items-center justify-center flex-shrink-0">
-              <CloudRain className="w-6 h-6 text-white" />
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center flex-shrink-0">
+              <CloudRain className="w-6 h-6 text-prmx-cyan" />
             </div>
             <div>
               <h3 className="text-lg font-semibold mb-2">AccuWeather Oracle</h3>
@@ -537,8 +537,8 @@ export default function OraclePage() {
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                          <MapPin className="w-5 h-5 text-white" />
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                          <MapPin className="w-5 h-5 text-prmx-cyan" />
                         </div>
                         <div>
                           <h3 className="font-semibold text-lg">{market.name}</h3>

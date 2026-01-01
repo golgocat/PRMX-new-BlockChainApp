@@ -679,7 +679,7 @@ export default function V3PolicyDetailPage() {
                   <div 
                     className={cn(
                       "h-full transition-all",
-                      policy.status === 'Triggered' ? 'bg-error' : 'bg-prmx-gradient'
+                      policy.status === 'Triggered' ? 'bg-error' : 'bg-gradient-to-br from-slate-700 to-slate-800'
                     )}
                     style={{ width: `${coverageProgress}%` }}
                   />
@@ -986,7 +986,7 @@ export default function V3PolicyDetailPage() {
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-2 bg-background-tertiary rounded-full overflow-hidden">
                                 <div 
-                                  className="h-full bg-prmx-gradient"
+                                  className="h-full bg-gradient-to-r from-prmx-cyan to-teal-500"
                                   style={{ width: `${holder.percentageOwned}%` }}
                                 />
                               </div>
@@ -1289,7 +1289,7 @@ export default function V3PolicyDetailPage() {
             </CardHeader>
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-prmx-gradient flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
                   <Shield className="w-5 h-5 text-white" />
                 </div>
                 <div className="flex items-center gap-2">

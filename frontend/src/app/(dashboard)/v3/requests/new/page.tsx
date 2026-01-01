@@ -279,7 +279,7 @@ export default function NewV3RequestPage() {
             <div className={cn(
               "w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-colors",
               step === s 
-                ? "bg-prmx-gradient text-white" 
+                ? "bg-gradient-to-br from-slate-600 to-slate-700 text-white" 
                 : (['event', 'coverage', 'terms', 'review'].indexOf(step) > i)
                   ? "bg-success text-white"
                   : "bg-background-tertiary text-text-tertiary"
@@ -440,7 +440,7 @@ export default function NewV3RequestPage() {
                                 <div className={cn(
                                   "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
                                   locationId === loc.id
-                                    ? "bg-prmx-gradient"
+                                    ? "bg-gradient-to-br from-slate-600 to-slate-700"
                                     : "bg-background-secondary group-hover:bg-prmx-cyan/20"
                                 )}>
                                   <MapPin className={cn(

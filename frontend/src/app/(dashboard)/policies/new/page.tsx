@@ -435,8 +435,8 @@ export default function NewPolicyPage() {
                     }`}
                   >
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                        <MapPin className="w-5 h-5 text-white" />
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                        <MapPin className="w-5 h-5 text-prmx-cyan" />
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
@@ -490,10 +490,10 @@ export default function NewPolicyPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Selected Market Summary */}
-            <div className="p-4 rounded-xl bg-background-tertiary/50">
+            <div className="p-4 rounded-xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-border-secondary">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                  <MapPin className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-prmx-cyan" />
                 </div>
                 <div>
                   <h4 className="font-semibold">{selectedMarket.name}</h4>
@@ -773,7 +773,7 @@ export default function NewPolicyPage() {
                     </div>
                   </div>
 
-                  <div className="p-4 rounded-xl bg-prmx-gradient/10 border border-prmx-cyan/20 space-y-3">
+                  <div className="p-4 rounded-xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-prmx-cyan/20 space-y-3">
                     <h4 className="font-semibold">Premium Quote</h4>
                     <div className="space-y-2">
                       <div className="text-3xl font-bold text-prmx-cyan">

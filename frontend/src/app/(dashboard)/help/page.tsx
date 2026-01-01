@@ -303,10 +303,10 @@ export default function HelpPage() {
 
             {/* Contact Section */}
             <div className="space-y-6">
-              <Card className="bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
+              <Card className="bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border-prmx-cyan/20">
                 <CardContent className="p-6 text-center">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-prmx-gradient flex items-center justify-center">
-                    <MessageCircle className="w-8 h-8 text-white" />
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                    <MessageCircle className="w-8 h-8 text-prmx-cyan" />
                   </div>
                   <h3 className="font-semibold mb-2">Still need help?</h3>
                   <p className="text-sm text-text-secondary mb-4">
@@ -364,10 +364,10 @@ export default function HelpPage() {
 
           {/* Featured Article */}
           <div className="space-y-6">
-            <Card className="bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
+            <Card className="bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border-prmx-cyan/20">
               <CardContent className="p-6">
-                <div className="w-12 h-12 rounded-xl bg-prmx-gradient flex items-center justify-center mb-4">
-                  <Book className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center mb-4">
+                  <Book className="w-6 h-6 text-prmx-cyan" />
                 </div>
                 <h3 className="font-semibold mb-2">What is Parametric Insurance?</h3>
                 <p className="text-sm text-text-secondary mb-4">
@@ -471,8 +471,8 @@ export default function HelpPage() {
           <Card className="lg:col-span-2 bg-gradient-to-r from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
             <CardContent className="p-6">
               <div className="flex items-center gap-6">
-                <div className="w-16 h-16 rounded-full bg-prmx-gradient flex items-center justify-center flex-shrink-0">
-                  <Mail className="w-8 h-8 text-white" />
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center flex-shrink-0">
+                  <Mail className="w-8 h-8 text-prmx-cyan" />
                 </div>
                 <div className="flex-1">
                   <h3 className="font-semibold text-lg mb-1">Need Direct Support?</h3>

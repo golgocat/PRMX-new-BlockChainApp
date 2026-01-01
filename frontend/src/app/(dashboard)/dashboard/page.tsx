@@ -144,7 +144,7 @@ function PolicyCard({
           {/* Icon */}
           <div className={cn(
             'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
-            isActive ? 'bg-success/20' : 'bg-prmx-gradient'
+            isActive ? 'bg-success/20' : 'bg-gradient-to-br from-slate-700 to-slate-800'
           )}>
             {isActive ? (
               <Shield className="w-6 h-6 text-success" />
@@ -201,8 +201,8 @@ function MarketMiniCard({
       <div className="group p-4 rounded-xl bg-gradient-to-br from-background-secondary/80 to-background-tertiary/50 border border-border-secondary hover:border-prmx-cyan/30 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-prmx-cyan/5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-prmx-gradient flex items-center justify-center">
-              <Globe2 className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+              <Globe2 className="w-4 h-4 text-prmx-cyan" />
             </div>
             <h4 className="font-semibold group-hover:text-prmx-cyan transition-colors">{market.name}</h4>
           </div>
@@ -511,8 +511,8 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-prmx-gradient flex items-center justify-center">
-                    <Shield className="w-5 h-5 text-white" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-prmx-cyan" />
                   </div>
                   <div>
                     <h3 className="font-bold">Recent Policies</h3>
@@ -531,8 +531,8 @@ export default function DashboardPage() {
                 </div>
               ) : recentPolicies.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-prmx-gradient flex items-center justify-center">
-                    <Shield className="w-8 h-8 text-white" />
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                    <Shield className="w-8 h-8 text-prmx-cyan" />
                   </div>
                   <p className="font-semibold mb-1">No policies yet</p>
                   <p className="text-sm text-text-tertiary mb-4">
@@ -682,8 +682,8 @@ export default function DashboardPage() {
             </div>
           ) : markets.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-prmx-gradient flex items-center justify-center">
-                <Globe2 className="w-8 h-8 text-white" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                <Globe2 className="w-8 h-8 text-prmx-cyan" />
               </div>
               <p className="font-semibold mb-1">No markets available</p>
               <p className="text-sm text-text-tertiary mb-4">Markets will appear here once created</p>

@@ -239,8 +239,8 @@ export default function MarketsPage() {
                     {/* Header */}
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-xl bg-prmx-gradient flex items-center justify-center">
-                          <Globe2 className="w-6 h-6 text-white" />
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                          <Globe2 className="w-6 h-6 text-prmx-cyan" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">

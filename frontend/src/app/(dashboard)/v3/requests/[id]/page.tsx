@@ -274,8 +274,8 @@ export default function V3RequestDetailPage() {
         
         <Card>
           <CardContent className="py-16 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-prmx-gradient flex items-center justify-center">
-              <Wallet className="w-10 h-10 text-white" />
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+              <Wallet className="w-10 h-10 text-prmx-cyan" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Connect Your Wallet</h3>
             <p className="text-text-secondary mb-8 max-w-md mx-auto">
@@ -456,7 +456,7 @@ export default function V3RequestDetailPage() {
           <div className="flex flex-col md:flex-row gap-6">
             {/* Event Icon & Type */}
             <div className="flex-shrink-0">
-              <div className="w-24 h-24 rounded-2xl bg-prmx-gradient flex items-center justify-center text-5xl shadow-prmx-glow-sm">
+              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center text-5xl shadow-lg">
                 {eventInfo?.icon || '📋'}
               </div>
             </div>
@@ -512,7 +512,7 @@ export default function V3RequestDetailPage() {
             </div>
             <div className="relative h-4 bg-background-tertiary rounded-full overflow-hidden">
               <div 
-                className="absolute inset-y-0 left-0 bg-prmx-gradient transition-all duration-500 ease-out"
+                className="absolute inset-y-0 left-0 bg-gradient-to-r from-prmx-cyan to-teal-500 transition-all duration-500 ease-out"
                 style={{ width: `${fillPercentage}%` }}
               />
               {fillPercentage > 0 && fillPercentage < 100 && (
@@ -738,8 +738,8 @@ export default function V3RequestDetailPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-prmx-gradient flex items-center justify-center">
-                    <Users className="w-6 h-6 text-white" />
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                    <Users className="w-6 h-6 text-prmx-cyan" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">

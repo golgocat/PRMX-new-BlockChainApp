@@ -37,9 +37,19 @@ import { formatId } from '@/lib/api-v3';
 
 type TabValue = 'open' | 'my' | 'all';
 
-function getStatusBadge(status: V3RequestStatus, expiresAt: number) {
+function getStatusBadge(status: V3RequestStatus, expiresAt: number, filledShares: number = 0) {
   const now = Math.floor(Date.now() / 1000);
   const isExpired = expiresAt <= now;
+  
+  // Partially filled + expired = Policy was created with partial shares
+  if (status === 'PartiallyFilled' && isExpired) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <Badge variant="success">Policy Created</Badge>
+        <span className="text-[10px] text-text-tertiary">{filledShares} shares</span>
+      </div>
+    );
+  }
   
   if (status === 'Pending' && isExpired) {
     return <Badge variant="error">Expired</Badge>;
@@ -55,6 +65,15 @@ function getStatusBadge(status: V3RequestStatus, expiresAt: number) {
     case 'Cancelled':
       return <Badge variant="default">Cancelled</Badge>;
     case 'Expired':
+      // Expired status with filled shares means a policy was created
+      if (filledShares > 0) {
+        return (
+          <div className="flex flex-col gap-0.5">
+            <Badge variant="success">Policy Created</Badge>
+            <span className="text-[10px] text-text-tertiary">{filledShares} shares</span>
+          </div>
+        );
+      }
       return <Badge variant="error">Expired</Badge>;
     default:
       return <Badge variant="default">{status}</Badge>;
@@ -353,21 +372,31 @@ export default function V3RequestsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="space-y-1">
-                          {getStatusBadge(request.status, request.expiresAt)}
+                          {getStatusBadge(request.status, request.expiresAt, request.filledShares)}
                           {isOwner && (
                             <Badge variant="cyan" className="block w-fit">You</Badge>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Link href={`/v3/requests/${request.id}`}>
-                          <Button 
-                            variant={canAccept ? 'primary' : 'ghost'} 
-                            size="sm"
-                          >
-                            {canAccept ? 'Accept' : <ChevronRight className="w-4 h-4" />}
-                          </Button>
-                        </Link>
+                        {/* If policy was created (filled or partially filled + expired), link to policy */}
+                        {(request.status === 'FullyFilled' || 
+                          (request.filledShares > 0 && (request.status === 'Expired' || request.expiresAt <= Math.floor(Date.now() / 1000)))) ? (
+                          <Link href={`/v3/policies/${request.id}`}>
+                            <Button variant="secondary" size="sm">
+                              View Policy
+                            </Button>
+                          </Link>
+                        ) : (
+                          <Link href={`/v3/requests/${request.id}`}>
+                            <Button 
+                              variant={canAccept ? 'primary' : 'ghost'} 
+                              size="sm"
+                            >
+                              {canAccept ? 'Accept' : <ChevronRight className="w-4 h-4" />}
+                            </Button>
+                          </Link>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

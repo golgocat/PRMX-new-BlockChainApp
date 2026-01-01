@@ -163,7 +163,7 @@ export default function LpTradingPage() {
   
   // DeFi solvency state
   const [solvencyInfo, setSolvencyInfo] = useState<DaoSolvencyInfo | null>(null);
-  const [policyDefiInfoMap, setPolicyDefiInfoMap] = useState<Map<number, PolicyDefiInfo>>(new Map());
+  const [policyDefiInfoMap, setPolicyDefiInfoMap] = useState<Map<string, PolicyDefiInfo>>(new Map());
   
   // Load DAO solvency info on mount
   useEffect(() => {
@@ -181,7 +181,7 @@ export default function LpTradingPage() {
   // Load DeFi info for holdings
   useEffect(() => {
     const loadDefiInfo = async () => {
-      const newMap = new Map<number, PolicyDefiInfo>();
+      const newMap = new Map<string, PolicyDefiInfo>();
       for (const holding of holdings) {
         try {
           const defiInfo = await api.getPolicyDefiInfo(holding.policyId);

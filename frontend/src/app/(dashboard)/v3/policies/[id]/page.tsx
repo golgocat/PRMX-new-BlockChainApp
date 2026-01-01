@@ -1148,7 +1148,7 @@ export default function V3PolicyDetailPage() {
                       </Button>
                       {!isDao && myLpHolding && (
                         <p className="text-xs text-text-tertiary mt-2 text-center">
-                          You hold {myLpHolding.percentageOwned.toFixed(1)}% of LP tokens (>=51% required)
+                          You hold {myLpHolding.percentageOwned.toFixed(1)}% of LP tokens (&ge;51% required)
                         </p>
                       )}
                     </div>

@@ -14,22 +14,222 @@ import {
   RefreshCw,
   AlertTriangle,
   CheckCircle2,
-  DollarSign
+  DollarSign,
+  Zap,
+  ChevronRight,
+  Sparkles,
+  MapPin
 } from 'lucide-react';
 import Link from 'next/link';
-import { StatCard } from '@/components/ui/StatCard';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge, StatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
-import { SkeletonStatsCard, SkeletonCard } from '@/components/ui/Skeleton';
-import { RainfallChart, PremiumChart } from '@/components/features/RainfallChart';
 import { formatUSDT, formatTimeRemaining, formatAddress } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { useMarkets, usePolicies, useLpOrders, useDashboardStats } from '@/hooks/useChainData';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 import type { DaoSolvencyInfo } from '@/types';
+
+// Animated stat card component
+function AnimatedStatCard({ 
+  title, 
+  value, 
+  icon: Icon, 
+  gradient,
+  subtitle,
+  onClick,
+}: { 
+  title: string;
+  value: string | number;
+  icon: React.ElementType;
+  gradient: string;
+  subtitle?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <div 
+      onClick={onClick}
+      className={cn(
+        'group relative overflow-hidden rounded-2xl p-5 transition-all duration-300',
+        'hover:scale-[1.02] hover:shadow-lg hover:shadow-prmx-cyan/10',
+        onClick && 'cursor-pointer',
+        gradient
+      )}
+    >
+      {/* Background glow effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      
+      <div className="relative z-10">
+        <div className="flex items-start justify-between mb-3">
+          <div className="w-11 h-11 rounded-xl bg-white/10 backdrop-blur-sm flex items-center justify-center">
+            <Icon className="w-5 h-5 text-white" />
+          </div>
+          {onClick && (
+            <ChevronRight className="w-5 h-5 text-white/50 group-hover:text-white group-hover:translate-x-1 transition-all" />
+          )}
+        </div>
+        <p className="text-white/70 text-sm font-medium mb-1">{title}</p>
+        <p className="text-white text-2xl font-bold tracking-tight">{value}</p>
+        {subtitle && (
+          <p className="text-white/50 text-xs mt-1">{subtitle}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Quick action button component
+function QuickActionCard({
+  href,
+  icon: Icon,
+  title,
+  description,
+  iconBg,
+  iconColor,
+}: {
+  href: string;
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  iconBg: string;
+  iconColor: string;
+}) {
+  return (
+    <Link href={href} className="block group">
+      <div className="p-4 rounded-xl bg-background-secondary/50 border border-border-secondary hover:border-prmx-cyan/30 hover:bg-background-secondary transition-all duration-200">
+        <div className="flex items-center gap-4">
+          <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110', iconBg)}>
+            <Icon className={cn('w-6 h-6', iconColor)} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold group-hover:text-prmx-cyan transition-colors">{title}</p>
+            <p className="text-sm text-text-tertiary truncate">{description}</p>
+          </div>
+          <ChevronRight className="w-5 h-5 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-1 transition-all" />
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// Policy card component (replaces table row)
+function PolicyCard({
+  policy,
+  marketName,
+}: {
+  policy: {
+    id: string;
+    label?: string;
+    marketId: number;
+    holder: string;
+    shares: bigint;
+    coverageEnd: number;
+    status: string;
+  };
+  marketName: string;
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  const isExpired = policy.coverageEnd < now;
+  const status = policy.status === 'Active' && isExpired ? 'Expired' : policy.status;
+  const isActive = status === 'Active';
+  const displayId = policy.label || `${policy.id.slice(0, 10)}...`;
+
+  return (
+    <Link href={`/policies/${policy.id}`}>
+      <div className={cn(
+        'group p-4 rounded-xl border transition-all duration-200 cursor-pointer',
+        'hover:shadow-lg hover:shadow-prmx-cyan/5',
+        isActive 
+          ? 'bg-gradient-to-r from-success/5 to-transparent border-success/20 hover:border-success/40' 
+          : 'bg-background-secondary/30 border-border-secondary hover:border-prmx-cyan/30'
+      )}>
+        <div className="flex items-center gap-4">
+          {/* Icon */}
+          <div className={cn(
+            'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
+            isActive ? 'bg-success/20' : 'bg-prmx-gradient'
+          )}>
+            {isActive ? (
+              <Shield className="w-6 h-6 text-success" />
+            ) : (
+              <Globe2 className="w-6 h-6 text-white" />
+            )}
+          </div>
+          
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-semibold truncate">{marketName}</span>
+              <StatusBadge status={status} />
+            </div>
+            <div className="flex items-center gap-4 text-sm text-text-secondary">
+              <span className="flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5" />
+                {displayId}
+              </span>
+              <span>{policy.shares.toString()} shares</span>
+            </div>
+          </div>
+          
+          {/* Right side */}
+          <div className="text-right flex-shrink-0">
+            <div className="flex items-center gap-1.5 text-text-secondary mb-1">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm">{formatTimeRemaining(policy.coverageEnd)}</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-1 transition-all ml-auto" />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// Market mini card
+function MarketMiniCard({
+  market,
+  activePolicies,
+}: {
+  market: {
+    id: number;
+    name: string;
+    status: string;
+    strikeValue: number;
+    riskParameters: { daoMarginBp: number };
+  };
+  activePolicies: number;
+}) {
+  return (
+    <Link href={`/markets/${market.id}`}>
+      <div className="group p-4 rounded-xl bg-gradient-to-br from-background-secondary/80 to-background-tertiary/50 border border-border-secondary hover:border-prmx-cyan/30 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-prmx-cyan/5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-prmx-gradient flex items-center justify-center">
+              <Globe2 className="w-4 h-4 text-white" />
+            </div>
+            <h4 className="font-semibold group-hover:text-prmx-cyan transition-colors">{market.name}</h4>
+          </div>
+          <StatusBadge status={market.status} />
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="p-2 rounded-lg bg-background-primary/50">
+            <p className="text-lg font-bold text-prmx-cyan">{activePolicies}</p>
+            <p className="text-[10px] text-text-tertiary uppercase tracking-wide">Policies</p>
+          </div>
+          <div className="p-2 rounded-lg bg-background-primary/50">
+            <p className="text-lg font-bold">{market.strikeValue}</p>
+            <p className="text-[10px] text-text-tertiary uppercase tracking-wide">mm</p>
+          </div>
+          <div className="p-2 rounded-lg bg-background-primary/50">
+            <p className="text-lg font-bold text-prmx-purple-light">{(market.riskParameters.daoMarginBp / 100).toFixed(0)}%</p>
+            <p className="text-[10px] text-text-tertiary uppercase tracking-wide">Margin</p>
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
 
 export default function DashboardPage() {
   const { isConnected, selectedAccount, isChainConnected, currentBlock } = useWalletStore();
@@ -76,9 +276,9 @@ export default function DashboardPage() {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  // Get recent policies (last 5)
-  const recentPolicies = policies
-    .sort((a, b) => b.id - a.id)
+  // Get recent policies (last 5, sorted by creation time)
+  const recentPolicies = [...policies]
+    .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 5);
 
   // Get market name by ID
@@ -91,290 +291,220 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-text-secondary mt-1">
-            {isConnected && selectedAccount ? (
-              <>Welcome back, <span className="text-prmx-cyan">{selectedAccount.name}</span> ({selectedAccount.role})</>
-            ) : (
-              'Connect your wallet to get started'
-            )}
-          </p>
+      {/* Hero Section */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-prmx-purple via-prmx-cyan/80 to-prmx-magenta p-8">
+        {/* Animated background pattern */}
+        <div className="absolute inset-0 opacity-30">
+          <div className="absolute top-0 left-0 w-72 h-72 bg-white/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-prmx-cyan/20 rounded-full blur-3xl animate-pulse delay-700" />
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="secondary"
-            icon={<RefreshCw className={cn('w-4 h-4 transition-transform', isRefreshing && 'animate-spin')} />}
-            onClick={handleRefreshAll}
-            disabled={isRefreshing || isLoading}
-          >
-            Refresh
-          </Button>
-          {isDao ? (
-            <Link href="/markets">
-              <Button icon={<Plus className="w-5 h-5" />}>
-                Create Market
+        
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                {isConnected && selectedAccount && (
+                  <Badge variant="cyan" className="bg-white/20 border-0">
+                    <Sparkles className="w-3 h-3 mr-1" />
+                    {selectedAccount.role}
+                  </Badge>
+                )}
+              </div>
+              <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+                {isConnected && selectedAccount ? (
+                  <>Welcome back, {selectedAccount.name}</>
+                ) : (
+                  'PRMX Dashboard'
+                )}
+              </h1>
+              <p className="text-white/70 max-w-md">
+                {isDao 
+                  ? 'Manage markets, monitor protocol health, and oversee platform operations'
+                  : selectedAccount?.role === 'Customer'
+                  ? 'Get parametric insurance coverage for weather-related risks'
+                  : 'Provide liquidity and earn returns on insurance markets'}
+              </p>
+            </div>
+            <div className="hidden md:flex items-center gap-3">
+              <Button
+                variant="secondary"
+                className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+                icon={<RefreshCw className={cn('w-4 h-4', isRefreshing && 'animate-spin')} />}
+                onClick={handleRefreshAll}
+                disabled={isRefreshing || isLoading}
+              >
+                Refresh
               </Button>
-            </Link>
-          ) : (
-            <Link href="/policies/new">
-              <Button icon={<Shield className="w-5 h-5" />}>
-                Get Coverage
-              </Button>
-            </Link>
+              {isDao ? (
+                <Link href="/markets">
+                  <Button className="bg-white text-prmx-purple hover:bg-white/90" icon={<Plus className="w-5 h-5" />}>
+                    Create Market
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/policies/new">
+                  <Button className="bg-white text-prmx-purple hover:bg-white/90" icon={<Shield className="w-5 h-5" />}>
+                    Get Coverage
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+          
+          {/* Balance Card */}
+          {isConnected && selectedAccount && (
+            <div className="inline-flex items-center gap-4 bg-white/10 backdrop-blur-sm rounded-xl px-5 py-3 border border-white/20">
+              <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center">
+                <Wallet className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <p className="text-white/60 text-sm">Available Balance</p>
+                <p className="text-white text-xl font-bold">{usdtFormatted}</p>
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Role-specific banner */}
-      {isConnected && selectedAccount && (
-        <div className={cn(
-          'p-4 rounded-xl border flex items-center justify-between',
-          isDao 
-            ? 'bg-prmx-purple/10 border-prmx-purple/30' 
-            : selectedAccount.role === 'Customer'
-            ? 'bg-prmx-cyan/10 border-prmx-cyan/30'
-            : 'bg-success/10 border-success/30'
-        )}>
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              'w-10 h-10 rounded-lg flex items-center justify-center',
-              isDao ? 'bg-prmx-purple/20' : selectedAccount.role === 'Customer' ? 'bg-prmx-cyan/20' : 'bg-success/20'
-            )}>
-              {isDao ? <Shield className="w-5 h-5 text-prmx-purple-light" /> : 
-               selectedAccount.role === 'Customer' ? <Shield className="w-5 h-5 text-prmx-cyan" /> :
-               <Wallet className="w-5 h-5 text-success" />}
-            </div>
-            <div>
-              <p className="font-semibold">{selectedAccount.role} Dashboard</p>
-              <p className="text-sm text-text-secondary">
-                {isDao 
-                  ? 'Create markets, manage parameters, and oversee the platform'
-                  : selectedAccount.role === 'Customer'
-                  ? 'Get insurance coverage and manage your policies'
-                  : 'Trade LP tokens and earn returns on your investments'}
-              </p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-text-secondary">Available Balance</p>
-            <p className="text-lg font-bold">{usdtFormatted}</p>
-          </div>
-        </div>
-      )}
-
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <AnimatedStatCard
           title="Active Markets"
           value={isLoading ? '...' : stats.totalMarkets}
-          icon={<Globe2 className="w-5 h-5" />}
+          icon={Globe2}
+          gradient="bg-gradient-to-br from-indigo-500 to-purple-600"
+          onClick={() => window.location.href = '/markets'}
         />
-        <StatCard
+        <AnimatedStatCard
           title="Total Policies"
           value={isLoading ? '...' : stats.totalPolicies}
-          icon={<Shield className="w-5 h-5" />}
-          iconColor="bg-prmx-purple/10 text-prmx-purple-light"
+          icon={Shield}
+          gradient="bg-gradient-to-br from-prmx-cyan to-teal-500"
+          subtitle={`${stats.activePolicies} active`}
+          onClick={() => window.location.href = '/policies'}
         />
-        <StatCard
-          title="Active Policies"
-          value={isLoading ? '...' : stats.activePolicies}
-          icon={<TrendingUp className="w-5 h-5" />}
-          iconColor="bg-success/10 text-success"
+        <AnimatedStatCard
+          title={isDao ? 'Platform LP Orders' : 'My LP Holdings'}
+          value={isLoading ? '...' : isDao ? stats.totalLpOrders : stats.myLpHoldings}
+          icon={Wallet}
+          gradient="bg-gradient-to-br from-emerald-500 to-green-600"
+          onClick={() => window.location.href = '/lp'}
         />
-        <StatCard
-          title="LP Orders"
-          value={isLoading ? '...' : stats.totalLpOrders}
-          icon={<Wallet className="w-5 h-5" />}
-          iconColor="bg-prmx-cyan/10 text-prmx-cyan"
+        <AnimatedStatCard
+          title="Current Block"
+          value={`#${currentBlock}`}
+          icon={Activity}
+          gradient="bg-gradient-to-br from-prmx-purple to-prmx-magenta"
+          subtitle={isChainConnected ? '● Synced' : '○ Disconnected'}
         />
       </div>
 
-      {/* My Stats (when connected) */}
-      {isConnected && selectedAccount && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-gradient-to-br from-prmx-cyan/10 to-prmx-purple/10 border-prmx-cyan/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-secondary">{isDao ? 'Total Policies' : 'My Policies'}</p>
-                  <p className="text-2xl font-bold">{isDao ? stats.totalPolicies : stats.myPolicies}</p>
-                  <p className="text-xs text-text-tertiary mt-1">{isDao ? stats.activePolicies : stats.myActivePolicies} active</p>
-                </div>
-                <Shield className="w-10 h-10 text-prmx-cyan opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-success/10 to-prmx-cyan/10 border-success/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-secondary">LP Holdings</p>
-                  <p className="text-2xl font-bold">{stats.myLpHoldings}</p>
-                  <p className="text-xs text-text-tertiary mt-1">positions</p>
-                </div>
-                <Wallet className="w-10 h-10 text-success opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-prmx-purple/10 to-prmx-magenta/10 border-prmx-purple/20">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-text-secondary">Current Block</p>
-                  <p className="text-2xl font-bold">#{currentBlock}</p>
-                  <p className="text-xs text-text-tertiary mt-1">
-                    {isChainConnected ? 'Chain synced' : 'Disconnected'}
-                  </p>
-                </div>
-                <Activity className="w-10 h-10 text-prmx-purple-light opacity-50" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
       {/* DAO DeFi Strategy Dashboard */}
-      {isDao && (
-        <Card className="border-prmx-cyan/30">
-          <CardHeader>
+      {isDao && solvencyInfo && (
+        <Card className="border-prmx-cyan/30 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-prmx-cyan/5 to-transparent" />
+          <CardHeader className="relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-prmx-cyan/10 flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-prmx-cyan" />
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-prmx-cyan to-teal-500 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h2 className="font-semibold">DeFi Strategy Dashboard</h2>
-                  <p className="text-sm text-text-secondary">DeFi yield strategy status & DAO solvency</p>
+                  <h2 className="text-lg font-bold">DeFi Strategy Dashboard</h2>
+                  <p className="text-sm text-text-secondary">Protocol solvency & yield strategy</p>
                 </div>
               </div>
-              <Button 
-                variant="secondary" 
-                size="sm" 
-                onClick={loadSolvencyInfo}
-                disabled={loadingSolvency}
-                icon={<RefreshCw className={cn('w-4 h-4', loadingSolvency && 'animate-spin')} />}
-              >
-                Refresh
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {loadingSolvency && !solvencyInfo ? (
-              <div className="flex items-center justify-center py-8">
-                <RefreshCw className="w-6 h-6 animate-spin text-prmx-cyan" />
-              </div>
-            ) : solvencyInfo ? (
-              <div className="space-y-4">
-                {/* Solvency Status Banner */}
-                <div className={cn(
-                  'p-4 rounded-xl border',
-                  solvencyInfo.isSolvent 
-                    ? 'bg-success/10 border-success/30' 
-                    : 'bg-warning/10 border-warning/30'
-                )}>
-                  <div className="flex items-center gap-3">
-                    {solvencyInfo.isSolvent ? (
-                      <CheckCircle2 className="w-6 h-6 text-success" />
-                    ) : (
-                      <AlertTriangle className="w-6 h-6 text-warning" />
-                    )}
-                    <div className="flex-1">
-                      <p className="font-semibold">
-                        {solvencyInfo.isSolvent ? 'DAO is Solvent' : 'Solvency Warning'}
-                      </p>
-                      <p className="text-xs text-text-secondary">
-                        {solvencyInfo.isSolvent 
-                          ? 'DAO can cover all potential DeFi losses' 
-                          : 'DAO may not cover all potential DeFi losses'}
-                      </p>
-                    </div>
-                    <Badge 
-                      variant={solvencyInfo.isSolvent ? 'success' : 'warning'}
-                    >
-                      {solvencyInfo.isSolvent ? '🟢 Solvent' : '🟡 At Risk'}
-                    </Badge>
-                  </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-xl bg-background-tertiary/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="w-4 h-4 text-success" />
-                      <span className="text-sm text-text-secondary">DAO Balance</span>
-                    </div>
-                    <p className="text-xl font-bold text-success">
-                      {formatUSDT(solvencyInfo.daoBalance)}
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-background-tertiary/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <TrendingUp className="w-4 h-4 text-prmx-purple" />
-                      <span className="text-sm text-text-secondary">Total in DeFi</span>
-                    </div>
-                    <p className="text-xl font-bold text-prmx-purple-light">
-                      {formatUSDT(solvencyInfo.totalAllocatedCapital)}
-                    </p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-background-tertiary/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Activity className="w-4 h-4 text-prmx-cyan" />
-                      <span className="text-sm text-text-secondary">Active Positions</span>
-                    </div>
-                    <p className="text-xl font-bold">{solvencyInfo.activePositionsCount}</p>
-                  </div>
-                  <div className="p-4 rounded-xl bg-background-tertiary/50">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Shield className="w-4 h-4 text-text-secondary" />
-                      <span className="text-sm text-text-secondary">Allocation Rate</span>
-                    </div>
-                    <p className="text-xl font-bold">
-                      {(solvencyInfo.allocationPercentagePpm / 10000).toFixed(0)}%
-                    </p>
-                  </div>
-                </div>
-
-                {/* Coverage Ratio */}
-                <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-text-secondary">Coverage Ratio</span>
-                    <span className="text-sm font-mono">
-                      {solvencyInfo.totalAllocatedCapital > BigInt(0)
-                        ? `${((Number(solvencyInfo.daoBalance) / Number(solvencyInfo.totalAllocatedCapital)) * 100).toFixed(1)}%`
-                        : 'N/A'
-                      }
-                    </span>
-                  </div>
-                  <div className="w-full h-2 bg-background-secondary rounded-full overflow-hidden">
-                    <div 
-                      className={cn(
-                        'h-full transition-all',
-                        solvencyInfo.isSolvent ? 'bg-success' : 'bg-warning'
-                      )}
-                      style={{ 
-                        width: solvencyInfo.totalAllocatedCapital > BigInt(0)
-                          ? `${Math.min(100, (Number(solvencyInfo.daoBalance) / Number(solvencyInfo.totalAllocatedCapital)) * 100)}%`
-                          : '0%'
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-text-tertiary mt-2">
-                    DAO Balance / Total Allocated Capital (100% = full coverage)
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <TrendingUp className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
-                <p className="text-text-secondary">Unable to load solvency data</p>
-                <Button variant="secondary" size="sm" className="mt-3" onClick={loadSolvencyInfo}>
-                  Try Again
+              <div className="flex items-center gap-3">
+                <Badge 
+                  variant={solvencyInfo.isSolvent ? 'success' : 'warning'}
+                  className="px-3 py-1"
+                >
+                  {solvencyInfo.isSolvent ? (
+                    <><CheckCircle2 className="w-4 h-4 mr-1" /> Solvent</>
+                  ) : (
+                    <><AlertTriangle className="w-4 h-4 mr-1" /> At Risk</>
+                  )}
+                </Badge>
+                <Button 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={loadSolvencyInfo}
+                  disabled={loadingSolvency}
+                  icon={<RefreshCw className={cn('w-4 h-4', loadingSolvency && 'animate-spin')} />}
+                >
+                  Refresh
                 </Button>
               </div>
-            )}
+            </div>
+          </CardHeader>
+          <CardContent className="relative">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="p-4 rounded-xl bg-success/10 border border-success/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="w-4 h-4 text-success" />
+                  <span className="text-sm text-text-secondary">DAO Balance</span>
+                </div>
+                <p className="text-xl font-bold text-success">
+                  {formatUSDT(solvencyInfo.daoBalance)}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-prmx-purple/10 border border-prmx-purple/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="w-4 h-4 text-prmx-purple-light" />
+                  <span className="text-sm text-text-secondary">In DeFi</span>
+                </div>
+                <p className="text-xl font-bold text-prmx-purple-light">
+                  {formatUSDT(solvencyInfo.totalAllocatedCapital)}
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/20">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="w-4 h-4 text-prmx-cyan" />
+                  <span className="text-sm text-text-secondary">Positions</span>
+                </div>
+                <p className="text-xl font-bold">{solvencyInfo.activePositionsCount}</p>
+              </div>
+              <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
+                <div className="flex items-center gap-2 mb-2">
+                  <Zap className="w-4 h-4 text-warning" />
+                  <span className="text-sm text-text-secondary">Allocation</span>
+                </div>
+                <p className="text-xl font-bold">
+                  {(solvencyInfo.allocationPercentagePpm / 10000).toFixed(0)}%
+                </p>
+              </div>
+            </div>
+            
+            {/* Coverage Progress */}
+            <div className="p-4 rounded-xl bg-background-tertiary/30 border border-border-secondary">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium">Coverage Ratio</span>
+                <span className={cn(
+                  'text-lg font-bold',
+                  solvencyInfo.isSolvent ? 'text-success' : 'text-warning'
+                )}>
+                  {solvencyInfo.totalAllocatedCapital > BigInt(0)
+                    ? `${((Number(solvencyInfo.daoBalance) / Number(solvencyInfo.totalAllocatedCapital)) * 100).toFixed(1)}%`
+                    : 'N/A'
+                  }
+                </span>
+              </div>
+              <div className="w-full h-3 bg-background-secondary rounded-full overflow-hidden">
+                <div 
+                  className={cn(
+                    'h-full transition-all rounded-full',
+                    solvencyInfo.isSolvent 
+                      ? 'bg-gradient-to-r from-success to-emerald-400' 
+                      : 'bg-gradient-to-r from-warning to-orange-400'
+                  )}
+                  style={{ 
+                    width: solvencyInfo.totalAllocatedCapital > BigInt(0)
+                      ? `${Math.min(100, (Number(solvencyInfo.daoBalance) / Number(solvencyInfo.totalAllocatedCapital)) * 100)}%`
+                      : '0%'
+                  }}
+                />
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -386,76 +516,49 @@ export default function DashboardPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Recent Policies</h3>
-                <Link href="/policies" className="text-sm text-prmx-cyan hover:text-prmx-cyan-light flex items-center gap-1">
-                  View all <ArrowRight className="w-4 h-4" />
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-prmx-gradient flex items-center justify-center">
+                    <Shield className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold">Recent Policies</h3>
+                    <p className="text-sm text-text-tertiary">{stats.activePolicies} active</p>
+                  </div>
+                </div>
+                <Link href="/policies" className="text-sm text-prmx-cyan hover:text-prmx-cyan-light flex items-center gap-1 group">
+                  View all <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Policy</TableHeaderCell>
-                    <TableHeaderCell>Holder</TableHeaderCell>
-                    <TableHeaderCell>Shares</TableHeaderCell>
-                    <TableHeaderCell>Expires</TableHeaderCell>
-                    <TableHeaderCell>Status</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {policiesLoading ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
-                        <RefreshCw className="w-6 h-6 animate-spin mx-auto text-text-tertiary" />
-                      </TableCell>
-                    </TableRow>
-                  ) : recentPolicies.length === 0 ? (
-                    <TableEmpty
-                      icon={<Shield className="w-8 h-8" />}
-                      title="No policies yet"
-                      description={isDao ? "No policies have been created yet" : "Be the first to get coverage!"}
-                    />
-                  ) : (
-                    recentPolicies.map((policy) => {
-                      const now = Math.floor(Date.now() / 1000);
-                      const isExpired = policy.coverageEnd < now;
-                      const status = policy.status === 'Active' && isExpired ? 'Expired' : policy.status;
-                      
-                      return (
-                        <TableRow key={policy.id} clickable>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-8 h-8 rounded-lg bg-prmx-gradient flex items-center justify-center">
-                                <Globe2 className="w-4 h-4 text-white" />
-                              </div>
-                              <div>
-                                <span className="font-medium">{getMarketName(policy.marketId)}</span>
-                                <p className="text-xs text-text-tertiary">#{policy.id}</p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <code className="text-sm text-text-secondary">
-                              {formatAddress(policy.holder)}
-                            </code>
-                          </TableCell>
-                          <TableCell>{policy.shares.toString()}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1.5 text-text-secondary">
-                              <Clock className="w-4 h-4" />
-                              {formatTimeRemaining(policy.coverageEnd)}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={status} />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
+            <CardContent className="space-y-3">
+              {policiesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <RefreshCw className="w-8 h-8 animate-spin text-prmx-cyan" />
+                </div>
+              ) : recentPolicies.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-prmx-gradient flex items-center justify-center">
+                    <Shield className="w-8 h-8 text-white" />
+                  </div>
+                  <p className="font-semibold mb-1">No policies yet</p>
+                  <p className="text-sm text-text-tertiary mb-4">
+                    {isDao ? "No policies have been created yet" : "Be the first to get coverage!"}
+                  </p>
+                  {!isDao && (
+                    <Link href="/policies/new">
+                      <Button size="sm">Get Coverage</Button>
+                    </Link>
                   )}
-                </TableBody>
-              </Table>
+                </div>
+              ) : (
+                recentPolicies.map((policy) => (
+                  <PolicyCard
+                    key={policy.id}
+                    policy={policy}
+                    marketName={getMarketName(policy.marketId)}
+                  />
+                ))
+              )}
             </CardContent>
           </Card>
         </div>
@@ -463,97 +566,99 @@ export default function DashboardPage() {
         {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <h3 className="font-semibold">Quick Actions</h3>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-prmx-purple to-prmx-magenta flex items-center justify-center">
+                <Zap className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold">Quick Actions</h3>
+                <p className="text-sm text-text-tertiary">Common tasks</p>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {isDao ? (
               <>
-                <Link href="/markets" className="block">
-                  <div className="p-4 rounded-xl bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-prmx-purple/20 flex items-center justify-center">
-                        <Plus className="w-5 h-5 text-prmx-purple-light" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Create Market</p>
-                        <p className="text-xs text-text-secondary">Add a new insurance market</p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-                <Link href="/oracle" className="block">
-                  <div className="p-4 rounded-xl bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-info/20 flex items-center justify-center">
-                        <Droplets className="w-5 h-5 text-info" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Oracle Data</p>
-                        <p className="text-xs text-text-secondary">Monitor rainfall data</p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                <QuickActionCard
+                  href="/markets"
+                  icon={Plus}
+                  title="Create Market"
+                  description="Add new insurance market"
+                  iconBg="bg-prmx-purple/20"
+                  iconColor="text-prmx-purple-light"
+                />
+                <QuickActionCard
+                  href="/oracle"
+                  icon={Droplets}
+                  title="Oracle Data"
+                  description="Monitor weather data feeds"
+                  iconBg="bg-info/20"
+                  iconColor="text-info"
+                />
+                <QuickActionCard
+                  href="/policies"
+                  icon={Shield}
+                  title="Manage Policies"
+                  description="View and settle policies"
+                  iconBg="bg-prmx-cyan/20"
+                  iconColor="text-prmx-cyan"
+                />
               </>
             ) : selectedAccount?.role === 'Customer' ? (
               <>
-                <Link href="/policies/new" className="block">
-                  <div className="p-4 rounded-xl bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-prmx-cyan/20 flex items-center justify-center">
-                        <Shield className="w-5 h-5 text-prmx-cyan" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Get Coverage</p>
-                        <p className="text-xs text-text-secondary">Request a new insurance quote</p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-                <Link href="/policies" className="block">
-                  <div className="p-4 rounded-xl bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-success" />
-                      </div>
-                      <div>
-                        <p className="font-medium">{isDao ? 'All Policies' : 'My Policies'}</p>
-                        <p className="text-xs text-text-secondary">{isDao ? 'Manage and settle policies' : 'View and manage your coverage'}</p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                <QuickActionCard
+                  href="/policies/new"
+                  icon={Shield}
+                  title="Get Coverage"
+                  description="Request insurance quote"
+                  iconBg="bg-prmx-cyan/20"
+                  iconColor="text-prmx-cyan"
+                />
+                <QuickActionCard
+                  href="/policies"
+                  icon={Activity}
+                  title="My Policies"
+                  description="View your coverage"
+                  iconBg="bg-success/20"
+                  iconColor="text-success"
+                />
+                <QuickActionCard
+                  href="/lp"
+                  icon={Wallet}
+                  title="LP Marketplace"
+                  description="Trade LP tokens"
+                  iconBg="bg-prmx-purple/20"
+                  iconColor="text-prmx-purple-light"
+                />
               </>
             ) : (
               <>
-                <Link href="/lp" className="block">
-                  <div className="p-4 rounded-xl bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
-                        <Wallet className="w-5 h-5 text-success" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Trade LP Tokens</p>
-                        <p className="text-xs text-text-secondary">Buy or sell LP positions</p>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
+                <QuickActionCard
+                  href="/lp"
+                  icon={Wallet}
+                  title="Trade LP Tokens"
+                  description="Buy or sell positions"
+                  iconBg="bg-success/20"
+                  iconColor="text-success"
+                />
+                <QuickActionCard
+                  href="/policies"
+                  icon={Activity}
+                  title="Browse Policies"
+                  description="Find investment opportunities"
+                  iconBg="bg-prmx-cyan/20"
+                  iconColor="text-prmx-cyan"
+                />
               </>
             )}
-            <Link href="/markets" className="block">
-              <div className="p-4 rounded-xl bg-background-tertiary/50 hover:bg-background-tertiary transition-colors cursor-pointer">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-prmx-magenta/20 flex items-center justify-center">
-                    <Globe2 className="w-5 h-5 text-prmx-magenta" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Explore Markets</p>
-                    <p className="text-xs text-text-secondary">Browse available insurance markets</p>
-                  </div>
-                </div>
-              </div>
-            </Link>
+            <QuickActionCard
+              href="/markets"
+              icon={Globe2}
+              title="Explore Markets"
+              description="Browse insurance markets"
+              iconBg="bg-prmx-magenta/20"
+              iconColor="text-prmx-magenta"
+            />
           </CardContent>
         </Card>
       </div>
@@ -562,24 +667,35 @@ export default function DashboardPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Markets Overview</h3>
-            <Link href="/markets" className="text-sm text-prmx-cyan hover:text-prmx-cyan-light flex items-center gap-1">
-              Explore markets <ArrowRight className="w-4 h-4" />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                <Globe2 className="w-5 h-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold">Active Markets</h3>
+                <p className="text-sm text-text-tertiary">{stats.totalMarkets} markets available</p>
+              </div>
+            </div>
+            <Link href="/markets" className="text-sm text-prmx-cyan hover:text-prmx-cyan-light flex items-center gap-1 group">
+              Explore all <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </div>
         </CardHeader>
         <CardContent>
           {marketsLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="w-6 h-6 animate-spin text-text-tertiary" />
+            <div className="flex items-center justify-center py-12">
+              <RefreshCw className="w-8 h-8 animate-spin text-prmx-cyan" />
             </div>
           ) : markets.length === 0 ? (
-            <div className="text-center py-8">
-              <Globe2 className="w-12 h-12 mx-auto mb-3 text-text-tertiary" />
-              <p className="text-text-secondary">No markets available</p>
+            <div className="text-center py-12">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-prmx-gradient flex items-center justify-center">
+                <Globe2 className="w-8 h-8 text-white" />
+              </div>
+              <p className="font-semibold mb-1">No markets available</p>
+              <p className="text-sm text-text-tertiary mb-4">Markets will appear here once created</p>
               {isDao && (
                 <Link href="/markets">
-                  <Button size="sm" className="mt-4">Create First Market</Button>
+                  <Button size="sm">Create First Market</Button>
                 </Link>
               )}
             </div>
@@ -590,28 +706,11 @@ export default function DashboardPage() {
                 const activePolicies = marketPolicies.filter(p => p.status === 'Active').length;
                 
                 return (
-                  <Link key={market.id} href={`/markets/${market.id}`}>
-                    <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary hover:border-prmx-cyan/30 transition-all cursor-pointer">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold">{market.name}</h4>
-                        <StatusBadge status={market.status} />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-text-secondary">Active Policies</span>
-                          <span>{activePolicies}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-text-secondary">Strike</span>
-                          <span>{market.strikeValue} mm</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-text-secondary">DAO Margin</span>
-                          <span>{(market.riskParameters.daoMarginBp / 100).toFixed(1)}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
+                  <MarketMiniCard
+                    key={market.id}
+                    market={market}
+                    activePolicies={activePolicies}
+                  />
                 );
               })}
             </div>

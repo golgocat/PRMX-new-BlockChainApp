@@ -228,8 +228,10 @@ export interface V3LpHolding {
   policyId: string; // H128 hash ID as hex string
   policy?: V3Policy;
   holder: string;
-  lpShares: number;
-  percentageOwned: number;
+  lpShares: number;        // Free (unlocked) shares
+  lockedShares: number;    // Shares locked in sell orders
+  totalShares: number;     // lpShares + lockedShares
+  percentageOwned: number; // Based on totalShares
 }
 
 // =============================================================================

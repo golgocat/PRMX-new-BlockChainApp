@@ -245,8 +245,8 @@ export default function V3PolicyDetailPage() {
     if (!policy || !selectedAccount) return false;
     if (isDao) return true; // DAO can always allocate
     if (!myLpHolding || !policy.totalShares) return false;
-    // Check if LP holder has >=51% ownership
-    const ownershipPercentage = (myLpHolding.lpShares / policy.totalShares) * 100;
+    // Check if LP holder has >=51% ownership (includes locked shares)
+    const ownershipPercentage = (myLpHolding.totalShares / policy.totalShares) * 100;
     return ownershipPercentage >= 51;
   }, [policy, selectedAccount, isDao, myLpHolding]);
   
@@ -942,7 +942,7 @@ export default function V3PolicyDetailPage() {
                 </h2>
                 {!holdersLoading && lpHolders.length > 0 && (
                   <span className="text-sm text-text-tertiary">
-                    {lpHolders.reduce((sum, h) => sum + h.lpShares, 0).toLocaleString()} total shares
+                    {lpHolders.reduce((sum, h) => sum + h.totalShares, 0).toLocaleString()} total shares
                   </span>
                 )}
               </div>
@@ -1005,7 +1005,12 @@ export default function V3PolicyDetailPage() {
                             )}
                           </div>
                           <p className="text-xs text-text-tertiary mt-0.5">
-                            {holder.lpShares.toLocaleString()} shares
+                            {holder.totalShares.toLocaleString()} shares
+                            {holder.lockedShares > 0 && (
+                              <span className="text-amber-500 ml-1">
+                                ({holder.lockedShares} locked)
+                              </span>
+                            )}
                           </p>
                         </div>
                         
@@ -1294,7 +1299,14 @@ export default function V3PolicyDetailPage() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-text-tertiary">LP Shares</span>
-                        <span className="text-sm font-medium">{myLpHolding.lpShares}</span>
+                        <div className="text-right">
+                          <span className="text-sm font-medium">{myLpHolding.totalShares}</span>
+                          {myLpHolding.lockedShares > 0 && (
+                            <span className="text-xs text-amber-500 ml-1">
+                              ({myLpHolding.lockedShares} locked)
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-text-tertiary">Ownership</span>
@@ -1303,7 +1315,7 @@ export default function V3PolicyDetailPage() {
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-text-tertiary">Collateral</span>
                         <span className="text-sm font-medium">
-                          {formatUSDT(BigInt(myLpHolding.lpShares) * BigInt(100_000_000))}
+                          {formatUSDT(BigInt(myLpHolding.totalShares) * BigInt(100_000_000))}
                         </span>
                       </div>
                       {policy.status === 'Active' && !isExpired && (

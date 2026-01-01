@@ -533,18 +533,24 @@ export async function getV3LpHoldings(address: string): Promise<V3LpHolding[]> {
   for (const policy of policies) {
     const result = await api.query.prmxHoldings.holdingsStorage(policy.id, address);
     if (result && !result.isEmpty) {
-      const lpShares = result.lpShares.toNumber();
-      if (lpShares > 0) {
+      const lpShares = (result as any).lpShares?.toNumber?.() ?? 0;
+      const lockedShares = (result as any).lockedShares?.toNumber?.() ?? 0;
+      const holderTotalShares = lpShares + lockedShares;
+      
+      // Include if they have any shares (free or locked)
+      if (holderTotalShares > 0) {
         // Get total LP shares for percentage calculation
         const totalLp = await api.query.prmxHoldings.totalLpShares(policy.id);
-        const totalShares = totalLp.toNumber();
+        const totalLpShares = totalLp.toNumber();
         
         holdings.push({
           policyId: policy.id,
           policy,
           holder: address,
           lpShares,
-          percentageOwned: totalShares > 0 ? (lpShares / totalShares) * 100 : 0,
+          lockedShares,
+          totalShares: holderTotalShares,
+          percentageOwned: totalLpShares > 0 ? (holderTotalShares / totalLpShares) * 100 : 0,
         });
       }
     }
@@ -560,14 +566,18 @@ export async function getV3PolicyLpHolders(policyId: string): Promise<V3LpHoldin
   const api = await getApi();
   const entries = await api.query.prmxHoldings.holdingsStorage.entries(policyId);
   const totalLp = await api.query.prmxHoldings.totalLpShares(policyId);
-  const totalShares = totalLp.toNumber();
+  const totalLpShares = totalLp.toNumber();
   
   const holders: V3LpHolding[] = [];
   
   for (const [key, value] of entries) {
     if (value && !value.isEmpty) {
-      const lpShares = value.lpShares.toNumber();
-      if (lpShares > 0) {
+      const lpShares = (value as any).lpShares?.toNumber?.() ?? 0;
+      const lockedShares = (value as any).lockedShares?.toNumber?.() ?? 0;
+      const holderTotalShares = lpShares + lockedShares;
+      
+      // Include holder if they have any shares (free or locked)
+      if (holderTotalShares > 0) {
         // Extract holder address from key
         const keyHuman = key.args[1].toString();
         
@@ -575,13 +585,16 @@ export async function getV3PolicyLpHolders(policyId: string): Promise<V3LpHoldin
           policyId,
           holder: keyHuman,
           lpShares,
-          percentageOwned: totalShares > 0 ? (lpShares / totalShares) * 100 : 0,
+          lockedShares,
+          totalShares: holderTotalShares,
+          percentageOwned: totalLpShares > 0 ? (holderTotalShares / totalLpShares) * 100 : 0,
         });
       }
     }
   }
   
-  return holders.sort((a, b) => b.lpShares - a.lpShares);
+  // Sort by total shares (free + locked)
+  return holders.sort((a, b) => b.totalShares - a.totalShares);
 }
 
 // =============================================================================

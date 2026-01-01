@@ -389,14 +389,19 @@ export default function V3RequestsPage() {
                             <span>Policy</span>
                             <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                           </Link>
-                        ) : (
+                        ) : canAccept ? (
                           <Link href={`/v3/requests/${request.id}`}>
-                            <Button 
-                              variant={canAccept ? 'primary' : 'ghost'} 
-                              size="sm"
-                            >
-                              {canAccept ? 'Accept' : <ChevronRight className="w-4 h-4" />}
+                            <Button variant="primary" size="sm">
+                              Accept
                             </Button>
+                          </Link>
+                        ) : (
+                          <Link 
+                            href={`/v3/requests/${request.id}`}
+                            className="group flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary transition-colors"
+                          >
+                            <span>Request</span>
+                            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                           </Link>
                         )}
                       </TableCell>

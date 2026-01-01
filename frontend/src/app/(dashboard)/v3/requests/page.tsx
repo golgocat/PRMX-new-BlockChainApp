@@ -43,12 +43,7 @@ function getStatusBadge(status: V3RequestStatus, expiresAt: number, filledShares
   
   // Partially filled + expired = Policy was created with partial shares
   if (status === 'PartiallyFilled' && isExpired) {
-    return (
-      <div className="flex flex-col gap-0.5">
-        <Badge variant="success">Partial</Badge>
-        <span className="text-[10px] text-text-tertiary">{filledShares} shares</span>
-      </div>
-    );
+    return <Badge variant="success">Partial</Badge>;
   }
   
   if (status === 'Pending' && isExpired) {
@@ -67,12 +62,7 @@ function getStatusBadge(status: V3RequestStatus, expiresAt: number, filledShares
     case 'Expired':
       // Expired status with filled shares means a policy was created
       if (filledShares > 0) {
-        return (
-          <div className="flex flex-col gap-0.5">
-            <Badge variant="success">Partial</Badge>
-            <span className="text-[10px] text-text-tertiary">{filledShares} shares</span>
-          </div>
-        );
+        return <Badge variant="success">Partial</Badge>;
       }
       return <Badge variant="error">Expired</Badge>;
     default:

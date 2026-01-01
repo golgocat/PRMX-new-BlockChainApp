@@ -382,10 +382,12 @@ export default function V3RequestsPage() {
                         {/* If policy was created (filled or partially filled + expired), link to policy */}
                         {(request.status === 'FullyFilled' || 
                           (request.filledShares > 0 && (request.status === 'Expired' || request.expiresAt <= Math.floor(Date.now() / 1000)))) ? (
-                          <Link href={`/v3/policies/${request.id}`}>
-                            <Button variant="secondary" size="sm">
-                              View Policy
-                            </Button>
+                          <Link 
+                            href={`/v3/policies/${request.id}`}
+                            className="group flex items-center gap-1 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors"
+                          >
+                            <span>Policy</span>
+                            <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                           </Link>
                         ) : (
                           <Link href={`/v3/requests/${request.id}`}>

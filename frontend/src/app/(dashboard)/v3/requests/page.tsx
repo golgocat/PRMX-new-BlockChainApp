@@ -280,10 +280,13 @@ export default function V3RequestsPage() {
                   const isOwner = request.requester === selectedAccount?.address;
                   const canAccept = isRequestAcceptable(request) && !isOwner && remainingShares > 0;
                   
-                  // For filled requests, show total collateral locked
+                  // For requests with policies (filled or partial+expired), show locked collateral
                   // For open requests, show collateral needed for remaining shares
-                  const collateralToShow = request.status === 'FullyFilled' 
-                    ? calculateCollateral(request.totalShares)
+                  const now = Math.floor(Date.now() / 1000);
+                  const hasPolicy = request.status === 'FullyFilled' || 
+                    (request.filledShares > 0 && request.expiresAt <= now);
+                  const collateralToShow = hasPolicy
+                    ? calculateCollateral(request.filledShares)
                     : calculateCollateral(remainingShares);
                   
                   return (
@@ -356,7 +359,7 @@ export default function V3RequestsPage() {
                       </TableCell>
                       <TableCell>
                         <span className="font-medium">{formatUSDT(collateralToShow, false)}</span>
-                        {request.status === 'FullyFilled' && (
+                        {hasPolicy && (
                           <span className="text-xs text-text-tertiary block">locked</span>
                         )}
                       </TableCell>

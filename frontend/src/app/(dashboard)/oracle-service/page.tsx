@@ -247,55 +247,59 @@ export default function OracleV2Page() {
         </div>
       )}
 
-      {/* Info Card */}
-      <Card className="bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border-prmx-purple/20">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-purple/30 flex items-center justify-center flex-shrink-0">
-              <Activity className="w-6 h-6 text-prmx-purple-light" />
+      {/* Info Card - Sleek design */}
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className="px-5 py-4 border-b border-border-primary/50">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                <Activity className="w-4 h-4 text-prmx-purple" />
+              </div>
+              <h3 className="text-base font-semibold">V2 Oracle Service</h3>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">V2 Oracle Service</h3>
-              <p className="text-text-secondary mb-4">
-                V2 policies use cumulative rainfall tracking with early trigger support. 
-                The off-chain oracle fetches AccuWeather data and automatically reports 
-                when the threshold is reached or coverage ends.
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="text-text-tertiary">Market</span>
-                  <p className="font-medium">Manila Only</p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">Duration</span>
-                  <p className="font-medium">2-7 Days</p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">Event Type</span>
-                  <p className="font-medium">Cumulative Rainfall</p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">Early Trigger</span>
-                  <p className="font-medium text-success">Enabled</p>
-                </div>
+          </div>
+          <div className="p-5">
+            <p className="text-sm text-text-secondary mb-4">
+              Cumulative rainfall tracking with early trigger support. Auto-reports on threshold or coverage end.
+            </p>
+            <div className="grid grid-cols-4 divide-x divide-border-primary/30">
+              <div className="px-4 text-center first:pl-0">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Market</p>
+                <p className="text-sm font-medium">Manila</p>
+              </div>
+              <div className="px-4 text-center">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Duration</p>
+                <p className="text-sm font-medium">2-7 Days</p>
+              </div>
+              <div className="px-4 text-center">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Event</p>
+                <p className="text-sm font-medium">Cumulative</p>
+              </div>
+              <div className="px-4 text-center last:pr-0">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Early Trigger</p>
+                <p className="text-sm font-medium text-emerald-500">On</p>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Active Monitors */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Activity className="w-5 h-5 text-prmx-cyan" />
-              Active Monitors
-            </h2>
-            <Badge variant="cyan">{monitors.filter(m => m.state === 'monitoring').length} Monitoring</Badge>
+      {/* Active Monitors - Sleek design */}
+      <Card className="overflow-hidden">
+        <CardHeader className="p-0 border-b border-border-primary/50">
+          <div className="px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                <Activity className="w-4 h-4 text-prmx-cyan" />
+              </div>
+              <h2 className="text-base font-semibold">Active Monitors</h2>
+            </div>
+            <span className="text-xs font-medium px-2 py-1 rounded-full bg-prmx-cyan/10 text-prmx-cyan">
+              {monitors.filter(m => m.state === 'monitoring').length} monitoring
+            </span>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-5">
           {loading ? (
             <div className="space-y-4 transition-fade-in">
               {[1, 2, 3].map((i) => (
@@ -319,7 +323,7 @@ export default function OracleV2Page() {
               </p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-3">
               {monitors.filter(m => m.state === 'monitoring').map((monitor) => {
                 const progressPercent = Math.min(100, (monitor.cumulative_mm / monitor.strike_mm) * 100);
                 const isNearThreshold = progressPercent >= 75;
@@ -330,129 +334,104 @@ export default function OracleV2Page() {
                 return (
                   <div 
                     key={monitor._id}
-                    className={cn(
-                      "p-4 rounded-xl border transition-all",
-                      isTriggered 
-                        ? "border-success/30 bg-success/5" 
-                        : isNearThreshold 
-                          ? "border-warning/30 bg-warning/5"
-                          : "border-border-secondary bg-background-tertiary/30"
-                    )}
+                    className="p-4 rounded-lg border border-border-primary/30 hover:bg-background-tertiary/20 transition-colors"
                   >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2.5">
                         <div className={cn(
-                          "w-10 h-10 rounded-lg flex items-center justify-center",
-                          isTriggered ? "bg-success/20" : "bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30"
+                          "w-8 h-8 rounded-lg flex items-center justify-center",
+                          isTriggered ? "bg-emerald-500/10" : "bg-prmx-cyan/10"
                         )}>
                           {isTriggered ? (
-                            <Zap className="w-5 h-5 text-success" />
+                            <Zap className="w-4 h-4 text-emerald-500" />
                           ) : (
-                            <CloudRain className="w-5 h-5 text-white" />
+                            <CloudRain className="w-4 h-4 text-prmx-cyan" />
                           )}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{policyLabel}</h3>
+                            <h3 className="text-sm font-semibold">{policyLabel}</h3>
                             {getStateBadge(monitor.state)}
                           </div>
-                          <p className="text-xs text-text-tertiary">
-                            Policy ID: #{formatId(monitor.policy_id)} • Monitor: {monitor._id}
+                          <p className="text-[10px] text-text-tertiary">
+                            #{formatId(monitor.policy_id)}
                           </p>
                         </div>
                       </div>
                       <Link href={`/policies/${monitor.policy_id}`}>
-                        <Button variant="ghost" size="sm" icon={<ExternalLink className="w-4 h-4" />}>
-                          View Policy
-                        </Button>
+                        <button className="text-xs text-prmx-cyan hover:text-prmx-cyan/80 transition-colors">
+                          View →
+                        </button>
                       </Link>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="mb-4">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-text-secondary">Cumulative Rainfall</span>
+                    <div className="mb-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs text-text-tertiary">Progress</span>
                         <span className={cn(
-                          "font-mono font-semibold",
-                          isTriggered ? "text-success" : isNearThreshold ? "text-warning" : "text-prmx-cyan"
+                          "text-xs font-medium",
+                          isTriggered ? "text-emerald-500" : "text-prmx-cyan"
                         )}>
                           {(monitor.cumulative_mm / 10).toFixed(1)} / {(monitor.strike_mm / 10).toFixed(1)} mm
                         </span>
                       </div>
-                      <div className="h-3 bg-background-secondary rounded-full overflow-hidden">
+                      <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                         <div 
                           className={cn(
                             "h-full rounded-full transition-all duration-500",
-                            isTriggered ? "bg-success" : isNearThreshold ? "bg-warning" : "bg-prmx-cyan"
+                            isTriggered ? "bg-emerald-500" : "bg-prmx-cyan"
                           )}
                           style={{ width: `${progressPercent}%` }}
                         />
                       </div>
-                      <div className="flex items-center justify-between text-xs text-text-tertiary mt-1">
-                        <span>0 mm</span>
-                        <span>{progressPercent.toFixed(0)}% of threshold</span>
-                        <span>{(monitor.strike_mm / 10).toFixed(1)} mm</span>
-                      </div>
                     </div>
 
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-text-tertiary">Coverage Start</span>
-                        <p className="font-medium">{formatDate(monitor.coverage_start)}</p>
-                      </div>
-                      <div>
-                        <span className="text-text-tertiary">Coverage End</span>
-                        <p className="font-medium">{formatDate(monitor.coverage_end)}</p>
-                      </div>
-                      <div>
-                        <span className="text-text-tertiary">Last Fetch</span>
-                        <p className="font-medium">
+                    {/* Details */}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs pt-3 border-t border-border-primary/30">
+                      <span className="text-text-tertiary">
+                        Start: <span className="text-text-secondary">{formatDate(monitor.coverage_start, false)}</span>
+                      </span>
+                      <span className="text-text-tertiary">
+                        End: <span className="text-text-secondary">{formatDate(monitor.coverage_end, false)}</span>
+                      </span>
+                      <span className="text-text-tertiary">
+                        Updated: <span className="text-text-secondary">
                           {monitor.last_fetch_at > 0 
-                            ? `${new Date(monitor.last_fetch_at * 1000).toLocaleTimeString()} (${getUtcOffsetString()})`
+                            ? new Date(monitor.last_fetch_at * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
                             : 'Never'}
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-text-tertiary">Location Key</span>
-                        <p className="font-mono text-xs">{monitor.location_key}</p>
-                      </div>
+                        </span>
+                      </span>
                     </div>
 
                     {/* Report Info */}
                     {monitor.report_tx_hash && (
-                      <div className="mt-4 pt-4 border-t border-border-secondary">
-                        <div className="flex items-center gap-2 text-xs">
-                          <CheckCircle2 className="w-4 h-4 text-success" />
-                          <span className="text-text-secondary">Report submitted:</span>
-                          <code className="text-prmx-cyan truncate">{monitor.report_tx_hash}</code>
-                        </div>
+                      <div className="flex items-center gap-2 text-xs mt-2 pt-2 border-t border-border-primary/30">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                        <span className="text-text-tertiary">TX:</span>
+                        <code className="text-prmx-cyan truncate text-[10px]">{monitor.report_tx_hash}</code>
                       </div>
                     )}
                     
                     {/* Show Hourly Readings Button */}
                     <button
                       onClick={() => toggleMonitorExpanded(monitor._id)}
-                      className="w-full flex items-center justify-center gap-2 py-3 mt-4 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-secondary"
+                      className="w-full flex items-center justify-center gap-2 py-2 mt-3 text-xs text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-primary/30"
                     >
-                      <List className="w-4 h-4" />
                       {loadingBuckets.has(monitor._id) ? (
                         <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <RefreshCw className="w-3 h-3 animate-spin" />
                           Loading...
                         </>
                       ) : expandedMonitors.has(monitor._id) ? (
                         <>
-                          Hide Hourly Readings
-                          <ChevronUp className="w-4 h-4" />
+                          Hide Readings
+                          <ChevronUp className="w-3 h-3" />
                         </>
                       ) : (
                         <>
-                          Show Hourly Readings
-                          {bucketData.get(monitor._id)?.length !== undefined && (
-                            <span className="text-text-tertiary">({bucketData.get(monitor._id)?.length})</span>
-                          )}
-                          <ChevronDown className="w-4 h-4" />
+                          Show Readings
+                          <ChevronDown className="w-3 h-3" />
                         </>
                       )}
                     </button>
@@ -694,38 +673,32 @@ export default function OracleV2Page() {
 
                     {/* Report Info */}
                     {monitor.report_tx_hash && (
-                      <div className="mt-4 pt-4 border-t border-border-secondary">
-                        <div className="flex items-center gap-2 text-xs">
-                          <CheckCircle2 className="w-4 h-4 text-success" />
-                          <span className="text-text-secondary">Report submitted:</span>
-                          <code className="text-prmx-cyan truncate">{monitor.report_tx_hash}</code>
-                        </div>
+                      <div className="flex items-center gap-2 text-xs mt-2 pt-2 border-t border-border-primary/30">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                        <span className="text-text-tertiary">TX:</span>
+                        <code className="text-prmx-cyan truncate text-[10px]">{monitor.report_tx_hash}</code>
                       </div>
                     )}
                     
                     {/* Show Hourly Readings Button */}
                     <button
                       onClick={() => toggleMonitorExpanded(monitor._id)}
-                      className="w-full flex items-center justify-center gap-2 py-3 mt-4 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-secondary"
+                      className="w-full flex items-center justify-center gap-2 py-2 mt-3 text-xs text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-primary/30"
                     >
-                      <List className="w-4 h-4" />
                       {loadingBuckets.has(monitor._id) ? (
                         <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <RefreshCw className="w-3 h-3 animate-spin" />
                           Loading...
                         </>
                       ) : expandedMonitors.has(monitor._id) ? (
                         <>
-                          Hide Hourly Readings
-                          <ChevronUp className="w-4 h-4" />
+                          Hide Readings
+                          <ChevronUp className="w-3 h-3" />
                         </>
                       ) : (
                         <>
-                          Show Hourly Readings
-                          {bucketData.get(monitor._id)?.length !== undefined && (
-                            <span className="text-text-tertiary">({bucketData.get(monitor._id)?.length})</span>
-                          )}
-                          <ChevronDown className="w-4 h-4" />
+                          Show Readings
+                          <ChevronDown className="w-3 h-3" />
                         </>
                       )}
                     </button>
@@ -865,9 +838,9 @@ export default function OracleV2Page() {
             {/* Summary */}
             <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30">
               <div className="grid grid-cols-2 gap-4">
-                <div>
+                <div className="col-span-2">
                   <span className="text-sm text-text-secondary">Bucket ID</span>
-                  <p className="font-mono text-sm font-semibold">{selectedBucket._id}</p>
+                  <p className="font-mono text-xs font-semibold break-all">{selectedBucket._id}</p>
                 </div>
                 <div>
                   <span className="text-sm text-text-secondary">Rainfall (Display)</span>
@@ -882,7 +855,7 @@ export default function OracleV2Page() {
                   <p className="font-mono text-sm">{new Date(selectedBucket.hour_utc).toLocaleString()} <span className="text-prmx-cyan">({getUtcOffsetString()})</span></p>
                 </div>
                 {selectedBucket.fetched_at && (
-                  <div className="col-span-2">
+                  <div>
                     <span className="text-sm text-text-secondary">Fetched At</span>
                     <p className="font-mono text-sm">{new Date(selectedBucket.fetched_at).toLocaleString()} <span className="text-prmx-cyan">({getUtcOffsetString()})</span></p>
                   </div>

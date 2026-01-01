@@ -35,30 +35,38 @@ function AnimatedStatCard({
   title, 
   value, 
   icon: Icon, 
-  gradient,
+  accentColor = 'cyan',
   subtitle,
   onClick,
 }: { 
   title: string;
   value: string | number;
   icon: React.ElementType;
-  gradient: string;
+  accentColor?: 'cyan' | 'emerald' | 'purple' | 'amber';
   subtitle?: string;
   onClick?: () => void;
 }) {
+  const accentClasses = {
+    cyan: 'border-prmx-cyan/20 dark:border-prmx-cyan/20',
+    emerald: 'border-emerald-500/20 dark:border-emerald-500/20',
+    purple: 'border-prmx-purple/20 dark:border-prmx-purple/20',
+    amber: 'border-amber-500/20 dark:border-amber-500/20',
+  };
+  
   return (
     <div 
       onClick={onClick}
       className={cn(
         'group relative overflow-hidden rounded-xl p-5 transition-all duration-200',
-        'hover:border-prmx-cyan/40',
+        'bg-white dark:bg-background-secondary border',
+        'hover:border-prmx-cyan/40 hover:shadow-md dark:hover:shadow-none',
         onClick && 'cursor-pointer',
-        gradient
+        accentClasses[accentColor]
       )}
     >
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-3">
-          <div className="w-10 h-10 rounded-lg bg-background-tertiary/80 flex items-center justify-center">
+          <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-background-tertiary flex items-center justify-center">
             <Icon className="w-5 h-5 text-prmx-cyan" />
           </div>
           {onClick && (
@@ -93,7 +101,7 @@ function QuickActionCard({
 }) {
   return (
     <Link href={href} className="block group">
-      <div className="p-4 rounded-xl bg-background-secondary/50 border border-border-secondary hover:border-prmx-cyan/30 hover:bg-background-secondary transition-all duration-200">
+      <div className="p-4 rounded-xl bg-white dark:bg-background-secondary/50 border border-gray-200 dark:border-border-secondary hover:border-prmx-cyan/30 hover:bg-gray-50 dark:hover:bg-background-secondary hover:shadow-sm dark:hover:shadow-none transition-all duration-200">
         <div className="flex items-center gap-4">
           <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110', iconBg)}>
             <Icon className={cn('w-6 h-6', iconColor)} />
@@ -144,12 +152,12 @@ function PolicyCard({
           {/* Icon */}
           <div className={cn(
             'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
-            isActive ? 'bg-success/20' : 'bg-gradient-to-br from-slate-700 to-slate-800'
+            isActive ? 'bg-success/10 dark:bg-success/20' : 'bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50'
           )}>
             {isActive ? (
               <Shield className="w-6 h-6 text-success" />
             ) : (
-              <Globe2 className="w-6 h-6 text-white" />
+              <Globe2 className="w-6 h-6 text-gray-500 dark:text-gray-400" />
             )}
           </div>
           
@@ -198,10 +206,10 @@ function MarketMiniCard({
 }) {
   return (
     <Link href={`/markets/${market.id}`}>
-      <div className="group p-4 rounded-xl bg-gradient-to-br from-background-secondary/80 to-background-tertiary/50 border border-border-secondary hover:border-prmx-cyan/30 transition-all duration-200 cursor-pointer hover:shadow-lg hover:shadow-prmx-cyan/5">
+      <div className="group p-4 rounded-xl bg-white dark:bg-background-secondary/80 border border-gray-200 dark:border-border-secondary hover:border-prmx-cyan/30 transition-all duration-200 cursor-pointer hover:shadow-lg dark:hover:shadow-prmx-cyan/5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-prmx-cyan/30 flex items-center justify-center">
               <Globe2 className="w-4 h-4 text-prmx-cyan" />
             </div>
             <h4 className="font-semibold group-hover:text-prmx-cyan transition-colors">{market.name}</h4>
@@ -209,15 +217,15 @@ function MarketMiniCard({
           <StatusBadge status={market.status} />
         </div>
         <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="p-2 rounded-lg bg-background-primary/50">
+          <div className="p-2 rounded-lg bg-gray-50 dark:bg-background-primary/50">
             <p className="text-lg font-bold text-prmx-cyan">{activePolicies}</p>
             <p className="text-[10px] text-text-tertiary uppercase tracking-wide">Policies</p>
           </div>
-          <div className="p-2 rounded-lg bg-background-primary/50">
+          <div className="p-2 rounded-lg bg-gray-50 dark:bg-background-primary/50">
             <p className="text-lg font-bold">{market.strikeValue}</p>
             <p className="text-[10px] text-text-tertiary uppercase tracking-wide">mm</p>
           </div>
-          <div className="p-2 rounded-lg bg-background-primary/50">
+          <div className="p-2 rounded-lg bg-gray-50 dark:bg-background-primary/50">
             <p className="text-lg font-bold text-prmx-purple-light">{(market.riskParameters.daoMarginBp / 100).toFixed(0)}%</p>
             <p className="text-[10px] text-text-tertiary uppercase tracking-wide">Margin</p>
           </div>
@@ -288,9 +296,9 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 border border-border-secondary">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-8 border border-gray-200 dark:border-border-secondary">
         {/* Subtle background accent */}
-        <div className="absolute inset-0 opacity-50">
+        <div className="absolute inset-0 opacity-30 dark:opacity-50">
           <div className="absolute top-0 right-0 w-96 h-96 bg-prmx-cyan/10 rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-prmx-purple/10 rounded-full blur-3xl" />
         </div>
@@ -347,13 +355,13 @@ export default function DashboardPage() {
           
           {/* Balance Card */}
           {isConnected && selectedAccount && (
-            <div className="inline-flex items-center gap-4 bg-background-tertiary/50 rounded-xl px-5 py-3 border border-border-secondary">
+            <div className="inline-flex items-center gap-4 bg-white/90 dark:bg-white/5 backdrop-blur-sm rounded-xl px-5 py-3 border border-gray-200/50 dark:border-white/10 shadow-sm dark:shadow-none">
               <div className="w-10 h-10 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
                 <Wallet className="w-5 h-5 text-prmx-cyan" />
               </div>
               <div>
-                <p className="text-text-tertiary text-sm">Available Balance</p>
-                <p className="text-text-primary text-xl font-bold">{usdtFormatted}</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">Available Balance</p>
+                <p className="text-gray-900 dark:text-white text-xl font-bold">{usdtFormatted}</p>
               </div>
             </div>
           )}
@@ -366,14 +374,14 @@ export default function DashboardPage() {
           title="Active Markets"
           value={isLoading ? '...' : stats.totalMarkets}
           icon={Globe2}
-          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-slate-600/50"
+          accentColor="cyan"
           onClick={() => window.location.href = '/markets'}
         />
         <AnimatedStatCard
           title="Total Policies"
           value={isLoading ? '...' : stats.totalPolicies}
           icon={Shield}
-          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/20"
+          accentColor="cyan"
           subtitle={`${stats.activePolicies} active`}
           onClick={() => window.location.href = '/policies'}
         />
@@ -381,27 +389,27 @@ export default function DashboardPage() {
           title={isDao ? 'Platform LP Orders' : 'My LP Holdings'}
           value={isLoading ? '...' : isDao ? stats.totalLpOrders : stats.myLpHoldings}
           icon={Wallet}
-          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-emerald-500/20"
+          accentColor="emerald"
           onClick={() => window.location.href = '/lp'}
         />
         <AnimatedStatCard
           title="Current Block"
           value={`#${currentBlock}`}
           icon={Activity}
-          gradient="bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-purple/20"
+          accentColor="purple"
           subtitle={isChainConnected ? '● Synced' : '○ Disconnected'}
         />
       </div>
 
       {/* DAO DeFi Strategy Dashboard */}
       {isDao && solvencyInfo && (
-        <Card className="border-prmx-cyan/30 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-prmx-cyan/5 to-transparent" />
+        <Card className="border-gray-200 dark:border-slate-600/50 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-50/50 dark:from-slate-800/50 to-transparent" />
           <CardHeader className="relative">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-prmx-cyan to-teal-500 flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-white" />
+                <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-prmx-cyan" />
                 </div>
                 <div>
                   <h2 className="text-lg font-bold">DeFi Strategy Dashboard</h2>
@@ -511,7 +519,7 @@ export default function DashboardPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-prmx-cyan/30 flex items-center justify-center">
                     <Shield className="w-5 h-5 text-prmx-cyan" />
                   </div>
                   <div>
@@ -530,17 +538,17 @@ export default function DashboardPage() {
                   <RefreshCw className="w-8 h-8 animate-spin text-prmx-cyan" />
                 </div>
               ) : recentPolicies.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                    <Shield className="w-8 h-8 text-prmx-cyan" />
+                <div className="flex flex-col items-center justify-center py-16 px-4">
+                  <div className="w-14 h-14 mb-5 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50 flex items-center justify-center">
+                    <Shield className="w-7 h-7 text-gray-400 dark:text-slate-400" />
                   </div>
-                  <p className="font-semibold mb-1">No policies yet</p>
-                  <p className="text-sm text-text-tertiary mb-4">
-                    {isDao ? "No policies have been created yet" : "Be the first to get coverage!"}
+                  <p className="font-semibold text-text-primary mb-1">No policies yet</p>
+                  <p className="text-sm text-text-tertiary text-center max-w-xs mb-5">
+                    {isDao ? "No policies have been created yet" : "Get started by purchasing coverage for your first policy"}
                   </p>
                   {!isDao && (
                     <Link href="/policies/new">
-                      <Button size="sm">Get Coverage</Button>
+                      <Button size="sm" icon={<Shield className="w-4 h-4" />}>Get Coverage</Button>
                     </Link>
                   )}
                 </div>
@@ -561,8 +569,8 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-prmx-purple to-prmx-magenta flex items-center justify-center">
-                <Zap className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-prmx-cyan" />
               </div>
               <div>
                 <h3 className="font-bold">Quick Actions</h3>
@@ -578,24 +586,24 @@ export default function DashboardPage() {
                   icon={Plus}
                   title="Create Market"
                   description="Add new insurance market"
-                  iconBg="bg-prmx-purple/20"
-                  iconColor="text-prmx-purple-light"
+                  iconBg="bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50"
+                  iconColor="text-prmx-cyan"
                 />
                 <QuickActionCard
                   href="/oracle"
                   icon={Droplets}
                   title="Oracle Data"
                   description="Monitor weather data feeds"
-                  iconBg="bg-info/20"
-                  iconColor="text-info"
+                  iconBg="bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50"
+                  iconColor="text-sky-500 dark:text-sky-400"
                 />
                 <QuickActionCard
                   href="/policies"
                   icon={Shield}
                   title="Manage Policies"
                   description="View and settle policies"
-                  iconBg="bg-prmx-cyan/20"
-                  iconColor="text-prmx-cyan"
+                  iconBg="bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50"
+                  iconColor="text-emerald-500 dark:text-emerald-400"
                 />
               </>
             ) : selectedAccount?.role === 'Customer' ? (
@@ -605,7 +613,7 @@ export default function DashboardPage() {
                   icon={Shield}
                   title="Get Coverage"
                   description="Request insurance quote"
-                  iconBg="bg-prmx-cyan/20"
+                  iconBg="bg-prmx-cyan/10 border border-prmx-cyan/20"
                   iconColor="text-prmx-cyan"
                 />
                 <QuickActionCard
@@ -613,16 +621,16 @@ export default function DashboardPage() {
                   icon={Activity}
                   title="My Policies"
                   description="View your coverage"
-                  iconBg="bg-success/20"
-                  iconColor="text-success"
+                  iconBg="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20"
+                  iconColor="text-emerald-600 dark:text-emerald-400"
                 />
                 <QuickActionCard
                   href="/lp"
                   icon={Wallet}
                   title="LP Marketplace"
                   description="Trade LP tokens"
-                  iconBg="bg-prmx-purple/20"
-                  iconColor="text-prmx-purple-light"
+                  iconBg="bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20"
+                  iconColor="text-violet-600 dark:text-violet-400"
                 />
               </>
             ) : (
@@ -632,15 +640,15 @@ export default function DashboardPage() {
                   icon={Wallet}
                   title="Trade LP Tokens"
                   description="Buy or sell positions"
-                  iconBg="bg-success/20"
-                  iconColor="text-success"
+                  iconBg="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20"
+                  iconColor="text-emerald-600 dark:text-emerald-400"
                 />
                 <QuickActionCard
                   href="/policies"
                   icon={Activity}
                   title="Browse Policies"
                   description="Find investment opportunities"
-                  iconBg="bg-prmx-cyan/20"
+                  iconBg="bg-prmx-cyan/10 border border-prmx-cyan/20"
                   iconColor="text-prmx-cyan"
                 />
               </>
@@ -650,8 +658,8 @@ export default function DashboardPage() {
               icon={Globe2}
               title="Explore Markets"
               description="Browse insurance markets"
-              iconBg="bg-prmx-magenta/20"
-              iconColor="text-prmx-magenta"
+              iconBg="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20"
+              iconColor="text-amber-600 dark:text-amber-400"
             />
           </CardContent>
         </Card>
@@ -662,8 +670,8 @@ export default function DashboardPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                <Globe2 className="w-5 h-5 text-white" />
+              <div className="w-10 h-10 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50 flex items-center justify-center">
+                <Globe2 className="w-5 h-5 text-prmx-cyan" />
               </div>
               <div>
                 <h3 className="font-bold">Active Markets</h3>
@@ -682,8 +690,8 @@ export default function DashboardPage() {
             </div>
           ) : markets.length === 0 ? (
             <div className="text-center py-12">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                <Globe2 className="w-8 h-8 text-prmx-cyan" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-prmx-cyan/30 flex items-center justify-center">
+                <Globe2 className="w-8 h-8 text-gray-400 dark:text-prmx-cyan" />
               </div>
               <p className="font-semibold mb-1">No markets available</p>
               <p className="text-sm text-text-tertiary mb-4">Markets will appear here once created</p>

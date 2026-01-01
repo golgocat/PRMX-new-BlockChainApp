@@ -515,38 +515,34 @@ export default function LpTradingPage() {
         {/* Portfolio Tab (Default) */}
         <TabsContent value="portfolio">
           <div className="space-y-6">
-            {/* Portfolio Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-cyan-500/20 dark:from-emerald-500/20 dark:to-cyan-500/20 flex items-center justify-center backdrop-blur-sm border border-emerald-500/30 dark:border-emerald-500/20">
-                  <Wallet className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+            {/* Portfolio Header - Sleek design */}
+            <div className="flex items-center justify-between px-5 py-4 rounded-xl bg-background-secondary/50 border border-border-primary/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                  <Wallet className="w-5 h-5 text-prmx-cyan" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-text-primary">My LP Holdings</h2>
-                  <p className="text-sm text-text-secondary">
-                    {holdings.filter(h => h.shares > 0).length} position{holdings.filter(h => h.shares > 0).length !== 1 ? 's' : ''} in your portfolio
+                  <h2 className="text-base font-semibold text-text-primary">My LP Holdings</h2>
+                  <p className="text-xs text-text-tertiary">
+                    {holdings.filter(h => h.shares > 0).length} position{holdings.filter(h => h.shares > 0).length !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-xs text-text-tertiary uppercase tracking-wider">USDT Balance</p>
-                <p className="text-2xl font-bold bg-gradient-to-r from-emerald-600 to-cyan-600 dark:from-emerald-400 dark:to-cyan-400 bg-clip-text text-transparent">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wider">Balance</p>
+                <p className="text-xl font-bold text-prmx-cyan">
                   {usdtFormatted}
                 </p>
               </div>
             </div>
 
-            {/* Solvency Warning */}
+            {/* Solvency Warning - Sleek design */}
             {solvencyInfo && !solvencyInfo.isSolvent && holdings.filter(h => h.shares > 0).length > 0 && (
-              <div className="px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <p className="text-sm text-amber-800 dark:text-amber-200/80">
-                    <span className="font-medium text-amber-700 dark:text-amber-300">Solvency alert:</span> DAO coverage may be limited. Consider reducing exposure.
-                  </p>
-                </div>
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  <span className="font-medium">Solvency alert:</span> DAO coverage may be limited
+                </p>
               </div>
             )}
 
@@ -561,17 +557,16 @@ export default function LpTradingPage() {
                 </div>
               </div>
             ) : holdings.filter(h => h.shares > 0).length === 0 ? (
-              <Card className="border-dashed">
-                <CardContent className="text-center py-16">
-                  <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900 flex items-center justify-center border border-slate-200 dark:border-white/5">
-                    <Wallet className="w-10 h-10 text-slate-400 dark:text-slate-500" />
+              <Card className="overflow-hidden">
+                <CardContent className="text-center py-12">
+                  <div className="w-12 h-12 mx-auto mb-4 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                    <Wallet className="w-6 h-6 text-text-tertiary" />
                   </div>
-                  <h3 className="text-lg font-semibold text-text-primary mb-2">No LP Holdings Yet</h3>
-                  <p className="text-text-secondary mb-6 max-w-md mx-auto">
-                    Start earning from policy premiums by purchasing LP tokens from the orderbook.
+                  <h3 className="text-base font-semibold text-text-primary mb-1">No LP Holdings</h3>
+                  <p className="text-sm text-text-tertiary mb-4 max-w-sm mx-auto">
+                    Start earning from premiums via the orderbook
                   </p>
-                  <Button onClick={() => setActiveTab('orderbook')}>
-                    <TrendingUp className="w-4 h-4 mr-2" />
+                  <Button onClick={() => setActiveTab('orderbook')} size="sm">
                     Browse Orderbook
                   </Button>
                 </CardContent>
@@ -794,17 +789,25 @@ export default function LpTradingPage() {
 
         {/* Orderbook Tab */}
         <TabsContent value="orderbook">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold">LP Token Orderbook</h3>
-                <div className="flex items-center gap-2">
-                  {hasActiveFilters && (
-                    <Badge variant="purple">{filteredOrders.length} of {orders.length}</Badge>
-                  )}
-                  <Badge variant="cyan">{orders.length} Active Orders</Badge>
+          <Card className="overflow-hidden">
+            <CardHeader className="p-0 border-b border-border-primary/50">
+              <div className="px-5 py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-prmx-cyan" />
+                    </div>
+                    <h3 className="text-base font-semibold">LP Orderbook</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {hasActiveFilters && (
+                      <span className="text-xs text-text-tertiary">{filteredOrders.length} of {orders.length}</span>
+                    )}
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-prmx-cyan/10 text-prmx-cyan">
+                      {orders.length} orders
+                    </span>
+                  </div>
                 </div>
-              </div>
               
               {/* Filter Controls */}
               <div className="flex items-center gap-2 flex-wrap">
@@ -843,15 +846,14 @@ export default function LpTradingPage() {
 
               {/* Expanded Filter Panel */}
               {showFilters && (
-                <div className="mt-4 p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {/* Market Filter */}
+                <div className="mt-4 p-4 rounded-lg bg-background-tertiary/30 border border-border-primary/30">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div>
-                      <label className="block text-xs text-text-secondary mb-1">Market</label>
+                      <label className="block text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Market</label>
                       <select
                         value={filterMarket}
                         onChange={(e) => setFilterMarket(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-background-secondary border border-border-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-prmx-cyan/50"
+                        className="w-full px-3 py-1.5 text-sm rounded-lg bg-background-secondary border border-border-primary/50 text-text-primary focus:outline-none focus:ring-1 focus:ring-prmx-cyan/50"
                       >
                         <option value="all">All Markets</option>
                         {marketsInOrders.map(marketId => {
@@ -864,67 +866,61 @@ export default function LpTradingPage() {
                         })}
                       </select>
                     </div>
-
-                    {/* Min Return Filter */}
                     <div>
-                      <label className="block text-xs text-text-secondary mb-1">Min Return %</label>
+                      <label className="block text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Min Return %</label>
                       <input
                         type="number"
                         placeholder="e.g. 10"
                         value={filterMinReturn}
                         onChange={(e) => setFilterMinReturn(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-background-secondary border border-border-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-prmx-cyan/50"
+                        className="w-full px-3 py-1.5 text-sm rounded-lg bg-background-secondary border border-border-primary/50 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-prmx-cyan/50"
                       />
                     </div>
-
-                    {/* Max Price Filter */}
                     <div>
-                      <label className="block text-xs text-text-secondary mb-1">Max Price ($)</label>
+                      <label className="block text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Max Price ($)</label>
                       <input
                         type="number"
                         placeholder="e.g. 90"
                         value={filterMaxPrice}
                         onChange={(e) => setFilterMaxPrice(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-background-secondary border border-border-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-prmx-cyan/50"
+                        className="w-full px-3 py-1.5 text-sm rounded-lg bg-background-secondary border border-border-primary/50 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-prmx-cyan/50"
                       />
                     </div>
-
-                    {/* Min Days Filter */}
                     <div>
-                      <label className="block text-xs text-text-secondary mb-1">Min Days Left</label>
+                      <label className="block text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Min Days Left</label>
                       <input
                         type="number"
                         placeholder="e.g. 7"
                         value={filterMinDays}
                         onChange={(e) => setFilterMinDays(e.target.value)}
-                        className="w-full px-3 py-2 text-sm rounded-lg bg-background-secondary border border-border-secondary text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-prmx-cyan/50"
+                        className="w-full px-3 py-1.5 text-sm rounded-lg bg-background-secondary border border-border-primary/50 text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-prmx-cyan/50"
                       />
                     </div>
                   </div>
                 </div>
               )}
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               {ordersLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <RefreshCw className="w-6 h-6 animate-spin text-text-tertiary" />
+                <div className="flex items-center justify-center py-8">
+                  <RefreshCw className="w-5 h-5 animate-spin text-text-tertiary" />
                 </div>
               ) : orders.length === 0 ? (
-                <div className="text-center py-12">
-                  <TrendingUp className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
-                  <p className="text-text-secondary">No orders yet</p>
-                  <p className="text-xs text-text-tertiary mt-1">Be the first to place an order!</p>
+                <div className="text-center py-10">
+                  <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-text-tertiary" />
+                  </div>
+                  <p className="text-sm text-text-secondary">No orders yet</p>
+                  <p className="text-xs text-text-tertiary mt-0.5">Be the first to place an order</p>
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="text-center py-12">
-                  <Filter className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
-                  <p className="text-text-secondary">No orders match your filters</p>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={clearFilters}
-                    className="mt-3"
-                  >
+                <div className="text-center py-10">
+                  <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                    <Filter className="w-5 h-5 text-text-tertiary" />
+                  </div>
+                  <p className="text-sm text-text-secondary">No matching orders</p>
+                  <Button variant="secondary" size="sm" onClick={clearFilters} className="mt-2">
                     Clear Filters
                   </Button>
                 </div>
@@ -938,6 +934,12 @@ export default function LpTradingPage() {
                     const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
                     const potentialReturn = market ? calculatePotentialReturn(order.priceUsdt, market.payoutPerShare) : 0;
                     
+                    // Format short policy ID
+                    const shortId = typeof order.policyId === 'string' && order.policyId.startsWith('0x') 
+                      ? order.policyId.slice(2, 10) 
+                      : String(order.policyId).slice(0, 8);
+                    const locationName = market?.name || (policy as any)?.locationName || 'Unknown';
+                    
                     return (
                       <div 
                         key={order.orderId} 
@@ -946,122 +948,93 @@ export default function LpTradingPage() {
                           setShowOrderDetailModal(true);
                         }}
                         className={cn(
-                          "p-4 hover:bg-background-tertiary/30 transition-colors cursor-pointer",
-                          isOwner && "border-l-4 border-l-prmx-cyan bg-prmx-cyan/5"
+                          "group py-3 px-4 hover:bg-background-tertiary/30 transition-colors cursor-pointer",
+                          isOwner && "bg-prmx-cyan/5"
                         )}>
-                        {/* Header Row */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                              <Shield className="w-5 h-5 text-prmx-cyan" />
-                            </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold">{policy?.label || `Policy #${order.policyId}`}</span>
-                                <Badge 
-                                  variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
-                                  className="text-xs"
-                                >
-                                  {policy?.policyVersion || 'V1'}
-                                </Badge>
-                                <Badge variant="error" className="text-xs">Sell</Badge>
-                                {isOwner && <Badge variant="cyan" className="text-xs">Your Order</Badge>}
-                              </div>
-                              {market && (
-                                <div className="flex items-center gap-1 text-sm text-text-secondary">
-                                  <MapPin className="w-3 h-3" />
-                                  <span>{market.name}</span>
-                                </div>
-                              )}
-                            </div>
+                        {/* Main Row - Compact layout */}
+                        <div className="flex items-center gap-3">
+                          {/* Policy Icon */}
+                          <div className="w-10 h-10 rounded-lg bg-prmx-cyan/10 flex items-center justify-center flex-shrink-0">
+                            <Shield className="w-5 h-5 text-prmx-cyan" />
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold text-lg">{formatUSDT(order.priceUsdt)}</div>
-                            <div className="text-xs text-text-secondary">per share</div>
-                          </div>
-                        </div>
-
-                        {/* Details Grid */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-                          <div className="p-2 rounded-lg bg-background-tertiary/50">
-                            <div className="text-xs text-text-tertiary mb-1">For Sale</div>
-                            <div className="font-medium">{order.remaining.toString()} shares</div>
-                          </div>
-                          <div className="p-2 rounded-lg bg-background-tertiary/50">
-                            <div className="text-xs text-text-tertiary mb-1">Total Value</div>
-                            <div className="font-medium">{formatUSDT(total)}</div>
-                          </div>
-                          {market && (
-                            <>
-                              <div className="p-2 rounded-lg bg-background-tertiary/50">
-                                <div className="text-xs text-text-tertiary mb-1">Strike</div>
-                                <div className="font-medium flex items-center gap-1">
-                                  <Droplets className="w-3 h-3 text-prmx-cyan" />
-                                  {market.strikeValue} mm
-                                </div>
-                              </div>
-                              <div className="p-2 rounded-lg bg-background-tertiary/50">
-                                <div className="text-xs text-text-tertiary mb-1">Time Left</div>
-                                <div className={cn(
-                                  "font-medium flex items-center gap-1",
-                                  daysRemaining <= 3 ? "text-warning" : "text-text-primary"
-                                )}>
-                                  <Clock className="w-3 h-3" />
-                                  {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
-                                </div>
-                              </div>
-                            </>
-                          )}
-                        </div>
-
-                        {/* Potential Return & Action */}
-                        <div className="flex items-center justify-between pt-3 border-t border-border-secondary/50">
-                          <div className="flex items-center gap-4">
-                            {market && potentialReturn > 0 && (
-                              <div className="flex items-center gap-2">
-                                <TrendingUp className={cn(
-                                  "w-4 h-4",
-                                  potentialReturn >= 50 ? "text-success" : "text-prmx-cyan"
-                                )} />
-                                <span className="text-sm">
-                                  <span className="text-text-secondary">Max Return: </span>
-                                  <span className={cn(
-                                    "font-medium",
-                                    potentialReturn >= 50 ? "text-success" : "text-prmx-cyan"
-                                  )}>
-                                    +{potentialReturn.toFixed(0)}%
-                                  </span>
+                          
+                          {/* Policy Info */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-medium text-sm truncate max-w-[180px]">
+                                {shortId}...
+                              </span>
+                              <span className={cn(
+                                "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                                policy?.policyVersion === 'V3' ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
+                                  : policy?.policyVersion === 'V2' ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+                                  : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                              )}>
+                                {policy?.policyVersion || 'V1'}
+                              </span>
+                              {isOwner && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-prmx-cyan/10 text-prmx-cyan uppercase">
+                                  Yours
                                 </span>
-                              </div>
-                            )}
-                            <div className="text-sm text-text-secondary">
-                              Seller: {isOwner ? (
-                                <span className="text-prmx-cyan font-medium">You</span>
-                              ) : (
-                                <code className="text-xs">{formatAddress(order.seller)}</code>
                               )}
                             </div>
+                            <div className="flex items-center gap-3 mt-0.5 text-xs text-text-tertiary">
+                              <span className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {locationName}
+                              </span>
+                              <span>•</span>
+                              <span>{order.remaining.toString()} shares</span>
+                              <span>•</span>
+                              <span className={cn(daysRemaining <= 3 && daysRemaining > 0 && "text-amber-500")}>
+                                {daysRemaining > 0 ? `${daysRemaining}d left` : 'Ended'}
+                              </span>
+                            </div>
                           </div>
-                          {isOwner ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleCancelOrder(order.orderId)}
-                              loading={cancellingOrderId === order.orderId}
-                              disabled={cancellingOrderId !== null}
-                              className="text-error hover:bg-error/10"
-                            >
-                              {cancellingOrderId === order.orderId ? 'Cancelling...' : 'Cancel Order'}
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              onClick={() => handleOpenBuyModal(order)}
-                            >
-                              Fill Order
-                            </Button>
-                          )}
+                          
+                          {/* Price & Return */}
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-lg font-bold text-text-primary">{formatUSDT(order.priceUsdt)}</p>
+                            <p className="text-xs text-text-tertiary">
+                              {market && potentialReturn > 0 ? (
+                                <span className={cn("font-medium", potentialReturn >= 50 ? "text-emerald-500" : "text-prmx-cyan")}>
+                                  +{potentialReturn.toFixed(0)}% return
+                                </span>
+                              ) : (
+                                <span>per share</span>
+                              )}
+                            </p>
+                          </div>
+                          
+                          {/* Action */}
+                          <div className="flex-shrink-0 ml-2">
+                            {isOwner ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCancelOrder(order.orderId);
+                                }}
+                                disabled={cancellingOrderId !== null}
+                                className="text-xs font-medium text-rose-500 hover:text-rose-600 disabled:opacity-50"
+                              >
+                                {cancellingOrderId === order.orderId ? '...' : 'Cancel'}
+                              </button>
+                            ) : (
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenBuyModal(order);
+                                }}
+                              >
+                                Buy
+                              </Button>
+                            )}
+                          </div>
+                          
+                          {/* Chevron */}
+                          <ChevronRight className="w-4 h-4 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-0.5 transition-all flex-shrink-0" />
                         </div>
                       </div>
                     );
@@ -1075,278 +1048,229 @@ export default function LpTradingPage() {
         {/* History Tab */}
         <TabsContent value="history">
           <div className="space-y-6">
-            {/* Trade History Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <History className="w-5 h-5 text-prmx-cyan" />
-                    <h3 className="font-semibold">Trade History</h3>
-                  </div>
-                  {trades.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm('Clear all trade history?')) {
-                          clearHistory();
-                          toast.success('Trade history cleared');
-                        }
-                      }}
-                      icon={<Trash2 className="w-4 h-4" />}
-                      className="text-text-tertiary hover:text-error"
-                    >
-                      Clear
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {tradesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin text-text-tertiary" />
-                  </div>
-                ) : trades.length === 0 ? (
-                  <div className="text-center py-8">
-                    <History className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
-                    <p className="text-text-secondary text-sm">No trades yet</p>
-                    <p className="text-xs text-text-tertiary mt-1">Your buy and sell orders will appear here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {trades.map((trade) => (
-                      <div
-                        key={trade.id}
+            {/* Trade History Section - Sleek design */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                        <History className="w-4 h-4 text-prmx-cyan" />
+                      </div>
+                      <h3 className="text-base font-semibold">Trade History</h3>
+                    </div>
+                    {trades.length > 0 && (
+                      <button
                         onClick={() => {
-                          setSelectedTrade(trade);
-                          setShowTradeDetailModal(true);
+                          if (confirm('Clear all trade history?')) {
+                            clearHistory();
+                            toast.success('Trade history cleared');
+                          }
                         }}
-                        className={cn(
-                          "p-4 rounded-xl border transition-all cursor-pointer hover:shadow-md",
-                          trade.type === 'buy' 
-                            ? "bg-success/5 border-success/20 hover:border-success/40" 
-                            : "bg-error/5 border-error/20 hover:border-error/40"
-                        )}
+                        className="text-xs text-text-tertiary hover:text-error transition-colors"
                       >
-                        <div className="flex items-center justify-between mb-2">
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="p-5">
+                  {tradesLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <RefreshCw className="w-5 h-5 animate-spin text-text-tertiary" />
+                    </div>
+                  ) : trades.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                        <History className="w-5 h-5 text-text-tertiary" />
+                      </div>
+                      <p className="text-sm text-text-secondary">No trades yet</p>
+                      <p className="text-xs text-text-tertiary mt-0.5">Your orders will appear here</p>
+                    </div>
+                  )                 : (
+                    <div className="space-y-2">
+                      {trades.map((trade) => (
+                        <div
+                          key={trade.id}
+                          onClick={() => {
+                            setSelectedTrade(trade);
+                            setShowTradeDetailModal(true);
+                          }}
+                          className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-background-tertiary/30 transition-colors cursor-pointer group"
+                        >
                           <div className="flex items-center gap-3">
                             <div className={cn(
                               "w-8 h-8 rounded-lg flex items-center justify-center",
-                              trade.type === 'buy' ? "bg-success/20" : "bg-error/20"
+                              trade.type === 'buy' ? "bg-emerald-500/10" : "bg-rose-500/10"
                             )}>
                               {trade.type === 'buy' ? (
-                                <ArrowDownRight className="w-4 h-4 text-success" />
+                                <ArrowDownRight className="w-4 h-4 text-emerald-500" />
                               ) : (
-                                <ArrowUpRight className="w-4 h-4 text-error" />
+                                <ArrowUpRight className="w-4 h-4 text-rose-500" />
                               )}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
                                 <span className={cn(
-                                  "font-semibold",
-                                  trade.type === 'buy' ? "text-success" : "text-error"
+                                  "text-sm font-medium",
+                                  trade.type === 'buy' ? "text-emerald-500" : "text-rose-500"
                                 )}>
                                   {trade.type === 'buy' ? 'Bought' : 'Sold'}
                                 </span>
-                                <span className="text-text-primary">
+                                <span className="text-sm text-text-primary">
                                   {trade.shares} share{trade.shares > 1 ? 's' : ''}
                                 </span>
                               </div>
-                              <p className="text-xs text-text-secondary">
+                              <p className="text-xs text-text-tertiary">
                                 {trade.marketName}
                               </p>
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="font-semibold">${trade.totalAmount.toFixed(2)}</p>
+                            <p className="text-sm font-semibold">${trade.totalAmount.toFixed(2)}</p>
                             <p className="text-xs text-text-tertiary">
-                              ${trade.pricePerShare.toFixed(2)}/share
+                              {new Date(trade.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             </p>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-text-tertiary pt-2 border-t border-border-secondary/50">
-                          <span className="flex items-center gap-1">
-                            <Clock className="w-3 h-3" />
-                            {new Date(trade.timestamp).toLocaleString()}
-                          </span>
-                          {trade.counterparty && (
-                            <span>Counterparty: {trade.counterparty}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Position Outcomes Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-prmx-purple" />
-                  <h3 className="font-semibold">Position Outcomes</h3>
+            {/* Position Outcomes Section - Sleek design */}
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                      <CheckCircle2 className="w-4 h-4 text-prmx-purple" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold">Position Outcomes</h3>
+                      <p className="text-xs text-text-tertiary">Final outcomes of settled positions</p>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-text-secondary mt-1">
-                  Track your LP positions and their final outcomes
-                </p>
-              </CardHeader>
-              <CardContent>
-                {outcomesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <RefreshCw className="w-6 h-6 animate-spin text-text-tertiary" />
-                  </div>
-                ) : outcomes.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Shield className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
-                    <p className="text-text-secondary text-sm">No position history</p>
-                    <p className="text-xs text-text-tertiary mt-1">
-                      Settled positions and their outcomes will appear here
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {outcomes.map((outcome) => (
-                      <div
-                        key={outcome.policyId}
-                        onClick={() => {
-                          setSelectedOutcome(outcome);
-                          setShowOutcomeDetailModal(true);
-                        }}
-                        className={cn(
-                          "p-4 rounded-xl border cursor-pointer transition-all hover:shadow-md",
-                          outcome.outcome === 'matured' && "bg-success/5 border-success/20 hover:border-success/40",
-                          outcome.outcome === 'event_triggered' && "bg-error/5 border-error/20 hover:border-error/40",
-                          outcome.outcome === 'active' && "bg-background-tertiary/50 border-border-secondary hover:border-prmx-cyan/40"
-                        )}
-                      >
-                        <div className="flex items-center justify-between mb-3">
+                
+                <div className="p-5">
+                  {outcomesLoading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <RefreshCw className="w-5 h-5 animate-spin text-text-tertiary" />
+                    </div>
+                  ) : outcomes.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-10 h-10 mx-auto mb-3 rounded-lg bg-background-tertiary/50 flex items-center justify-center">
+                        <Shield className="w-5 h-5 text-text-tertiary" />
+                      </div>
+                      <p className="text-sm text-text-secondary">No position history</p>
+                      <p className="text-xs text-text-tertiary mt-0.5">Settled outcomes appear here</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {outcomes.map((outcome) => (
+                        <div
+                          key={outcome.policyId}
+                          onClick={() => {
+                            setSelectedOutcome(outcome);
+                            setShowOutcomeDetailModal(true);
+                          }}
+                          className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-background-tertiary/30 transition-colors cursor-pointer group"
+                        >
                           <div className="flex items-center gap-3">
                             <div className={cn(
-                              "w-10 h-10 rounded-lg flex items-center justify-center",
-                              outcome.outcome === 'matured' && "bg-success/20",
-                              outcome.outcome === 'event_triggered' && "bg-error/20",
-                              outcome.outcome === 'active' && "bg-prmx-cyan/20"
+                              "w-8 h-8 rounded-lg flex items-center justify-center",
+                              outcome.outcome === 'matured' && "bg-emerald-500/10",
+                              outcome.outcome === 'event_triggered' && "bg-rose-500/10",
+                              outcome.outcome === 'active' && "bg-prmx-cyan/10"
                             )}>
-                              {outcome.outcome === 'matured' && <CheckCircle2 className="w-5 h-5 text-success" />}
-                              {outcome.outcome === 'event_triggered' && <XCircle className="w-5 h-5 text-error" />}
-                              {outcome.outcome === 'active' && <Clock className="w-5 h-5 text-prmx-cyan" />}
+                              {outcome.outcome === 'matured' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+                              {outcome.outcome === 'event_triggered' && <XCircle className="w-4 h-4 text-rose-500" />}
+                              {outcome.outcome === 'active' && <Clock className="w-4 h-4 text-prmx-cyan" />}
                             </div>
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold">{outcome.marketName}</span>
-                                <Badge 
-                                  variant={
-                                    outcome.outcome === 'matured' ? 'success' : 
-                                    outcome.outcome === 'event_triggered' ? 'destructive' : 
-                                    'default'
-                                  }
-                                >
+                                <span className="text-sm font-medium">{outcome.marketName}</span>
+                                <span className={cn(
+                                  "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                                  outcome.outcome === 'matured' && "bg-emerald-500/10 text-emerald-500",
+                                  outcome.outcome === 'event_triggered' && "bg-rose-500/10 text-rose-500",
+                                  outcome.outcome === 'active' && "bg-prmx-cyan/10 text-prmx-cyan"
+                                )}>
                                   {outcome.outcome === 'matured' && 'Matured'}
-                                  {outcome.outcome === 'event_triggered' && 'Event Triggered'}
+                                  {outcome.outcome === 'event_triggered' && 'Triggered'}
                                   {outcome.outcome === 'active' && 'Active'}
-                                </Badge>
+                                </span>
                               </div>
-                              <p className="text-sm text-text-secondary flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                {outcome.marketName}
-                              </p>
+                              <div className="flex items-center gap-3 text-xs text-text-tertiary mt-0.5">
+                                <span>{outcome.sharesHeld} shares</span>
+                                <span>•</span>
+                                <span>${outcome.investmentCost.toFixed(0)} invested</span>
+                              </div>
                             </div>
                           </div>
                           <div className="text-right">
                             <p className={cn(
-                              "text-lg font-bold",
-                              outcome.profitLoss >= 0 ? "text-success" : "text-error"
+                              "text-sm font-bold",
+                              outcome.profitLoss >= 0 ? "text-emerald-500" : "text-rose-500"
                             )}>
-                              {outcome.profitLoss >= 0 ? '+' : ''}{outcome.profitLoss.toFixed(2)} USDT
+                              {outcome.profitLoss >= 0 ? '+' : ''}{outcome.profitLoss.toFixed(2)}
                             </p>
-                            <p className="text-xs text-text-tertiary">
-                              {outcome.profitLoss >= 0 ? 'Profit' : 'Loss'}
-                            </p>
+                            {outcome.settledAt && (
+                              <p className="text-xs text-text-tertiary">
+                                {new Date(outcome.settledAt * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </p>
+                            )}
                           </div>
                         </div>
-
-                        <div className="grid grid-cols-4 gap-3 pt-3 border-t border-border-secondary/50">
-                          <div>
-                            <p className="text-xs text-text-tertiary">Shares Held</p>
-                            <p className="font-medium">{outcome.sharesHeld}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-text-tertiary">Investment</p>
-                            <p className="font-medium">${outcome.investmentCost.toFixed(2)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-text-tertiary">Payout</p>
-                            <p className={cn(
-                              "font-medium",
-                              outcome.payoutReceived > 0 ? "text-success" : "text-text-primary"
-                            )}>
-                              ${outcome.payoutReceived.toFixed(2)}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-xs text-text-tertiary">
-                              {outcome.outcome === 'event_triggered' ? 'Trigger' : 'Status'}
-                            </p>
-                            <p className="font-medium">
-                              {outcome.eventOccurred !== undefined ? (
-                                outcome.eventOccurred ? (
-                                  <span className="text-error flex items-center gap-1">
-                                    <AlertTriangle className="w-3 h-3" />
-                                    Rain Event
-                                  </span>
-                                ) : (
-                                  <span className="text-success">No Event</span>
-                                )
-                              ) : (
-                                <span className="text-text-secondary">Pending</span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-
-                        {outcome.settledAt && (
-                          <div className="flex items-center gap-1 text-xs text-text-tertiary mt-3 pt-2 border-t border-border-secondary/50">
-                            <Clock className="w-3 h-3" />
-                            Settled: {new Date(outcome.settledAt * 1000).toLocaleString()}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
 
-            {/* Summary Stats */}
+            {/* Summary Stats - Sleek design */}
             {outcomes.length > 0 && (
-              <Card className="bg-gradient-to-r from-prmx-cyan/5 to-prmx-purple/5 border-prmx-cyan/20">
-                <CardContent className="p-4">
-                  <h4 className="font-semibold mb-3">Performance Summary</h4>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-sm text-text-secondary">Total Positions</p>
-                      <p className="text-xl font-bold">{outcomes.length}</p>
+              <Card className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="px-5 py-4 border-b border-border-primary/50">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-violet-500" />
+                      </div>
+                      <h4 className="text-base font-semibold">Performance Summary</h4>
                     </div>
-                    <div>
-                      <p className="text-sm text-text-secondary">Matured</p>
-                      <p className="text-xl font-bold text-success">
+                  </div>
+                  <div className="grid grid-cols-4 divide-x divide-border-primary/30">
+                    <div className="px-5 py-4 text-center">
+                      <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Positions</p>
+                      <p className="text-lg font-bold">{outcomes.length}</p>
+                    </div>
+                    <div className="px-5 py-4 text-center">
+                      <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Matured</p>
+                      <p className="text-lg font-bold text-emerald-500">
                         {outcomes.filter(o => o.outcome === 'matured').length}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-text-secondary">Triggered</p>
-                      <p className="text-xl font-bold text-error">
+                    <div className="px-5 py-4 text-center">
+                      <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Triggered</p>
+                      <p className="text-lg font-bold text-rose-500">
                         {outcomes.filter(o => o.outcome === 'event_triggered').length}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm text-text-secondary">Total P&L</p>
+                    <div className="px-5 py-4 text-center">
+                      <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Total P&L</p>
                       <p className={cn(
-                        "text-xl font-bold",
+                        "text-lg font-bold",
                         outcomes.reduce((sum, o) => sum + o.profitLoss, 0) >= 0 
-                          ? "text-success" 
-                          : "text-error"
+                          ? "text-emerald-500" 
+                          : "text-rose-500"
                       )}>
                         ${outcomes.reduce((sum, o) => sum + o.profitLoss, 0).toFixed(2)}
                       </p>
@@ -1379,78 +1303,62 @@ export default function LpTradingPage() {
 
           return (
           <div className="space-y-4">
-            {/* Market Info Card */}
-            {market && (
-              <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border border-prmx-purple/20">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-purple/30 flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-prmx-purple-light" />
-                  </div>
-                  <div>
-                    <h4 className="font-semibold">{selectedPolicy.label}</h4>
-                    <p className="text-xs text-text-secondary">{market.name}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-2 rounded-lg bg-background-primary/50">
-                    <div className="text-xs text-text-tertiary mb-1">Strike Threshold</div>
-                    <div className="font-medium flex items-center gap-1">
-                      <Droplets className="w-3 h-3 text-prmx-cyan" />
-                      {market.strikeValue} mm
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-background-primary/50">
-                    <div className="text-xs text-text-tertiary mb-1">Max Payout/Share</div>
-                    <div className="font-medium text-success">{maxPayout}</div>
-                  </div>
-                </div>
+            {/* Header - Clean design */}
+            <div className="flex items-center gap-3 pb-4 border-b border-border-primary/30">
+              <div className="w-10 h-10 rounded-lg bg-prmx-purple/10 flex items-center justify-center shrink-0">
+                <MapPin className="w-5 h-5 text-prmx-purple" />
               </div>
-            )}
-
-            {/* Policy Details */}
-            <div className="p-4 rounded-xl bg-background-tertiary/50">
-              <div className="grid grid-cols-2 gap-4 mb-3">
-                <div>
-                  <div className="text-xs text-text-tertiary mb-1">Your LP Tokens</div>
-                  <div className="font-semibold text-lg">{myShares} shares</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs text-text-tertiary mb-1">Time Remaining</div>
-                  <div className={cn(
-                    "font-semibold text-lg",
-                    daysRemaining <= 3 ? "text-warning" : "text-text-primary"
-                  )}>
-                    {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
-                  </div>
-                </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold truncate">{selectedPolicy.label}</p>
+                {market && <p className="text-xs text-text-tertiary">{market.name}</p>}
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-text-secondary">Capital Pool: </span>
-                  <span className="font-medium">{formatUSDT(selectedPolicy.capitalPool.totalCapital)}</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-text-secondary">Fair Value: </span>
-                  <span className="font-medium">${fairValuePerShare.toFixed(2)}/share</span>
-                </div>
+              <div className="text-right">
+                <p className="text-xs text-text-tertiary">Your Shares</p>
+                <p className="text-lg font-bold text-prmx-purple">{myShares}</p>
               </div>
             </div>
 
-            {/* Pricing Guide */}
-            <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
-              <div className="flex items-start gap-2">
-                <Info className="w-4 h-4 text-prmx-cyan flex-shrink-0 mt-0.5" />
-                <div className="text-xs text-text-secondary">
-                  <strong className="text-text-primary">Pricing Guide:</strong> Fair value per share is ~${fairValuePerShare.toFixed(2)} based on the capital pool. 
-                  Price lower if you think the event is likely (LP tokens lose value if event occurs), or higher if you believe it's unlikely.
-                </div>
+            {/* Policy Info - Compact rows */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Time Remaining</span>
+                <span className={cn(
+                  "text-sm font-semibold",
+                  daysRemaining <= 3 ? "text-amber-500" : "text-text-primary"
+                )}>
+                  {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
+                </span>
               </div>
+              {market && (
+                <>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                    <span className="text-sm text-text-secondary">Strike Threshold</span>
+                    <span className="text-sm font-medium">{market.strikeValue} mm</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                    <span className="text-sm text-text-secondary">Max Payout/Share</span>
+                    <span className="text-sm font-semibold text-emerald-500">{maxPayout}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Fair Value</span>
+                <span className="text-sm font-medium">${fairValuePerShare.toFixed(2)}/share</span>
+              </div>
+            </div>
+
+            {/* Pricing Hint */}
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-background-tertiary/30">
+              <Info className="w-3.5 h-3.5 text-text-tertiary flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-text-tertiary leading-relaxed">
+                Price lower if event is likely (LP tokens lose value), higher if unlikely.
+              </p>
             </div>
 
             {/* Input Fields */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <Input
-                label="Quantity to Sell"
+                label="Quantity"
                 type="number"
                 min="1"
                 max={myShares}
@@ -1458,37 +1366,35 @@ export default function LpTradingPage() {
                 onChange={(e) => setSellQuantity(e.target.value)}
               />
               <Input
-                label="Price per Share (USDT)"
+                label="Price (USDT)"
                 type="number"
                 step="0.01"
                 min="0.01"
                 value={sellPrice}
                 onChange={(e) => setSellPrice(e.target.value)}
-                placeholder={`Suggested: $${fairValuePerShare.toFixed(2)}`}
+                placeholder={`~$${fairValuePerShare.toFixed(2)}`}
               />
             </div>
 
-            {/* Total Value Summary */}
-            <div className="p-4 rounded-xl bg-success/5 border border-success/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-text-secondary">Total Sale Value</span>
-                <span className="text-xl font-bold text-success">
-                  ${totalValue.toFixed(2)} USDT
-                </span>
+            {/* Total Value - Clean summary */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-emerald-500/5">
+              <span className="text-sm text-text-secondary">Total Sale Value</span>
+              <div className="text-right">
+                <p className="text-xl font-bold text-emerald-500">${totalValue.toFixed(2)}</p>
+                {parseFloat(sellPrice || '0') > 0 && fairValuePerShare > 0 && (
+                  <p className="text-[10px] text-text-tertiary">
+                    {parseFloat(sellPrice) > fairValuePerShare 
+                      ? `${((parseFloat(sellPrice) / fairValuePerShare - 1) * 100).toFixed(0)}% above fair value`
+                      : parseFloat(sellPrice) < fairValuePerShare
+                      ? `${((1 - parseFloat(sellPrice) / fairValuePerShare) * 100).toFixed(0)}% below fair value`
+                      : 'At fair value'}
+                  </p>
+                )}
               </div>
-              {parseFloat(sellPrice || '0') > 0 && fairValuePerShare > 0 && (
-                <div className="text-xs text-text-secondary">
-                  {parseFloat(sellPrice) > fairValuePerShare 
-                    ? `${((parseFloat(sellPrice) / fairValuePerShare - 1) * 100).toFixed(0)}% above fair value`
-                    : parseFloat(sellPrice) < fairValuePerShare
-                    ? `${((1 - parseFloat(sellPrice) / fairValuePerShare) * 100).toFixed(0)}% below fair value`
-                    : 'At fair value'}
-                </div>
-              )}
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={() => setShowSellModal(false)} className="flex-1">
                 Cancel
               </Button>
@@ -1524,126 +1430,72 @@ export default function LpTradingPage() {
 
           return (
           <div className="space-y-4">
-            {/* Market Info Card */}
-            {market && (
-              <div className="p-4 rounded-xl bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border border-prmx-cyan/20">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-prmx-cyan" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-semibold">{policy?.label || `Policy #${selectedOrder.policyId}`}</h4>
-                      <Badge 
-                        variant={policy?.policyVersion === 'V3' ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
-                        className="text-xs"
-                      >
-                        {policy?.policyVersion || 'V1'}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-text-secondary">{market.name}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-2 rounded-lg bg-background-primary/50">
-                    <div className="text-xs text-text-tertiary mb-1">Strike Threshold</div>
-                    <div className="font-medium flex items-center gap-1">
-                      <Droplets className="w-3 h-3 text-prmx-cyan" />
-                      {market.strikeValue} mm (24h)
-                    </div>
-                  </div>
-                  <div className="p-2 rounded-lg bg-background-primary/50">
-                    <div className="text-xs text-text-tertiary mb-1">Max Payout/Share</div>
-                    <div className="font-medium text-success">{maxPayout}</div>
-                  </div>
-                </div>
+            {/* Header - Clean design */}
+            <div className="flex items-center gap-3 pb-4 border-b border-border-primary/30">
+              <div className="w-10 h-10 rounded-lg bg-prmx-cyan/10 flex items-center justify-center shrink-0">
+                <Shield className="w-5 h-5 text-prmx-cyan" />
               </div>
-            )}
-
-            {/* Coverage Period */}
-            {policy && (
-              <div className="p-4 rounded-xl bg-background-tertiary/50">
-                <div className="flex items-center gap-2 mb-3">
-                  <Calendar className="w-4 h-4 text-text-secondary" />
-                  <span className="font-medium">Coverage Period</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-text-secondary">Start (UTC)</span>
-                  <span>{formatDateTimeUTC(policy.coverageStart)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm mb-2">
-                  <span className="text-text-secondary">End (UTC)</span>
-                  <span>{formatDateTimeUTC(policy.coverageEnd)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-text-secondary">Time Remaining</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
                   <span className={cn(
-                    "font-medium",
-                    daysRemaining <= 3 ? "text-warning" : "text-prmx-cyan"
+                    "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                    policy?.policyVersion === 'V3' ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
+                      : policy?.policyVersion === 'V2' ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
                   )}>
-                    {daysRemaining > 0 ? `${daysRemaining} days` : 'Coverage Ended'}
+                    {policy?.policyVersion || 'V1'}
                   </span>
                 </div>
+                <p className="text-base font-semibold truncate">{policy?.label || `Policy #${selectedOrder.policyId}`}</p>
+                {market && <p className="text-xs text-text-tertiary">{market.name}</p>}
               </div>
-            )}
-
-            {/* Order Details */}
-            <div className="p-4 rounded-xl bg-background-tertiary/50">
-              <div className="flex items-center gap-2 mb-3">
-                <DollarSign className="w-4 h-4 text-text-secondary" />
-                <span className="font-medium">Order Details</span>
-              </div>
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-text-secondary">Seller</span>
-                <code className="text-xs bg-background-secondary px-2 py-1 rounded">{formatAddress(selectedOrder.seller)}</code>
-              </div>
-              <div className="flex items-center justify-between text-sm mb-2">
-                <span className="text-text-secondary">Price per Share</span>
-                <span className="font-medium">{formatUSDT(selectedOrder.priceUsdt)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-text-secondary">Available Shares</span>
-                <span className="font-medium">{selectedOrder.remaining.toString()}</span>
+              <div className="text-right">
+                <p className="text-xs text-text-tertiary">Price/Share</p>
+                <p className="text-lg font-bold text-prmx-cyan">{formatUSDT(selectedOrder.priceUsdt)}</p>
               </div>
             </div>
 
-            {/* Investment Analysis */}
+            {/* Order & Policy Info - Compact rows */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Available</span>
+                <span className="text-sm font-semibold">{selectedOrder.remaining.toString()} shares</span>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Time Remaining</span>
+                <span className={cn(
+                  "text-sm font-semibold",
+                  daysRemaining <= 3 ? "text-amber-500" : "text-text-primary"
+                )}>
+                  {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
+                </span>
+              </div>
+              {market && (
+                <>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                    <span className="text-sm text-text-secondary">Strike</span>
+                    <span className="text-sm font-medium">{market.strikeValue} mm</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                    <span className="text-sm text-text-secondary">Max Payout</span>
+                    <span className="text-sm font-semibold text-emerald-500">{maxPayout}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Seller</span>
+                <code className="text-xs font-mono text-text-secondary">{formatAddress(selectedOrder.seller)}</code>
+              </div>
+            </div>
+
+            {/* Potential Return - Compact */}
             {market && potentialReturn > 0 && (
-              <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
-                <div className="flex items-center gap-2 mb-3">
-                  <TrendingUp className="w-4 h-4 text-prmx-cyan" />
-                  <span className="font-medium text-prmx-cyan">Investment Potential</span>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary/30">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-emerald-500" />
+                  <span className="text-sm text-text-secondary">If no event</span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <div className="text-text-secondary mb-1">If No Event</div>
-                    <div className="font-semibold text-success">
-                      +{potentialReturn.toFixed(0)}% return
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-text-secondary mb-1">If Event Occurs</div>
-                    <div className="font-semibold text-error">
-                      -100% (lose investment)
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-border-secondary text-xs text-text-secondary flex items-start gap-2">
-                  <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                  <span>
-                    {policy?.policyVersion === 'V2' ? (
-                      <>
-                        As an LP, you earn {maxPayout}/share if the cumulative rainfall stays below {market.strikeValue}mm over the coverage window. 
-                        V2 policies have early trigger enabled - if rainfall exceeds threshold at any point, your investment pays out immediately.
-                      </>
-                    ) : (
-                      <>
-                        As an LP, you earn {maxPayout}/share if the 24h rolling rainfall stays below {market.strikeValue}mm. 
-                        If the event occurs (rainfall exceeds threshold), your investment pays out to policy holders.
-                      </>
-                    )}
-                  </span>
-                </div>
+                <span className="text-sm font-bold text-emerald-500">+{potentialReturn.toFixed(0)}% return</span>
               </div>
             )}
 
@@ -1657,28 +1509,28 @@ export default function LpTradingPage() {
               onChange={(e) => setBuyQuantity(e.target.value)}
             />
 
-            {/* Cost Summary */}
-            <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-text-secondary">Total Cost</span>
+            {/* Cost Summary - Clean */}
+            <div className="space-y-2 p-3 rounded-lg bg-prmx-cyan/5">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-text-secondary">Total Cost</span>
                 <span className="text-xl font-bold">{formatUSDT(totalCost)}</span>
               </div>
               {market && (
-                <div className="flex items-center justify-between mb-2 text-sm">
-                  <span className="text-text-secondary">Value if No Event</span>
-                  <span className="font-medium text-success">{formatUSDT(totalPotentialPayout)}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-tertiary">Value if No Event</span>
+                  <span className="text-sm font-semibold text-emerald-500">{formatUSDT(totalPotentialPayout)}</span>
                 </div>
               )}
-              <div className="flex items-center justify-between text-sm pt-2 border-t border-prmx-cyan/20">
-                <span className="text-text-secondary">Your Balance</span>
-                <span className={usdtBalance >= totalCost ? 'text-success' : 'text-error'}>
+              <div className="flex items-center justify-between pt-2 border-t border-border-primary/20">
+                <span className="text-xs text-text-tertiary">Your Balance</span>
+                <span className={cn("text-sm font-medium", usdtBalance >= totalCost ? 'text-emerald-500' : 'text-rose-500')}>
                   {usdtFormatted}
                 </span>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <Button variant="secondary" onClick={() => setShowBuyModal(false)} className="flex-1">
                 Cancel
               </Button>
@@ -1735,274 +1587,151 @@ export default function LpTradingPage() {
             : String(selectedHoldingPolicyId).slice(0, 8);
           
           return (
-          <div className="space-y-5">
-            {/* Hero Header */}
-            <div className="relative overflow-hidden rounded-2xl">
-              {/* Gradient background - works in both themes */}
-              <div 
-                className="absolute inset-0"
-                style={{
-                  background: `linear-gradient(135deg, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 65%, 40%) 0%, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 75%, 25%) 50%,
-                    hsl(${(parseInt(shortId, 16) % 60) + 240}, 65%, 30%) 100%)`
-                }}
-              />
-              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxwYXRoIGQ9Ik0zNiAxOGMzLjMxNCAwIDYgMi42ODYgNiA2cy0yLjY4NiA2LTYgNi02LTIuNjg2LTYtNiAyLjY4Ni02IDYtNiIgc3Ryb2tlPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMDgpIiBzdHJva2Utd2lkdGg9IjIiLz48L2c+PC9zdmc+')] opacity-40" />
-              
-              <div className="relative p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div 
-                      className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-lg"
-                      style={{
-                        background: `linear-gradient(135deg, 
-                          hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 55%) 0%, 
-                          hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 45%) 100%)`
-                      }}
-                    >
-                      {shortId.slice(0, 4).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={cn(
-                          "text-xs font-bold px-2 py-0.5 rounded-full uppercase tracking-wider",
-                          policy?.policyVersion === 'V3' 
-                            ? "bg-cyan-500/30 text-cyan-100" 
-                            : policy?.policyVersion === 'V2' 
-                              ? "bg-purple-500/30 text-purple-100" 
-                              : "bg-white/20 text-white/90"
-                        )}>
-                          {policy?.policyVersion || 'V1'}
-                        </span>
-                        {market && (
-                          <span className="text-xs text-white/70 flex items-center gap-1">
-                            <MapPin className="w-3 h-3" />
-                            {market.name}
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-mono text-white/50 text-sm">{displayId}</p>
-                    </div>
-                  </div>
-                  
-                  <div className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-semibold",
-                    isEnded 
-                      ? "bg-red-500/30 text-red-100" 
-                      : isExpiringSoon 
-                        ? "bg-amber-500/30 text-amber-100" 
-                        : "bg-emerald-500/30 text-emerald-100"
+          <div className="space-y-4">
+            {/* Header - Clean design */}
+            <div className="flex items-center gap-3 pb-4 border-b border-border-primary/30">
+              <div className="w-12 h-12 rounded-lg bg-prmx-cyan/10 flex items-center justify-center shrink-0">
+                <Shield className="w-6 h-6 text-prmx-cyan" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className={cn(
+                    "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                    policy?.policyVersion === 'V3' ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
+                      : policy?.policyVersion === 'V2' ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+                      : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
                   )}>
-                    {isEnded ? 'Coverage Ended' : isExpiringSoon ? `${daysRemaining}d remaining` : `${daysRemaining} days left`}
-                  </div>
+                    {policy?.policyVersion || 'V1'}
+                  </span>
+                  <span className={cn(
+                    "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                    isEnded ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
+                      : isExpiringSoon ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"
+                      : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                  )}>
+                    {isEnded ? 'Ended' : `${daysRemaining}d left`}
+                  </span>
                 </div>
-
-                {/* Big numbers */}
-                <div className="mt-6 grid grid-cols-2 gap-6">
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-white/50 mb-1">Your Shares</p>
-                    <p className="text-4xl font-bold text-white">{holding.shares.toString()}</p>
-                    <p className="text-sm text-white/60 mt-1">{ownershipPercent.toFixed(1)}% of pool</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wider text-white/50 mb-1">Max Payout</p>
-                    <p className="text-4xl font-bold text-emerald-300">{formatUSDT(potentialPayout)}</p>
-                    <p className="text-sm text-white/60 mt-1">if no event occurs</p>
-                  </div>
-                </div>
+                <p className="text-base font-semibold truncate">{policy?.label || displayId}</p>
+                {market && <p className="text-xs text-text-tertiary flex items-center gap-1"><MapPin className="w-3 h-3" />{market.name}</p>}
               </div>
             </div>
 
-            {/* Stats Grid - Theme-aware */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-white/5">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center">
-                    <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                </div>
-                <p className="text-xs text-text-tertiary">Per Share</p>
-                <p className="text-lg font-bold text-text-primary">
-                  {market?.payoutPerShare ? formatUSDT(market.payoutPerShare) : '$100'}
-                </p>
+            {/* Key Stats - Side by side */}
+            <div className="flex gap-3">
+              <div className="flex-1 p-3 rounded-lg bg-background-tertiary/30">
+                <p className="text-xs text-text-tertiary mb-1">Your Shares</p>
+                <p className="text-2xl font-bold text-text-primary">{holding.shares.toString()}</p>
+                <p className="text-[10px] text-text-tertiary">{ownershipPercent.toFixed(1)}% of pool</p>
               </div>
-              
-              <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-white/5">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-cyan-500/10 flex items-center justify-center">
-                    <Droplets className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
-                  </div>
-                </div>
-                <p className="text-xs text-text-tertiary">Strike</p>
-                <p className="text-lg font-bold text-text-primary">{market?.strikeValue || 50} mm</p>
-              </div>
-              
-              <div className="p-4 rounded-xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-white/5">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-500/10 flex items-center justify-center">
-                    <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-                <p className="text-xs text-text-tertiary">Total Pool</p>
-                <p className="text-lg font-bold text-text-primary">{totalShares} shares</p>
+              <div className="flex-1 p-3 rounded-lg bg-emerald-500/5">
+                <p className="text-xs text-text-tertiary mb-1">Max Payout</p>
+                <p className="text-2xl font-bold text-emerald-500">{formatUSDT(potentialPayout)}</p>
+                <p className="text-[10px] text-text-tertiary">if no event</p>
               </div>
             </div>
 
-            {/* Coverage Period - Theme-aware */}
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-white/5 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 dark:border-white/5 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-text-tertiary" />
-                <span className="text-sm font-medium text-text-primary">Coverage Period</span>
+            {/* Details - Compact rows */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Per Share</span>
+                <span className="text-sm font-semibold">{market?.payoutPerShare ? formatUSDT(market.payoutPerShare) : '$100'}</span>
               </div>
-              <div className="p-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-text-tertiary uppercase tracking-wider mb-1">Start Date</p>
-                    <p className="text-base font-semibold text-text-primary">
-                      {policy?.coverageStart 
-                        ? new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { 
-                            month: 'long', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                          }) 
-                        : '—'}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-0.5">
-                      {policy?.coverageStart 
-                        ? new Date(policy.coverageStart * 1000).toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            timeZoneName: 'short'
-                          }) 
-                        : ''}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-text-tertiary uppercase tracking-wider mb-1">End Date</p>
-                    <p className="text-base font-semibold text-text-primary">
-                      {policy?.coverageEnd 
-                        ? new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { 
-                            month: 'long', 
-                            day: 'numeric', 
-                            year: 'numeric' 
-                          }) 
-                        : '—'}
-                    </p>
-                    <p className="text-xs text-text-tertiary mt-0.5">
-                      {policy?.coverageEnd 
-                        ? new Date(policy.coverageEnd * 1000).toLocaleTimeString('en-US', { 
-                            hour: '2-digit', 
-                            minute: '2-digit',
-                            timeZoneName: 'short'
-                          }) 
-                        : ''}
-                    </p>
-                  </div>
-                </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Strike</span>
+                <span className="text-sm font-medium">{market?.strikeValue || 50} mm</span>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Total Pool</span>
+                <span className="text-sm font-medium">{totalShares} shares</span>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Coverage</span>
+                <span className="text-sm">
+                  {policy?.coverageStart ? new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                  {' → '}
+                  {policy?.coverageEnd ? new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                </span>
               </div>
             </div>
 
-            {/* Share Management - Theme-aware */}
-            <div className="rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-white/5 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-200 dark:border-white/5 flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-text-tertiary" />
-                <span className="text-sm font-medium text-text-primary">Share Management</span>
+            {/* Share Management - Compact */}
+            <div className="pt-3 border-t border-border-primary/30 space-y-2">
+              <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Share Management</p>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Owned</span>
+                <span className="text-sm font-semibold">{holding.shares.toString()}</span>
               </div>
-              <div className="p-4">
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-sm text-text-secondary">Owned</span>
-                  <span className="text-sm font-semibold text-text-primary">{holding.shares.toString()}</span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-t border-slate-200 dark:border-white/5">
-                  <span className="text-sm text-text-secondary">Locked in Orders</span>
-                  <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">{holding.lockedShares.toString()}</span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-t border-slate-200 dark:border-white/5">
-                  <span className="text-sm text-text-secondary">Available</span>
-                  <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{availableShares.toString()}</span>
-                </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Locked in Orders</span>
+                <span className="text-sm font-semibold text-amber-500">{holding.lockedShares.toString()}</span>
+              </div>
+              <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                <span className="text-sm text-text-secondary">Available to Sell</span>
+                <span className="text-sm font-semibold text-emerald-500">{availableShares.toString()}</span>
               </div>
             </div>
 
-            {/* Active Orders - Theme-aware */}
+            {/* Active Orders */}
             {myOrdersForPolicy.length > 0 && (
-              <div className="rounded-xl bg-amber-50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-500/20 overflow-hidden">
-                <div className="px-4 py-3 border-b border-amber-200 dark:border-amber-500/20 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                  <span className="text-sm font-medium text-amber-800 dark:text-amber-300">Active Sell Orders</span>
-                </div>
-                <div className="p-3 space-y-2">
+              <div className="pt-3 border-t border-border-primary/30">
+                <p className="text-xs text-amber-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Active Sell Orders
+                </p>
+                <div className="space-y-2">
                   {myOrdersForPolicy.map(order => (
-                    <div key={order.orderId} className="flex justify-between items-center p-3 rounded-lg bg-amber-100/50 dark:bg-black/20">
-                      <div>
-                        <span className="text-text-primary font-medium">{order.remaining.toString()}</span>
-                        <span className="text-text-secondary text-sm"> shares @ </span>
-                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">{formatUSDT(order.priceUsdt)}</span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                    <div key={order.orderId} className="flex justify-between items-center py-2 px-3 rounded-lg bg-amber-500/5">
+                      <span className="text-sm">
+                        <span className="font-medium">{order.remaining.toString()}</span>
+                        <span className="text-text-tertiary"> @ </span>
+                        <span className="font-medium text-emerald-500">{formatUSDT(order.priceUsdt)}</span>
+                      </span>
+                      <button
                         onClick={() => {
                           setShowHoldingModal(false);
                           handleCancelOrder(order.orderId);
                         }}
-                        className="text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-100 dark:hover:bg-red-500/10 text-xs"
+                        className="text-xs text-rose-500 hover:text-rose-600 font-medium"
                       >
                         Cancel
-                      </Button>
+                      </button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* DeFi Status - Theme-aware */}
+            {/* DeFi Status */}
             {(() => {
               const defiInfo = policyDefiInfoMap.get(selectedHoldingPolicyId);
               if (!defiInfo?.isAllocatedToDefi) return null;
               
               return (
-                <div className="rounded-xl overflow-hidden bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-500/20">
-                  <div className="px-4 py-3 border-b border-purple-200 dark:border-purple-500/20 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
-                        <TrendingUp className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-                      </div>
-                      <span className="text-sm font-medium text-purple-800 dark:text-purple-300">Earning Yield</span>
-                    </div>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">Active</span>
+                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-purple-500/5">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-purple-500" />
+                    <span className="text-sm text-text-secondary">Earning Yield</span>
                   </div>
-                  <div className="p-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-text-secondary">Principal in DeFi</span>
-                      <span className="text-xl font-bold text-purple-700 dark:text-purple-300">
-                        {defiInfo.position ? formatUSDT(defiInfo.position.principalUsdt) : '$0'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-text-tertiary mt-3">
-                      Funds are earning yield via Hydration Stableswap. DAO covers losses.
-                    </p>
-                  </div>
+                  <span className="text-sm font-bold text-purple-500">
+                    {defiInfo.position ? formatUSDT(defiInfo.position.principalUsdt) : '$0'}
+                  </span>
                 </div>
               );
             })()}
 
-            {/* Compact Risk Notice - Theme-aware */}
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 dark:bg-red-500/5 border border-red-200 dark:border-red-500/10">
-              <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-500/10 flex items-center justify-center flex-shrink-0">
-                <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
-              </div>
-              <div className="text-xs text-text-secondary">
-                <span className="text-red-600 dark:text-red-400 font-medium">Risk:</span>{' '}
+            {/* Risk Notice - Minimal */}
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-rose-500/5">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0 mt-0.5" />
+              <p className="text-[11px] text-text-tertiary">
+                <span className="text-rose-500 font-medium">Risk:</span>{' '}
                 {policy?.policyVersion === 'V2' 
-                  ? `Cumulative rainfall > ${market?.strikeValue || 50}mm triggers payout to policyholder.`
-                  : `24h rainfall > ${market?.strikeValue || 50}mm triggers payout to policyholder.`
+                  ? `Cumulative rainfall > ${market?.strikeValue || 50}mm triggers payout.`
+                  : `24h rainfall > ${market?.strikeValue || 50}mm triggers payout.`
                 }
-              </div>
+              </p>
             </div>
 
-            {/* Actions - Theme-aware */}
+            {/* Actions */}
             <div className="flex gap-3 pt-2">
               <Button 
                 variant="secondary" 
@@ -2046,135 +1775,120 @@ export default function LpTradingPage() {
           const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
           
           return (
-            <div className="space-y-5">
-              {/* Trade Summary Card */}
-              <div className={cn(
-                "p-5 rounded-xl",
-                selectedTrade.type === 'buy' 
-                  ? "bg-gradient-to-br from-success/10 to-success/5 border border-success/20" 
-                  : "bg-gradient-to-br from-error/10 to-error/5 border border-error/20"
-              )}>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={cn(
-                      "w-14 h-14 rounded-xl flex items-center justify-center shrink-0",
-                      selectedTrade.type === 'buy' ? "bg-success/20" : "bg-error/20"
+            <div className="space-y-4">
+              {/* Trade Summary - Clean header */}
+              <div className="flex items-center gap-3 pb-4 border-b border-border-primary/30">
+                <div className={cn(
+                  "w-10 h-10 rounded-lg flex items-center justify-center shrink-0",
+                  selectedTrade.type === 'buy' ? "bg-emerald-500/10" : "bg-rose-500/10"
+                )}>
+                  {selectedTrade.type === 'buy' ? (
+                    <ArrowDownRight className="w-5 h-5 text-emerald-500" />
+                  ) : (
+                    <ArrowUpRight className="w-5 h-5 text-rose-500" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className={cn(
+                      "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                      selectedTrade.type === 'buy' 
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                        : "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
                     )}>
-                      {selectedTrade.type === 'buy' ? (
-                        <ArrowDownRight className="w-7 h-7 text-success" />
-                      ) : (
-                        <ArrowUpRight className="w-7 h-7 text-error" />
-                      )}
-                    </div>
-                    <div>
-                      <p className={cn(
-                        "text-sm font-medium uppercase tracking-wide",
-                        selectedTrade.type === 'buy' ? "text-success" : "text-error"
-                      )}>
-                        {selectedTrade.type === 'buy' ? 'Purchased' : 'Sold'}
-                      </p>
-                      <p className="text-2xl font-bold mt-0.5">
-                        {selectedTrade.shares} Share{selectedTrade.shares > 1 ? 's' : ''}
-                      </p>
-                      <p className="text-sm text-text-tertiary mt-1">
-                        {new Date(selectedTrade.timestamp).toLocaleString()}
-                      </p>
-                    </div>
+                      {selectedTrade.type === 'buy' ? 'Bought' : 'Sold'}
+                    </span>
+                    <span className="text-base font-semibold">
+                      {selectedTrade.shares} Share{selectedTrade.shares > 1 ? 's' : ''}
+                    </span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-text-tertiary">Total</p>
-                    <p className="text-2xl font-bold">${selectedTrade.totalAmount.toFixed(2)}</p>
-                    <p className="text-sm text-text-tertiary">
-                      @ ${selectedTrade.pricePerShare.toFixed(2)}/share
-                    </p>
-                  </div>
+                  <p className="text-xs text-text-tertiary mt-0.5">
+                    {new Date(selectedTrade.timestamp).toLocaleString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold">${selectedTrade.totalAmount.toFixed(2)}</p>
+                  <p className="text-xs text-text-tertiary">@ ${selectedTrade.pricePerShare.toFixed(2)}/share</p>
                 </div>
               </div>
 
-              {/* Policy & Market Info */}
+              {/* Policy Info - Compact */}
               {policy && market && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between pb-3 border-b border-border-secondary">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center shrink-0">
-                        <Shield className="w-5 h-5 text-prmx-cyan" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold">{policy.label || `Policy #${selectedTrade.policyId}`}</span>
-                          <Badge 
-                            variant={policy.policyVersion === 'V3' ? 'cyan' : policy.policyVersion === 'V2' ? 'purple' : 'default'} 
-                            className="text-xs"
-                          >
-                            {policy.policyVersion || 'V1'}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-text-secondary flex items-center gap-1">
-                          <MapPin className="w-3 h-3" />
-                          {market.name}
-                        </p>
-                      </div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center shrink-0">
+                      <Shield className="w-4 h-4 text-prmx-cyan" />
                     </div>
-                    <Badge variant={policy.status === 'Active' ? 'success' : 'default'}>
-                      {policy.status}
-                    </Badge>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn(
+                          "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                          policy.policyVersion === 'V3' ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
+                            : policy.policyVersion === 'V2' ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                        )}>
+                          {policy.policyVersion || 'V1'}
+                        </span>
+                        <span className={cn(
+                          "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                          policy.status === 'Active' 
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300"
+                            : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                        )}>
+                          {policy.status}
+                        </span>
+                      </div>
+                      <p className="text-sm font-medium truncate mt-0.5">{policy.label || `Policy #${selectedTrade.policyId}`}</p>
+                    </div>
                   </div>
                   
-                  {/* Key Metrics - 2x2 Grid */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl bg-background-tertiary/50">
-                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Strike</p>
-                      <p className="text-lg font-semibold mt-1 flex items-center gap-1.5">
-                        <Droplets className="w-4 h-4 text-prmx-cyan" />
+                  {/* Key Metrics - Row layout */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                      <span className="text-sm text-text-secondary">Location</span>
+                      <span className="text-sm font-medium flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-text-tertiary" />
+                        {market.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                      <span className="text-sm text-text-secondary">Strike</span>
+                      <span className="text-sm font-medium">
                         {policy.strikeMm ? `${policy.strikeMm / 10}mm` : `${market.strikeValue}mm`}
-                      </p>
+                      </span>
                     </div>
-                    <div className="p-3 rounded-xl bg-background-tertiary/50">
-                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Max Payout</p>
-                      <p className="text-lg font-semibold text-success mt-1">
-                        {formatUSDT(market.payoutPerShare)}
-                      </p>
+                    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                      <span className="text-sm text-text-secondary">Max Payout</span>
+                      <span className="text-sm font-semibold text-emerald-500">{formatUSDT(market.payoutPerShare)}</span>
                     </div>
-                    <div className="p-3 rounded-xl bg-background-tertiary/50">
-                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Time Left</p>
-                      <p className={cn(
-                        "text-lg font-semibold mt-1 flex items-center gap-1.5",
-                        daysRemaining <= 3 ? "text-warning" : ""
+                    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                      <span className="text-sm text-text-secondary">Time Left</span>
+                      <span className={cn(
+                        "text-sm font-medium",
+                        daysRemaining <= 3 ? "text-amber-500" : ""
                       )}>
-                        <Clock className="w-4 h-4" />
                         {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-background-tertiary/50">
-                      <p className="text-xs text-text-tertiary uppercase tracking-wide">Coverage</p>
-                      <p className="text-sm font-medium mt-1">
-                        {new Date(policy.coverageStart * 1000).toLocaleDateString()} - {new Date(policy.coverageEnd * 1000).toLocaleDateString()}
-                      </p>
+                      </span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Transaction Info */}
-              <div className="space-y-3 pt-2">
-                <p className="text-xs text-text-tertiary uppercase tracking-wide font-medium">Transaction Details</p>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between py-2 border-b border-border-secondary/50">
-                    <span className="text-sm text-text-secondary">Your Account</span>
-                    <span className="font-mono text-sm">{formatAddress(selectedTrade.trader)}</span>
+              {/* Transaction Info - Compact footer */}
+              <div className="pt-3 border-t border-border-primary/30 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-tertiary">Your Account</span>
+                  <code className="text-xs font-mono text-text-secondary">{formatAddress(selectedTrade.trader)}</code>
+                </div>
+                {selectedTrade.counterparty && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-text-tertiary">Counterparty</span>
+                    <code className="text-xs font-mono text-text-secondary">{selectedTrade.counterparty}</code>
                   </div>
-                  {selectedTrade.counterparty && (
-                    <div className="flex items-center justify-between py-2 border-b border-border-secondary/50">
-                      <span className="text-sm text-text-secondary">Counterparty</span>
-                      <span className="font-mono text-sm">{selectedTrade.counterparty}</span>
-                    </div>
-                  )}
-                  <div className="flex items-start justify-between py-2">
-                    <span className="text-sm text-text-secondary">Trade ID</span>
-                    <span className="font-mono text-xs text-text-tertiary break-all text-right max-w-[200px]">
-                      {selectedTrade.id}
-                    </span>
-                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-tertiary">Trade ID</span>
+                  <code className="text-[10px] font-mono text-text-tertiary truncate max-w-[180px]">{selectedTrade.id}</code>
                 </div>
               </div>
 
@@ -2442,130 +2156,125 @@ export default function LpTradingPage() {
           const isOwner = isSameAddress(order.seller, selectedAccount?.address);
           const totalValue = order.remaining * order.priceUsdt;
           const sellerInfo = api.getAccountByAddress(order.seller);
-          // Get location name for V3
-          const locationName = isV3 ? (policy?.label?.split(' - ')[0] || 'Unknown Location') : market?.name;
+          
+          // Get location name properly
+          const locationName = isV3 
+            ? ((policy as any)?.locationName || (policy as any)?.location?.name || 'V3 Policy')
+            : market?.name;
+          
+          // Format short policy ID for display
+          const shortId = typeof order.policyId === 'string' && order.policyId.startsWith('0x')
+            ? order.policyId.slice(2, 10)
+            : String(order.policyId).slice(0, 8);
           
           return (
-            <div className="space-y-5">
-              {/* Header */}
-              <div className="flex items-center gap-4 p-4 rounded-xl bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border border-prmx-cyan/20">
-                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center shrink-0">
-                  <Shield className="w-7 h-7 text-prmx-cyan" />
+            <div className="space-y-4">
+              {/* Header - Clean design */}
+              <div className="flex items-center gap-3 pb-4 border-b border-border-primary/30">
+                <div className="w-12 h-12 rounded-lg bg-prmx-cyan/10 flex items-center justify-center shrink-0">
+                  <Shield className="w-6 h-6 text-prmx-cyan" />
                 </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-xl font-bold">{policy?.label || `Policy #${order.policyId}`}</h3>
-                    <Badge 
-                      variant={isV3 ? 'cyan' : policy?.policyVersion === 'V2' ? 'purple' : 'default'} 
-                      className="text-xs"
-                    >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                    <span className={cn(
+                      "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
+                      isV3 ? "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/20 dark:text-cyan-300" 
+                        : policy?.policyVersion === 'V2' ? "bg-purple-100 text-purple-700 dark:bg-purple-500/20 dark:text-purple-300"
+                        : "bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"
+                    )}>
                       {policy?.policyVersion || 'V1'}
-                    </Badge>
-                    <Badge variant="error" className="text-xs">Sell Order</Badge>
-                    {isOwner && <Badge variant="success" className="text-xs">Your Order</Badge>}
+                    </span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300 uppercase">
+                      Sell
+                    </span>
+                    {isOwner && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 uppercase">
+                        Your Order
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm text-text-secondary flex items-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3" />
-                    {locationName || 'Unknown'}
+                  <p className="text-base font-semibold">
+                    {locationName || 'Unknown Location'}
+                  </p>
+                  <p className="text-xs text-text-tertiary font-mono mt-0.5">
+                    {shortId}...
                   </p>
                 </div>
               </div>
 
-              {/* Price & Value */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl bg-background-tertiary/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-5 h-5 text-success" />
-                    <span className="text-sm text-text-secondary">Price per Share</span>
-                  </div>
-                  <div className="text-2xl font-bold text-success">{formatUSDT(order.priceUsdt)}</div>
+              {/* Price & Value - Side by side compact */}
+              <div className="flex gap-3">
+                <div className="flex-1 p-3 rounded-lg bg-background-tertiary/30">
+                  <p className="text-xs text-text-tertiary mb-1">Price per Share</p>
+                  <p className="text-xl font-bold text-emerald-500">{formatUSDT(order.priceUsdt)}</p>
                 </div>
-                <div className="p-4 rounded-xl bg-background-tertiary/50">
-                  <div className="flex items-center gap-2 mb-2">
-                    <DollarSign className="w-5 h-5 text-prmx-cyan" />
-                    <span className="text-sm text-text-secondary">Total Value</span>
-                  </div>
-                  <div className="text-2xl font-bold text-prmx-cyan">{formatUSDT(totalValue)}</div>
+                <div className="flex-1 p-3 rounded-lg bg-background-tertiary/30">
+                  <p className="text-xs text-text-tertiary mb-1">Total Value</p>
+                  <p className="text-xl font-bold text-prmx-cyan">{formatUSDT(totalValue)}</p>
                 </div>
               </div>
 
-              {/* Order Info Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Shares Available</p>
-                  <p className="text-lg font-semibold mt-1">{order.remaining.toString()}</p>
+              {/* Order Info Grid - Compact rows */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                  <span className="text-sm text-text-secondary">Shares Available</span>
+                  <span className="text-sm font-semibold">{order.remaining.toString()}</span>
                 </div>
-                <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Original Quantity</p>
-                  <p className="text-lg font-semibold mt-1">{order.quantity.toString()}</p>
+                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                  <span className="text-sm text-text-secondary">Original Quantity</span>
+                  <span className="text-sm font-semibold">{order.quantity.toString()}</span>
                 </div>
-                <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Time Remaining</p>
-                  <p className={cn(
-                    "text-lg font-semibold mt-1 flex items-center gap-1.5",
-                    daysRemaining <= 3 ? "text-warning" : ""
+                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                  <span className="text-sm text-text-secondary">Time Remaining</span>
+                  <span className={cn(
+                    "text-sm font-semibold flex items-center gap-1",
+                    daysRemaining <= 3 ? "text-amber-500" : "text-text-primary"
                   )}>
-                    <Clock className="w-4 h-4" />
+                    <Clock className="w-3.5 h-3.5" />
                     {daysRemaining > 0 ? `${daysRemaining} days` : 'Expired'}
-                  </p>
+                  </span>
                 </div>
-                <div className="p-3 rounded-xl bg-background-tertiary/50">
-                  <p className="text-xs text-text-tertiary">Potential Return</p>
-                  <p className={cn(
-                    "text-lg font-semibold mt-1 flex items-center gap-1.5",
-                    potentialReturn >= 50 ? "text-success" : "text-prmx-cyan"
+                <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
+                  <span className="text-sm text-text-secondary">Potential Return</span>
+                  <span className={cn(
+                    "text-sm font-semibold flex items-center gap-1",
+                    potentialReturn >= 50 ? "text-emerald-500" : "text-prmx-cyan"
                   )}>
-                    <TrendingUp className="w-4 h-4" />
+                    <TrendingUp className="w-3.5 h-3.5" />
                     +{potentialReturn.toFixed(1)}%
-                  </p>
+                  </span>
                 </div>
               </div>
 
-              {/* Seller Info */}
-              <div className="p-4 rounded-xl bg-background-tertiary/30 border border-border-secondary">
-                <p className="text-xs text-text-tertiary uppercase tracking-wide mb-2">Seller</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                    <Users className="w-5 h-5 text-prmx-cyan" />
+              {/* Seller & Coverage - Compact */}
+              <div className="pt-3 border-t border-border-primary/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-tertiary">Seller</span>
+                  <div className="flex items-center gap-2">
+                    {isOwner ? (
+                      <span className="text-sm font-medium text-prmx-cyan">You</span>
+                    ) : (
+                      <span className="text-sm font-medium">{sellerInfo?.name || 'Unknown'}</span>
+                    )}
+                    <code className="text-[10px] text-text-tertiary font-mono">{formatAddress(order.seller)}</code>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium">
-                      {isOwner ? (
-                        <span className="text-prmx-cyan">You</span>
-                      ) : (
-                        sellerInfo?.name || 'Unknown'
-                      )}
-                    </p>
-                    <p className="text-xs text-text-tertiary font-mono truncate">{formatAddress(order.seller)}</p>
-                  </div>
-                  {sellerInfo && !isOwner && (
-                    <Badge variant="default" className="text-xs shrink-0">{sellerInfo.role}</Badge>
-                  )}
                 </div>
-              </div>
-
-              {/* Coverage Period */}
-              {policy && (
-                <div className="p-4 rounded-xl bg-prmx-cyan/5 border border-prmx-cyan/20">
-                  <p className="text-xs text-text-tertiary uppercase tracking-wide mb-3">Coverage Period</p>
+                
+                {policy && (
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-text-tertiary">Start</p>
-                      <p className="font-medium">{new Date(policy.coverageStart * 1000).toLocaleDateString()}</p>
-                    </div>
-                    <ArrowRight className="w-4 h-4 text-text-tertiary" />
-                    <div className="text-right">
-                      <p className="text-xs text-text-tertiary">End</p>
-                      <p className="font-medium">{new Date(policy.coverageEnd * 1000).toLocaleDateString()}</p>
-                    </div>
+                    <span className="text-xs text-text-tertiary">Coverage</span>
+                    <span className="text-sm">
+                      {new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {' → '}
+                      {new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
                   </div>
+                )}
+                
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-text-tertiary">Order ID</span>
+                  <code className="text-xs font-mono text-text-secondary">{order.orderId}</code>
                 </div>
-              )}
-
-              {/* Order ID */}
-              <div className="p-3 rounded-xl bg-background-tertiary/30 border border-border-secondary">
-                <p className="text-xs text-text-tertiary">Order ID</p>
-                <p className="font-mono text-sm mt-0.5">{order.orderId}</p>
               </div>
 
               {/* Actions */}

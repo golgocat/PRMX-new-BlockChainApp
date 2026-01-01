@@ -439,36 +439,37 @@ export default function OraclePage() {
         </Card>
       )}
 
-      {/* Oracle Info */}
-      <Card className="bg-gradient-to-br from-slate-900/50 via-slate-800/30 to-slate-900/50 border-prmx-cyan/20">
-        <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center flex-shrink-0">
-              <CloudRain className="w-6 h-6 text-prmx-cyan" />
+      {/* Oracle Info - Sleek design */}
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className="px-5 py-4 border-b border-border-primary/50">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                <CloudRain className="w-4 h-4 text-prmx-cyan" />
+              </div>
+              <h3 className="text-base font-semibold">AccuWeather Oracle</h3>
             </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-2">AccuWeather Oracle</h3>
-              <p className="text-text-secondary mb-4">
-                Rainfall data is fetched hourly from AccuWeather API via off-chain workers. 
-                The 24-hour rolling sum is calculated on-chain to determine policy triggers.
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="text-text-tertiary">Data Source</span>
-                  <p className="font-medium">AccuWeather API</p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">Update Frequency</span>
-                  <p className="font-medium">Hourly</p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">Rolling Window</span>
-                  <p className="font-medium">24 Hours</p>
-                </div>
-                <div>
-                  <span className="text-text-tertiary">Precision</span>
-                  <p className="font-medium">0.1 mm</p>
-                </div>
+          </div>
+          <div className="p-5">
+            <p className="text-sm text-text-secondary mb-4">
+              Rainfall data fetched hourly from AccuWeather API. 24h rolling sum calculated on-chain.
+            </p>
+            <div className="grid grid-cols-4 divide-x divide-border-primary/30">
+              <div className="px-4 text-center first:pl-0">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Source</p>
+                <p className="text-sm font-medium">AccuWeather</p>
+              </div>
+              <div className="px-4 text-center">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Frequency</p>
+                <p className="text-sm font-medium">Hourly</p>
+              </div>
+              <div className="px-4 text-center">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Window</p>
+                <p className="text-sm font-medium">24 Hours</p>
+              </div>
+              <div className="px-4 text-center last:pr-0">
+                <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-1">Precision</p>
+                <p className="text-sm font-medium">0.1 mm</p>
               </div>
             </div>
           </div>
@@ -530,93 +531,79 @@ export default function OraclePage() {
                   key={market.id}
                   ref={isHighlighted ? highlightRef : undefined}
                   className={cn(
-                    'transition-all',
+                    'overflow-hidden transition-all',
                     isHighlighted && 'ring-2 ring-prmx-cyan shadow-lg shadow-prmx-cyan/20'
                   )}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                          <MapPin className="w-5 h-5 text-prmx-cyan" />
+                  <CardHeader className="p-0 border-b border-border-primary/50">
+                    <div className="px-5 py-4 flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                          <MapPin className="w-4 h-4 text-prmx-cyan" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-lg">{market.name}</h3>
-                          <p className="text-xs text-text-secondary">
+                          <h3 className="text-sm font-semibold">{market.name}</h3>
+                          <p className="text-[10px] text-text-tertiary">
                             {formatCoordinates(market.centerLatitude, market.centerLongitude)}
                           </p>
                         </div>
                       </div>
                       {data ? (
-                        isAboveStrike ? (
-                          <Badge variant="destructive" className="flex items-center gap-1">
-                            <Activity className="w-3 h-3" />
-                            Triggered
-                          </Badge>
-                        ) : (
-                          <Badge variant="success" className="flex items-center gap-1">
-                            <Activity className="w-3 h-3" />
-                            Normal
-                          </Badge>
-                        )
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-full",
+                          isAboveStrike 
+                            ? "bg-rose-500/10 text-rose-500" 
+                            : "bg-emerald-500/10 text-emerald-500"
+                        )}>
+                          {isAboveStrike ? 'Triggered' : 'Normal'}
+                        </span>
                       ) : (
-                        <Badge variant="default">No Data</Badge>
+                        <span className="text-xs text-text-tertiary">No Data</span>
                       )}
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-5 space-y-4">
                     {/* Rainfall Progress */}
-                    <div className="p-4 rounded-xl bg-background-tertiary/50">
+                    <div>
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-text-secondary">24h Rolling Sum</span>
+                        <span className="text-xs text-text-tertiary">24h Rolling Sum</span>
                         <span className={cn(
-                          'text-2xl font-bold',
-                          isAboveStrike ? 'text-error' : 'text-prmx-cyan'
+                          'text-xl font-bold',
+                          isAboveStrike ? 'text-rose-500' : 'text-prmx-cyan'
                         )}>
                           {rollingSumMm.toFixed(1)} mm
                         </span>
                       </div>
                       
                       {/* Progress bar */}
-                      <div className="h-3 bg-background-secondary rounded-full overflow-hidden mb-2">
+                      <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden mb-1.5">
                         <div 
                           className={cn(
                             'h-full rounded-full transition-all duration-500',
-                            percentOfStrike >= 100 ? 'bg-error' : percentOfStrike >= 75 ? 'bg-warning' : 'bg-prmx-cyan'
+                            percentOfStrike >= 100 ? 'bg-rose-500' : 'bg-prmx-cyan'
                           )}
                           style={{ width: `${Math.min(percentOfStrike, 100)}%` }}
                         />
                       </div>
                       
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-text-tertiary">0 mm</span>
-                        <span className={cn(
-                          'font-medium',
-                          isAboveStrike ? 'text-error' : 'text-text-secondary'
-                        )}>
-                          {percentOfStrike.toFixed(0)}% of strike
-                        </span>
-                        <span className="text-text-tertiary">{market.strikeValue} mm</span>
+                      <div className="flex items-center justify-between text-[10px] text-text-tertiary">
+                        <span>0 mm</span>
+                        <span className="font-medium">{percentOfStrike.toFixed(0)}%</span>
+                        <span>{market.strikeValue} mm</span>
                       </div>
                     </div>
 
-                    {/* Details Grid */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="p-3 rounded-lg bg-background-tertiary/30">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Droplets className="w-4 h-4 text-prmx-cyan" />
-                          <span className="text-xs text-text-secondary">Strike Value</span>
-                        </div>
-                        <p className="font-semibold">{market.strikeValue} mm</p>
+                    {/* Details */}
+                    <div className="flex gap-4 text-sm pt-3 border-t border-border-primary/30">
+                      <div className="flex-1">
+                        <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-0.5">Strike</p>
+                        <p className="font-medium">{market.strikeValue} mm</p>
                       </div>
-                      <div className="p-3 rounded-lg bg-background-tertiary/30">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Activity className="w-4 h-4 text-warning" />
-                          <span className="text-xs text-text-secondary">To Strike</span>
-                        </div>
+                      <div className="flex-1">
+                        <p className="text-[10px] text-text-tertiary uppercase tracking-wide mb-0.5">Remaining</p>
                         <p className={cn(
-                          'font-semibold',
-                          isAboveStrike ? 'text-error' : 'text-text-primary'
+                          'font-medium',
+                          isAboveStrike ? 'text-rose-500' : 'text-text-primary'
                         )}>
                           {isAboveStrike ? 'TRIGGERED' : `${remainingToStrike.toFixed(1)} mm`}
                         </p>
@@ -838,44 +825,36 @@ export default function OraclePage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-2">
               {triggerLogs.map((log, idx) => {
                 const market = getMarketById(log.marketId);
                 return (
-                  <Card key={idx} className="border-warning/30">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center">
-                            <AlertTriangle className="w-5 h-5 text-warning" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold">
-                              {market?.name || `Market #${log.marketId}`}
-                            </h4>
-                            <p className="text-sm text-text-secondary">
-                              Triggered at block #{log.blockNumber ?? 'unknown'}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant="warning">Triggered</Badge>
+                  <div 
+                    key={idx} 
+                    className="flex items-center justify-between py-3 px-4 rounded-lg hover:bg-background-tertiary/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
                       </div>
-                      <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-border-secondary">
-                        <div>
-                          <span className="text-xs text-text-tertiary">Rainfall</span>
-                          <p className="font-semibold text-error">{(log.rollingSumMm / 10).toFixed(1)} mm</p>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{market?.name || `Market #${log.marketId}`}</span>
+                          <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-500">
+                            Triggered
+                          </span>
                         </div>
-                        <div>
-                          <span className="text-xs text-text-tertiary">Strike Threshold</span>
-                          <p className="font-semibold">{(log.strikeThreshold / 10).toFixed(1)} mm</p>
-                        </div>
-                        <div>
-                          <span className="text-xs text-text-tertiary">Policy ID</span>
-                          <p className="font-semibold">#{log.policyId}</p>
+                        <div className="flex items-center gap-3 text-xs text-text-tertiary mt-0.5">
+                          <span>{(log.rollingSumMm / 10).toFixed(1)} mm</span>
+                          <span>•</span>
+                          <span>Strike: {(log.strikeThreshold / 10).toFixed(1)} mm</span>
+                          <span>•</span>
+                          <span>Policy #{log.policyId}</span>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                    <span className="text-xs text-text-tertiary">Block #{log.blockNumber ?? '—'}</span>
+                  </div>
                 );
               })}
             </div>
@@ -884,41 +863,38 @@ export default function OraclePage() {
       </TabsContent>
       </Tabs>
 
-      {/* How It Works */}
-      <Card>
-        <CardHeader>
-          <h3 className="font-semibold">How the Oracle Works</h3>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-4 rounded-xl bg-background-tertiary/50">
-              <div className="w-10 h-10 rounded-lg bg-prmx-cyan/20 flex items-center justify-center mb-3">
-                <CloudRain className="w-5 h-5 text-prmx-cyan" />
+      {/* How It Works - Sleek design */}
+      <Card className="overflow-hidden">
+        <CardContent className="p-0">
+          <div className="px-5 py-4 border-b border-border-primary/50">
+            <h3 className="text-base font-semibold">How It Works</h3>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-border-primary/30">
+            <div className="p-5">
+              <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center mb-3">
+                <CloudRain className="w-4 h-4 text-prmx-cyan" />
               </div>
-              <h4 className="font-semibold mb-2">1. Data Ingestion</h4>
-              <p className="text-sm text-text-secondary">
-                Off-chain workers fetch hourly rainfall data from AccuWeather API 
-                for each market's geographic location.
+              <h4 className="text-sm font-semibold mb-1">1. Ingestion</h4>
+              <p className="text-xs text-text-tertiary">
+                Hourly data from AccuWeather API for each market location.
               </p>
             </div>
-            <div className="p-4 rounded-xl bg-background-tertiary/50">
-              <div className="w-10 h-10 rounded-lg bg-prmx-purple/20 flex items-center justify-center mb-3">
-                <Activity className="w-5 h-5 text-prmx-purple-light" />
+            <div className="p-5">
+              <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center mb-3">
+                <Activity className="w-4 h-4 text-prmx-purple" />
               </div>
-              <h4 className="font-semibold mb-2">2. Rolling Calculation</h4>
-              <p className="text-sm text-text-secondary">
-                The smart contract calculates a 24-hour rolling sum on-chain, 
-                ensuring tamper-proof and transparent calculations.
+              <h4 className="text-sm font-semibold mb-1">2. Calculation</h4>
+              <p className="text-xs text-text-tertiary">
+                24h rolling sum calculated on-chain for transparency.
               </p>
             </div>
-            <div className="p-4 rounded-xl bg-background-tertiary/50">
-              <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center mb-3">
-                <ThermometerSun className="w-5 h-5 text-success" />
+            <div className="p-5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center mb-3">
+                <ThermometerSun className="w-4 h-4 text-emerald-500" />
               </div>
-              <h4 className="font-semibold mb-2">3. Trigger Evaluation</h4>
-              <p className="text-sm text-text-secondary">
-                When the 24h rolling sum exceeds the market's strike value, 
-                policy payouts are triggered automatically.
+              <h4 className="text-sm font-semibold mb-1">3. Trigger</h4>
+              <p className="text-xs text-text-tertiary">
+                Auto payout when sum exceeds market strike.
               </p>
             </div>
           </div>

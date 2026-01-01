@@ -21,21 +21,23 @@ PRMX is a decentralized parametric insurance platform that automatically settles
 ### Key Features
 
 - **Automated Settlement** - Oracle-driven payouts with no manual claims
-- **Dual Oracle System** - V1 (on-chain) and V2 (off-chain) for different use cases
+- **Multi-Version Oracle System** - V1 (on-chain), V2 (off-chain polling), V3 (Ingest API with HMAC)
 - **LP Token Trading** - Policy-specific liquidity provider tokens tradable on an orderbook
 - **AccuWeather Integration** - Real-time rainfall data from a trusted weather provider
 - **XCM Ready** - Prepared for cross-chain capital management via Polkadot
+- **Sleek Modern UI** - Clean, compact design system with consistent visual language
 
-### V1 vs V2 Products
+### V1 vs V2 vs V3 Products
 
-| Feature | V1 | V2 |
-|---------|----|----|
-| **Markets** | All markets | Manila only |
-| **Coverage Duration** | 24 hours fixed | 2-7 days configurable |
-| **Event Type** | 24h rolling rainfall | Cumulative over window |
-| **Early Trigger** | No | Yes |
-| **Oracle** | On-chain OCW | Off-chain Node.js service |
-| **Settlement** | Automatic via `on_initialize` | Via `submit_v2_report` extrinsic |
+| Feature | V1 | V2 | V3 |
+|---------|----|----|-----|
+| **Markets** | All markets | Manila only | All markets |
+| **Coverage Duration** | 24 hours fixed | 2-7 days configurable | Configurable |
+| **Event Type** | 24h rolling rainfall | Cumulative over window | Cumulative with commitments |
+| **Early Trigger** | No | Yes | Yes |
+| **Oracle** | On-chain OCW | Off-chain Node.js polling | Ingest API with HMAC auth |
+| **Settlement** | Automatic via `on_initialize` | Via `submit_v2_report` extrinsic | Via Ingest API |
+| **Data Integrity** | N/A | N/A | HMAC commitment verification |
 
 ---
 
@@ -63,10 +65,16 @@ flowchart TB
         end
     end
 
-    subgraph OracleV2["V2 Oracle Service (Node.js)"]
-        Listener[Event Listener]
-        Evaluator[Rainfall Evaluator]
-        Reporter[Report Submitter]
+    subgraph OracleService["Oracle Service (Node.js)"]
+        subgraph V2["V2 Polling"]
+            Listener[Event Listener]
+            Evaluator[Rainfall Evaluator]
+            Reporter[Report Submitter]
+        end
+        subgraph V3["V3 Ingest API"]
+            IngestAPI[REST Endpoints]
+            HMACAuth[HMAC Auth]
+        end
         MongoDB[(MongoDB Atlas)]
     end
 
@@ -78,10 +86,12 @@ flowchart TB
     UI <--> Blockchain
     OCW --> AccuWeather
     Quote --> RPricing
-    OracleV2 --> AccuWeather
-    OracleV2 <--> Blockchain
+    V2 --> AccuWeather
+    V2 <--> Blockchain
+    V3 <--> Blockchain
     Listener --> MongoDB
     Evaluator --> MongoDB
+    IngestAPI --> MongoDB
 ```
 
 ---
@@ -135,7 +145,7 @@ cd frontend && npm install && npm run dev
 ### 3. Access the Application
 
 - **Frontend**: http://localhost:3000
-- **Oracle V2 API**: http://localhost:3001
+- **Oracle Service API**: http://localhost:3001 (V2 polling + V3 Ingest)
 - **Blockchain RPC**: ws://localhost:9944
 
 For detailed restart instructions, see [docs/RESTART-GUIDE.md](docs/RESTART-GUIDE.md).
@@ -186,7 +196,8 @@ PRMX/
 │
 ├── docs/                       # Documentation
 │   ├── RESTART-GUIDE.md        # Dev environment restart guide
-│   └── SETTLEMENT-FLOW.md      # V1/V2 settlement documentation
+│   ├── SETTLEMENT-FLOW.md      # V1/V2/V3 settlement documentation
+│   └── UI-DESIGN-PRINCIPLES.md # UI design system and component guidelines
 │
 ├── app-design.md               # Application design specification
 ├── oracle-design.md            # Oracle system specification
@@ -204,37 +215,48 @@ The PRMX blockchain is built on Substrate with custom pallets:
 | Pallet | Description |
 |--------|-------------|
 | `prmx-markets` | Market definitions with geospatial coordinates, strike values, and window rules |
-| `prmx-policy` | Policy creation, lifecycle, V1/V2 handling, and settlement |
+| `prmx-policy` | Policy creation, lifecycle, V1/V2/V3 handling, and settlement |
 | `prmx-holdings` | Per-policy LP token holdings (free and locked shares) |
 | `prmx-orderbook-lp` | LP-only orderbook for trading policy-specific LP tokens |
-| `prmx-oracle` | V1 24h rolling rainfall + V2 report receiver |
+| `prmx-oracle` | V1 24h rolling rainfall + V2 report receiver + V3 Ingest API integration |
 | `prmx-quote` | Quote requests with R pricing model integration |
 | `prmx-xcm-capital` | XCM-based capital management (Hydration Pool 102 ready) |
 
 For detailed specifications, see [app-design.md](app-design.md).
 
-### Oracle V2 Service
+### Oracle Service (V2 + V3)
 
-The V2 Oracle is an off-chain Node.js service for cumulative rainfall monitoring:
+The off-chain Oracle Service handles both V2 polling and V3 Ingest API:
 
+**V2 Features:**
 - **Event Listener**: Subscribes to `V2PolicyCreated` events
 - **Scheduler**: Polls AccuWeather every 30 minutes
 - **Evaluator**: Calculates cumulative rainfall during coverage
 - **Reporter**: Submits `submit_v2_report` when triggered or matured
 
+**V3 Features:**
+- **Ingest API**: Receives weather data via authenticated REST endpoints
+- **HMAC Authentication**: Secure data submission with commitment verification
+- **Observation Commitments**: Cryptographic commitments for data integrity
+- **Multi-Event Types**: Supports rainfall, temperature, and wind events
+
 For settlement flow details, see [docs/SETTLEMENT-FLOW.md](docs/SETTLEMENT-FLOW.md).
 
 ### Frontend
 
-A modern Next.js application with:
+A modern Next.js application with a sleek, consistent design system:
 
-- Dashboard with platform statistics
-- Market explorer with rainfall data
-- Policy management (V1/V2)
-- LP token trading orderbook
-- Oracle monitoring pages
+- **Dashboard** - Platform statistics with animated stat cards
+- **Market Explorer** - Browse markets with real-time rainfall data
+- **Policy Management** - Unified UI for V1/V2/V3 policies
+- **LP Trading** - Full orderbook for trading policy-specific LP tokens
+- **Oracle Monitoring** - V1 and V2 oracle status pages
+- **V3 Requests** - Create and monitor V3 coverage requests
 
-For frontend details, see [frontend/README.md](frontend/README.md).
+**Design System:**
+The UI follows the PRMX Design Principles with clean, compact layouts and consistent visual language. See [docs/UI-DESIGN-PRINCIPLES.md](docs/UI-DESIGN-PRINCIPLES.md) for the complete design guide.
+
+For frontend implementation details, see [frontend/README.md](frontend/README.md).
 
 ---
 
@@ -246,13 +268,16 @@ For frontend details, see [frontend/README.md](frontend/README.md).
 # Blockchain
 NEXT_PUBLIC_RPC_URL=ws://localhost:9944
 
-# Oracle Service
+# Oracle Service (V2 + V3)
 MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/prmx-oracle
 WS_ENDPOINT=ws://127.0.0.1:9944
 ACCUWEATHER_API_KEY=your-api-key
 MANILA_LOCATION_KEY=264885
 ORACLE_SEED=//Alice
 ORACLE_V2_API_PORT=3001
+
+# V3 Ingest API (HMAC Authentication)
+V3_HMAC_SECRET=your-hmac-secret-key
 
 # R Pricing
 RPRICING_API_KEY=your-api-key
@@ -331,10 +356,11 @@ cd scripts
 | Document | Description |
 |----------|-------------|
 | [app-design.md](app-design.md) | Complete application design specification |
-| [oracle-design.md](oracle-design.md) | V1 and V2 oracle system specification |
+| [oracle-design.md](oracle-design.md) | V1, V2, and V3 oracle system specification |
 | [pricing-model.md](pricing-model.md) | R actuarial model integration |
 | [docs/RESTART-GUIDE.md](docs/RESTART-GUIDE.md) | Development environment restart guide |
-| [docs/SETTLEMENT-FLOW.md](docs/SETTLEMENT-FLOW.md) | V1/V2 settlement flow documentation |
+| [docs/SETTLEMENT-FLOW.md](docs/SETTLEMENT-FLOW.md) | V1/V2/V3 settlement flow documentation |
+| [docs/UI-DESIGN-PRINCIPLES.md](docs/UI-DESIGN-PRINCIPLES.md) | UI design system and component guidelines |
 | [frontend/README.md](frontend/README.md) | Frontend application documentation |
 
 ---

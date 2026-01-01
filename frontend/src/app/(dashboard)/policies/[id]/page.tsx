@@ -312,14 +312,9 @@ export default function PolicyDetailPage() {
                 </Button>
               </Link>
               
-              {/* Dynamic gradient avatar */}
+              {/* Subtle gradient avatar */}
               <div 
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-lg flex-shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
-                }}
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-sm flex-shrink-0 bg-gradient-to-br from-gray-600 to-gray-700 dark:from-slate-600 dark:to-slate-700 border border-gray-500/30"
               >
                 {shortId.slice(0, 4).toUpperCase()}
               </div>
@@ -356,422 +351,275 @@ export default function PolicyDetailPage() {
         );
       })()}
 
-      {/* Main Info Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Policy Overview */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <Shield className="w-5 h-5 text-prmx-cyan" />
-              Policy Overview
-            </h2>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Market Info */}
-            <div className="p-4 rounded-xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-border-secondary">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                    <MapPin className="w-6 h-6 text-prmx-cyan" />
+      {/* Main Info Grid - Balanced 2-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column */}
+        <div className="space-y-6">
+        {/* Policy Overview - Sleek design */}
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-border-primary/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-prmx-cyan" />
                   </div>
-                  <div>
-                    <h3 className="font-semibold text-lg">{market?.name || `Market #${policy.marketId}`}</h3>
-                    {market && (
-                      <p className="text-sm text-text-secondary">
-                        {formatCoordinates(market.centerLatitude, market.centerLongitude)}
-                      </p>
-                    )}
-                  </div>
+                  <h2 className="text-base font-semibold">Policy Overview</h2>
                 </div>
                 <Link href={policy.policyVersion === 'V2' ? '/oracle-service' : `/oracle?marketId=${policy.marketId}`}>
                   <Button variant="secondary" size="sm" icon={policy.policyVersion === 'V2' ? <Activity className="w-4 h-4" /> : <Droplets className="w-4 h-4" />}>
-                    {policy.policyVersion === 'V2' ? 'View V2 Oracle' : 'View Rainfall'}
+                    {policy.policyVersion === 'V2' ? 'Oracle' : 'Rainfall'}
                   </Button>
                 </Link>
               </div>
+            </div>
+            
+            <div className="p-5 space-y-5">
+              {/* Market Info */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-background-tertiary/50 flex items-center justify-center flex-shrink-0">
+                  <MapPin className="w-5 h-5 text-prmx-cyan" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold">{market?.name || `Market #${policy.marketId}`}</p>
+                  {market && (
+                    <p className="text-xs text-text-tertiary">
+                      {formatCoordinates(market.centerLatitude, market.centerLongitude)}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
               {market && (
-                <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
-                  <div>
-                    <span className="text-text-secondary">Strike Value</span>
-                    <p className="font-medium">{market.strikeValue} mm (24h rolling)</p>
+                <div className="flex gap-4 text-sm">
+                  <div className="flex-1">
+                    <p className="text-xs text-text-tertiary mb-0.5">Strike</p>
+                    <p className="font-medium">{market.strikeValue} mm</p>
                   </div>
-                  <div>
-                    <span className="text-text-secondary">Payout per Share</span>
+                  <div className="flex-1">
+                    <p className="text-xs text-text-tertiary mb-0.5">Payout/Share</p>
                     <p className="font-medium">{formatUSDT(market.payoutPerShare)}</p>
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Coverage Period */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl border border-border-secondary">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="w-4 h-4 text-text-secondary" />
-                  <span className="text-sm text-text-secondary">Coverage Start (UTC)</span>
+              {/* Coverage Period */}
+              <div className="pt-3 border-t border-border-primary/30">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Calendar className="w-3.5 h-3.5 text-text-tertiary" />
+                  <p className="text-xs text-text-tertiary">Coverage Period</p>
                 </div>
-                <p className="font-semibold text-lg">{formatDateTimeUTC(policy.coverageStart)}</p>
-              </div>
-              <div className="p-4 rounded-xl border border-border-secondary">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="w-4 h-4 text-text-secondary" />
-                  <span className="text-sm text-text-secondary">Coverage End (UTC)</span>
-                </div>
-                <p className="font-semibold text-lg">{formatDateTimeUTC(policy.coverageEnd)}</p>
-              </div>
-            </div>
-
-            {/* Time Remaining */}
-            {isActive && (
-              <div className={`p-4 rounded-xl ${isExpired ? 'bg-warning/10 border border-warning/30' : 'bg-prmx-cyan/10 border border-prmx-cyan/30'}`}>
                 <div className="flex items-center gap-2">
-                  <Clock className={`w-5 h-5 ${isExpired ? 'text-warning' : 'text-prmx-cyan'}`} />
-                  <span className="font-medium">
-                    {isExpired ? 'Coverage Expired - Awaiting Settlement' : formatTimeRemaining(policy.coverageEnd)}
+                  <div className="text-center px-3 py-2 rounded-lg bg-background-tertiary/50 flex-1">
+                    <p className="text-[10px] text-text-tertiary uppercase tracking-wide">Start</p>
+                    <p className="font-semibold text-sm mt-0.5">{formatDateTimeUTC(policy.coverageStart)}</p>
+                  </div>
+                  <span className="text-text-tertiary text-sm">→</span>
+                  <div className="text-center px-3 py-2 rounded-lg bg-background-tertiary/50 flex-1">
+                    <p className="text-[10px] text-text-tertiary uppercase tracking-wide">End</p>
+                    <p className="font-semibold text-sm mt-0.5">{formatDateTimeUTC(policy.coverageEnd)}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Time Remaining */}
+              {isActive && (
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    "w-2 h-2 rounded-full",
+                    isExpired ? "bg-amber-500" : "bg-prmx-cyan animate-pulse"
+                  )} />
+                  <span className={cn(
+                    "text-sm font-medium",
+                    isExpired ? "text-amber-500" : "text-prmx-cyan"
+                  )}>
+                    {isExpired ? 'Awaiting Settlement' : formatTimeRemaining(policy.coverageEnd)}
                   </span>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Holder Info */}
-            <div className="p-4 rounded-xl border border-border-secondary">
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-4 h-4 text-text-secondary" />
-                <span className="text-sm text-text-secondary">Policy Holder</span>
+              {/* Holder Info */}
+              <div className="pt-3 border-t border-border-primary/30">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-text-tertiary" />
+                    <p className="text-xs text-text-tertiary">Holder</p>
+                  </div>
+                  <p className="font-mono text-xs text-text-secondary">{formatAddress(policy.holder)}</p>
+                </div>
               </div>
-              <p className="font-mono text-sm">{policy.holder}</p>
-            </div>
 
-            {/* Created At */}
-            <div className="p-4 rounded-xl border border-border-secondary">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="w-4 h-4 text-text-secondary" />
-                <span className="text-sm text-text-secondary">Policy Created (UTC)</span>
+              {/* Created At */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-text-tertiary" />
+                  <p className="text-xs text-text-tertiary">Created</p>
+                </div>
+                <p className="text-xs text-text-secondary">{formatDateTimeUTC(policy.createdAt)}</p>
               </div>
-              <p className="font-semibold">{formatDateTimeUTC(policy.createdAt)}</p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Financial Summary */}
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-success" />
-                Financial Summary
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-4 rounded-xl bg-success/10 border border-success/30">
-                <span className="text-sm text-text-secondary">Max Payout</span>
-                <p className="text-2xl font-bold text-success">{formatUSDT(policy.maxPayout)}</p>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Shares</span>
-                  <span className="font-medium">{Number(policy.shares)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Premium Paid</span>
-                  <span className="font-medium">{formatUSDT(policy.premiumPaid)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-text-secondary">Capital Pool</span>
-                  <span className="font-medium">{formatUSDT(policy.capitalPool.totalCapital)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Pool Account Info */}
+          {/* Pool Account Info - Sleek design */}
           {poolInfo && (
-            <Card className="border-prmx-purple/30">
-              <CardHeader className="pb-2">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Lock className="w-5 h-5 text-prmx-purple" />
-                  Locked Funds
-                </h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Pool Balance */}
-                <div className="p-4 rounded-xl bg-prmx-purple/10 border border-prmx-purple/30">
-                  <span className="text-sm text-text-secondary">Pool Balance</span>
-                  <p className="text-2xl font-bold text-prmx-purple-light">
-                    {formatUSDT(poolInfo.balance)}
-                  </p>
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                      <Lock className="w-4 h-4 text-prmx-purple" />
+                    </div>
+                    <h2 className="text-base font-semibold">Locked Funds</h2>
+                  </div>
+                </div>
+                
+                {/* Balance highlight */}
+                <div className="px-5 py-4 bg-gradient-to-r from-prmx-purple/5 to-transparent">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-text-tertiary">Pool Balance</span>
+                    <span className="text-2xl font-bold text-prmx-purple">{formatUSDT(poolInfo.balance)}</span>
+                  </div>
                 </div>
                 
                 {/* Pool Address */}
-                <div className="space-y-2">
+                <div className="px-5 py-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-secondary">Pool Address</span>
+                    <span className="text-xs text-text-tertiary">Pool Address</span>
                     <button
                       onClick={handleCopyAddress}
-                      className="flex items-center gap-1 text-xs text-prmx-cyan hover:text-prmx-cyan/80 transition-colors"
+                      className="flex items-center gap-1.5 group"
+                      title="Copy address"
                     >
+                      <code className="text-xs font-mono text-text-secondary group-hover:text-prmx-cyan transition-colors">
+                        {formatAddress(poolInfo.address)}
+                      </code>
                       {copied ? (
-                        <>
-                          <Check className="w-3 h-3" />
-                          Copied!
-                        </>
+                        <Check className="w-3 h-3 text-success" />
                       ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          Copy
-                        </>
+                        <Copy className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
                       )}
                     </button>
                   </div>
-                  <div className="p-3 rounded-lg bg-background-tertiary/50 border border-border-secondary">
-                    <p className="font-mono text-xs break-all text-text-secondary">
-                      {poolInfo.address}
-                    </p>
-                  </div>
                 </div>
                 
-                <p className="text-xs text-text-tertiary">
-                  Funds are locked in this derived account until policy settlement.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* DeFi Allocation Card */}
-          {defiInfo && (
-            <Card className={defiInfo.isAllocatedToDefi ? 'border-success/30' : 'border-border-secondary'}>
-              <CardHeader className="pb-2">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <TrendingUp className="w-5 h-5 text-success" />
-                  DeFi Yield Strategy
-                </h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Investment Status */}
-                <div className={`p-4 rounded-xl ${
-                  defiInfo.isAllocatedToDefi 
-                    ? 'bg-success/10 border border-success/30' 
-                    : 'bg-background-tertiary/50 border border-border-secondary'
-                }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-text-secondary">Status</span>
-                    <Badge 
-                      variant={defiInfo.isAllocatedToDefi ? 'success' : 'default'}
-                      className="text-xs"
-                    >
-                      {defiInfo.investmentStatus === 'Invested' && '🟢 Allocated to DeFi'}
-                      {defiInfo.investmentStatus === 'NotInvested' && '⚪ Not Allocated'}
-                      {defiInfo.investmentStatus === 'Unwinding' && '🔄 Unwinding'}
-                      {defiInfo.investmentStatus === 'Settled' && '✓ Settled'}
-                      {defiInfo.investmentStatus === 'Failed' && '❌ Failed'}
-                    </Badge>
-                  </div>
-                  {defiInfo.isAllocatedToDefi && (
-                    <p className="text-xs text-text-secondary">
-                      Locked funds are generating yield via Hydration Stableswap
-                    </p>
-                  )}
-                </div>
-
-                {/* Position Details (if allocated) */}
-                {defiInfo.position && (
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary text-sm">Principal Allocated</span>
-                      <span className="font-medium text-success">
-                        {formatUSDT(defiInfo.position.principalUsdt)}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary text-sm">LP Tokens</span>
-                      <span className="font-medium">
-                        {(Number(defiInfo.position.lpShares) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Info tooltip */}
-                <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
-                  <p className="text-xs text-text-secondary">
-                    💡 Policy funds may be allocated to DeFi strategies to generate yield. 
-                    The DAO guarantees coverage of potential losses.
+                {/* Footer note */}
+                <div className="px-5 py-3 bg-background-tertiary/30 border-t border-border-primary/30">
+                  <p className="text-[11px] text-text-tertiary">
+                    Locked until settlement
                   </p>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* LP Token Holders / Settlement Payouts */}
-          <Card className={policy.status === 'Settled' ? 'border-success/30' : 'border-prmx-cyan/30'}>
-            <CardHeader className="pb-2">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                {policy.status === 'Settled' ? (
-                  <>
-                    <Wallet className="w-5 h-5 text-success" />
-                    Settlement Payouts
-                  </>
-                ) : (
-                  <>
-                    <Users className="w-5 h-5 text-prmx-cyan" />
-                    LP Token Holders
-                  </>
-                )}
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {policy.status === 'Settled' && settlementResult ? (
-                // Show settlement payout breakdown
-                <div className="space-y-4">
-                  {settlementResult.eventOccurred ? (
-                    // Event triggered - policyholder got paid
-                    <>
-                      <div className="p-4 rounded-xl bg-success/10 border border-success/30">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-lg bg-success/20 flex items-center justify-center">
-                            <CheckCircle2 className="w-5 h-5 text-success" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-success">Policyholder Payout</p>
-                            <p className="text-xs text-text-secondary">Rainfall exceeded strike threshold</p>
-                          </div>
-                        </div>
-                        <div className="p-3 rounded-lg bg-success/5 border border-success/20">
+          {/* LP Token Holders - Sleek design */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className={cn(
+                      "w-8 h-8 rounded-lg flex items-center justify-center",
+                      policy.status === 'Settled' ? "bg-emerald-500/10" : "bg-prmx-cyan/10"
+                    )}>
+                      {policy.status === 'Settled' ? (
+                        <Wallet className="w-4 h-4 text-emerald-500" />
+                      ) : (
+                        <Users className="w-4 h-4 text-prmx-cyan" />
+                      )}
+                    </div>
+                    <h2 className="text-base font-semibold">
+                      {policy.status === 'Settled' ? 'Settlement Payouts' : 'LP Token Holders'}
+                    </h2>
+                  </div>
+                  {!settlementResult && lpHoldings.length > 0 && (
+                    <span className="text-xs text-text-tertiary">
+                      {lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0).toLocaleString()} shares
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="p-5">
+                {policy.status === 'Settled' && settlementResult ? (
+                  <div className="space-y-4">
+                    {settlementResult.eventOccurred ? (
+                      <>
+                        {/* Policyholder Payout */}
+                        <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-emerald-500/5 to-transparent">
                           <div className="flex items-center justify-between">
                             <div>
-                              <p className="text-xs text-text-tertiary">Recipient</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="font-medium">{api.getAccountByAddress(policy.holder)?.name || 'Policyholder'}</span>
-                                <span className="text-xs text-text-tertiary font-mono">{formatAddress(policy.holder)}</span>
-                              </div>
+                              <p className="text-xs text-text-tertiary">Holder Payout</p>
+                              <p className="text-sm text-text-secondary mt-0.5">
+                                {api.getAccountByAddress(policy.holder)?.name || formatAddress(policy.holder)}
+                              </p>
                             </div>
-                            <div className="text-right">
-                              <p className="text-xs text-text-tertiary">Payout</p>
-                              <p className="text-xl font-bold text-success">{formatUSDT(settlementResult.payoutToHolder)}</p>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* LPs lost their capital */}
-                      <div className="p-4 rounded-xl bg-error/5 border border-error/20">
-                        <div className="flex items-center gap-2 mb-2">
-                          <XCircle className="w-4 h-4 text-error" />
-                          <p className="text-sm font-medium text-error">LP Capital Used for Payout</p>
-                        </div>
-                        <p className="text-xs text-text-secondary">
-                          The LP capital pool was used to pay the policyholder. LPs received no return on this policy.
-                        </p>
-                        <div className="mt-3 p-2 rounded-lg bg-background-tertiary/50">
-                          <div className="flex justify-between text-sm">
-                            <span className="text-text-secondary">Total LP Shares</span>
-                            <span className="font-medium">{policy.capitalPool.totalShares.toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between text-sm mt-1">
-                            <span className="text-text-secondary">Returned to LPs</span>
-                            <span className="font-medium text-error">$0.00</span>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    // No event - LPs got their capital back
-                    <>
-                      <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30">
-                        <div className="flex items-center gap-3 mb-3">
-                          <div className="w-10 h-10 rounded-lg bg-prmx-cyan/20 flex items-center justify-center">
-                            <Users className="w-5 h-5 text-prmx-cyan" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-prmx-cyan">LP Capital Returned</p>
-                            <p className="text-xs text-text-secondary">No rainfall event - LPs profit from premium</p>
+                            <span className="text-xl font-bold text-emerald-500">
+                              {formatUSDT(settlementResult.payoutToHolder)}
+                            </span>
                           </div>
                         </div>
                         
-                        {/* Summary */}
-                        <div className="grid grid-cols-2 gap-3 mb-4">
-                          <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
-                            <p className="text-xs text-text-tertiary">Total Returned</p>
-                            <p className="text-lg font-bold text-prmx-cyan">{formatUSDT(settlementResult.returnedToLps)}</p>
+                        {/* LP Loss */}
+                        <div className="flex items-center justify-between text-sm pt-3 border-t border-border-primary/30">
+                          <div className="flex items-center gap-2">
+                            <XCircle className="w-4 h-4 text-red-400" />
+                            <span className="text-text-tertiary">LP Return</span>
                           </div>
-                          <div className="p-3 rounded-lg bg-background-tertiary/50 border border-border-secondary">
-                            <p className="text-xs text-text-tertiary">Total Shares</p>
-                            <p className="text-lg font-bold">{policy.capitalPool.totalShares.toLocaleString()}</p>
+                          <span className="font-medium text-red-400">$0.00</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* LP Return */}
+                        <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-prmx-cyan/5 to-transparent">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-text-tertiary">Returned to LPs</span>
+                            <span className="text-xl font-bold text-prmx-cyan">
+                              {formatUSDT(settlementResult.returnedToLps)}
+                            </span>
                           </div>
                         </div>
                         
-                        {/* Per-share calculation */}
-                        <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-xs text-text-tertiary">Return per Share</p>
-                              <p className="text-sm text-text-secondary mt-1">
-                                Each LP share received proportional payout
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-success">
-                                {policy.capitalPool.totalShares > 0 
-                                  ? `$${(Number(settlementResult.returnedToLps) / 1_000_000 / policy.capitalPool.totalShares).toFixed(4)}`
-                                  : 'N/A'
-                                }
-                              </p>
-                              <p className="text-xs text-text-tertiary">per share</p>
-                            </div>
-                          </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-text-tertiary">Per Share</span>
+                          <span className="font-medium text-emerald-500">
+                            {policy.capitalPool.totalShares > 0 
+                              ? `$${(Number(settlementResult.returnedToLps) / 1_000_000 / policy.capitalPool.totalShares).toFixed(4)}`
+                              : 'N/A'
+                            }
+                          </span>
                         </div>
-                      </div>
-                      
-                      {/* Policyholder got nothing */}
-                      <div className="p-3 rounded-lg bg-background-tertiary/30 border border-border-secondary">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Shield className="w-4 h-4 text-text-tertiary" />
-                          <span className="text-text-secondary">Policyholder received:</span>
+                        
+                        <div className="flex items-center justify-between text-sm pt-3 border-t border-border-primary/30">
+                          <div className="flex items-center gap-2">
+                            <Shield className="w-4 h-4 text-text-tertiary" />
+                            <span className="text-text-tertiary">Holder received</span>
+                          </div>
                           <span className="font-medium">$0.00</span>
-                          <span className="text-text-tertiary">(no event occurred)</span>
                         </div>
-                      </div>
-                    </>
-                  )}
-                  
-                  {/* Note about LP token burn */}
-                  <div className="p-3 rounded-lg bg-background-tertiary/20 border border-border-secondary">
-                    <p className="text-xs text-text-tertiary flex items-center gap-2">
+                      </>
+                    )}
+                    
+                    {/* Footer note */}
+                    <p className="text-[11px] text-text-tertiary flex items-center gap-1.5 pt-3 border-t border-border-primary/30">
                       <Info className="w-3 h-3" />
-                      LP tokens were burned upon settlement. Payouts were distributed automatically.
+                      LP tokens burned upon settlement
                     </p>
                   </div>
-                </div>
-              ) : lpHoldings.length === 0 ? (
-                <div className="text-center py-6">
-                  <Users className="w-10 h-10 mx-auto mb-3 text-text-tertiary" />
-                  <p className="text-text-secondary text-sm">No LP tokens issued yet</p>
-                  <p className="text-text-tertiary text-xs mt-1">
-                    LP tokens are minted when LPs provide capital
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {/* Summary Stats */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30">
-                      <span className="text-xs text-text-secondary">Total Shares Issued</span>
-                      <p className="text-lg font-bold text-prmx-cyan">
-                        {lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0).toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-background-tertiary/50 border border-border-secondary">
-                      <span className="text-xs text-text-secondary">Number of Holders</span>
-                      <p className="text-lg font-bold">
-                        {lpHoldings.length}
-                      </p>
-                    </div>
+                ) : lpHoldings.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-8 h-8 mx-auto mb-2 text-text-tertiary opacity-50" />
+                    <p className="text-sm text-text-secondary">No LP tokens yet</p>
                   </div>
-
-                  {/* Holders List */}
-                  <div className="space-y-2">
-                    <p className="text-sm text-text-secondary font-medium">Holders</p>
-                    <div className="max-h-48 overflow-y-auto space-y-2">
+                ) : (
+                  <div className="space-y-4">
+                    {/* Holders List */}
+                    <div className="max-h-48 overflow-y-auto space-y-1">
                       {lpHoldings.map((holding, idx) => {
                         const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0);
                         const holderTotal = Number(holding.shares) + Number(holding.lockedShares);
@@ -781,396 +629,445 @@ export default function PolicyDetailPage() {
                         return (
                           <div 
                             key={holding.holder}
-                            className={cn(
-                              "p-3 rounded-xl border transition-all",
-                              idx === 0 
-                                ? "bg-prmx-cyan/10 border-prmx-cyan/30" 
-                                : "bg-background-tertiary/30 border-border-secondary"
-                            )}
+                            className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-background-tertiary/30 transition-colors group"
                           >
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center gap-2">
-                                <div className={cn(
-                                  "w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold",
-                                  idx === 0 ? "bg-prmx-cyan text-black" : "bg-background-tertiary text-text-secondary"
-                                )}>
-                                  {idx + 1}
-                                </div>
-                                <span className="font-medium text-sm">
+                            <div className="flex items-center gap-2.5">
+                              <span className={cn(
+                                "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
+                                idx === 0 ? "bg-prmx-cyan/20 text-prmx-cyan" : "bg-background-tertiary text-text-tertiary"
+                              )}>
+                                {idx + 1}
+                              </span>
+                              <div>
+                                <span className="text-sm font-medium">
                                   {accountInfo?.name || formatAddress(holding.holder)}
                                 </span>
-                                {accountInfo && (
-                                  <Badge variant="default" className="text-xs">
-                                    {accountInfo.role}
-                                  </Badge>
-                                )}
-                                {idx === 0 && (
-                                  <Badge variant="cyan" className="text-xs">Top Holder</Badge>
+                                {Number(holding.lockedShares) > 0 && (
+                                  <span className="ml-2 text-[10px] text-amber-500">
+                                    <Lock className="w-2.5 h-2.5 inline" /> {Number(holding.lockedShares)}
+                                  </span>
                                 )}
                               </div>
-                              <span className="text-sm font-semibold text-prmx-cyan">
-                                {ownership.toFixed(1)}%
-                              </span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-text-tertiary ml-8">
-                              <span className="font-mono">{formatAddress(holding.holder)}</span>
-                              <span>{holderTotal.toLocaleString()} shares</span>
-                            </div>
-                            {Number(holding.lockedShares) > 0 && (
-                              <div className="flex items-center gap-1 text-xs text-text-tertiary ml-8 mt-1">
-                                <span className="text-success">{Number(holding.shares).toLocaleString()} free</span>
-                                <span>•</span>
-                                <span className="text-warning flex items-center gap-1">
-                                  <Lock className="w-3 h-3" />
-                                  {Number(holding.lockedShares).toLocaleString()} locked
-                                </span>
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
+                                <div 
+                                  className="h-full bg-prmx-cyan rounded-full"
+                                  style={{ width: `${ownership}%` }}
+                                />
                               </div>
-                            )}
+                              <span className="text-xs font-medium w-10 text-right">{ownership.toFixed(1)}%</span>
+                            </div>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
 
-                  {/* Ownership Chart (simple bar) */}
-                  <div className="space-y-2">
-                    <p className="text-xs text-text-tertiary">Ownership Distribution</p>
-                    <div className="h-3 rounded-full bg-background-tertiary/50 overflow-hidden flex">
-                      {lpHoldings.map((holding, idx) => {
-                        const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0);
-                        const holderTotal = Number(holding.shares) + Number(holding.lockedShares);
-                        const width = totalShares > 0 ? (holderTotal / totalShares) * 100 : 0;
-                        const colors = ['bg-prmx-cyan', 'bg-prmx-purple', 'bg-success', 'bg-warning', 'bg-error'];
-                        return (
-                          <div 
-                            key={holding.holder}
-                            className={cn(colors[idx % colors.length], "h-full")}
-                            style={{ width: `${width}%` }}
-                            title={`${api.getAccountByAddress(holding.holder)?.name || formatAddress(holding.holder)}: ${width.toFixed(1)}%`}
-                          />
-                        );
-                      })}
+                    {/* Ownership Distribution Bar */}
+                    <div className="pt-3 border-t border-border-primary/30">
+                      <div className="h-1.5 rounded-full bg-background-tertiary overflow-hidden flex">
+                        {lpHoldings.map((holding, idx) => {
+                          const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0);
+                          const holderTotal = Number(holding.shares) + Number(holding.lockedShares);
+                          const width = totalShares > 0 ? (holderTotal / totalShares) * 100 : 0;
+                          const colors = ['bg-prmx-cyan', 'bg-prmx-purple', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'];
+                          return (
+                            <div 
+                              key={holding.holder}
+                              className={cn(colors[idx % colors.length], "h-full")}
+                              style={{ width: `${width}%` }}
+                            />
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
-                </>
-              )}
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column */}
+        <div className="space-y-6">
+          {/* Financial Summary - Sleek design */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <h2 className="text-base font-semibold">Financial Summary</h2>
+                </div>
+              </div>
+              
+              {/* Max Payout highlight */}
+              <div className="px-5 py-4 bg-gradient-to-r from-emerald-500/5 to-transparent">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-tertiary">Max Payout</span>
+                  <span className="text-2xl font-bold text-emerald-500">{formatUSDT(policy.maxPayout)}</span>
+                </div>
+              </div>
+              
+              {/* Details */}
+              <div className="px-5 py-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-text-tertiary">Shares</span>
+                  <span className="text-sm font-medium">{Number(policy.shares)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-text-tertiary">Premium Paid</span>
+                  <span className="text-sm font-medium text-prmx-cyan">{formatUSDT(policy.premiumPaid)}</span>
+                </div>
+                <div className="h-px bg-border-primary/50 my-1" />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-text-tertiary">Capital Pool</span>
+                  <span className="text-sm font-medium">{formatUSDT(policy.capitalPool.totalCapital)}</span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          {/* V2 Oracle Details (V2 policies only) */}
-          {policy.policyVersion === 'V2' && (
-            <Card className="border-prmx-purple/30">
-              <CardHeader className="pb-2">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-prmx-purple" />
-                  V2 Oracle Details
-                </h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Event Type */}
-                <div className="p-4 rounded-xl bg-prmx-purple/10 border border-prmx-purple/30">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-text-secondary">Event Type</span>
-                      <p className="font-medium text-prmx-purple-light">
-                        {policy.eventType === 'CumulativeRainfallWindow' 
-                          ? 'Cumulative Rainfall' 
-                          : '24h Rolling'}
-                      </p>
+          {/* DeFi Allocation Card - Sleek design */}
+          {defiInfo && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                        <TrendingUp className="w-4 h-4 text-violet-500" />
+                      </div>
+                      <h2 className="text-base font-semibold">DeFi Strategy</h2>
                     </div>
-                    <div>
-                      <span className="text-text-secondary">Early Trigger</span>
-                      <p className="font-medium">
-                        {policy.earlyTrigger ? (
-                          <span className="text-success flex items-center gap-1">
-                            <Zap className="w-3 h-3" /> Enabled
-                          </span>
-                        ) : 'Disabled'}
-                      </p>
-                    </div>
+                    <span className={cn(
+                      "text-xs font-medium px-2 py-1 rounded-full",
+                      defiInfo.isAllocatedToDefi 
+                        ? "bg-emerald-500/10 text-emerald-500" 
+                        : "bg-text-tertiary/10 text-text-tertiary"
+                    )}>
+                      {defiInfo.isAllocatedToDefi ? 'Active' : 'Inactive'}
+                    </span>
                   </div>
                 </div>
+                
+                <div className="px-5 py-4">
+                  {/* Status indicator */}
+                  {defiInfo.isAllocatedToDefi ? (
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs text-text-secondary">
+                        Earning yield via Hydration Stableswap
+                      </span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-text-tertiary mb-4">
+                      Funds available for DeFi allocation
+                    </p>
+                  )}
 
-                {/* Oracle Status - prioritize live monitor state when available */}
-                <div className="space-y-2">
+                  {/* Position Details */}
+                  {defiInfo.position && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-text-tertiary">Principal</span>
+                        <span className="text-sm font-semibold text-emerald-500">
+                          {formatUSDT(defiInfo.position.principalUsdt)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-text-tertiary">LP Tokens</span>
+                        <span className="text-sm font-medium">
+                          {(Number(defiInfo.position.lpShares) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Footer note */}
+                <div className="px-5 py-3 bg-background-tertiary/30 border-t border-border-primary/30">
+                  <p className="text-[11px] text-text-tertiary">
+                    DAO guarantees coverage of DeFi losses
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* V2 Oracle Details - Sleek design */}
+          {policy.policyVersion === 'V2' && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-text-secondary">Oracle Status</span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                        <Activity className="w-4 h-4 text-prmx-purple" />
+                      </div>
+                      <h2 className="text-base font-semibold">V2 Oracle</h2>
+                    </div>
                     {(() => {
-                      // Use live monitor state if available, otherwise fall back to on-chain status
                       const liveState = v2Monitor?.state;
                       const displayStatus = liveState 
                         ? (liveState === 'triggered' ? 'Triggered' :
                            liveState === 'matured' ? 'Matured' :
                            liveState === 'reported' ? 'Reported' :
                            liveState === 'monitoring' ? 'Monitoring' : liveState)
-                        : (policy.oracleStatusV2 || 'PendingMonitoring');
-                      
-                      const variant = 
-                        displayStatus === 'Settled' || displayStatus === 'Reported' ? 'success' :
-                        displayStatus === 'Triggered' || displayStatus === 'TriggeredReported' ? 'warning' :
-                        displayStatus === 'Matured' || displayStatus === 'MaturedReported' ? 'default' :
-                        displayStatus === 'Monitoring' ? 'cyan' :
-                        'default';
+                        : (policy.oracleStatusV2 || 'Pending');
                       
                       return (
-                        <Badge variant={variant} className="text-xs">
+                        <span className={cn(
+                          "text-xs font-medium px-2 py-1 rounded-full",
+                          displayStatus === 'Monitoring' ? "bg-prmx-cyan/10 text-prmx-cyan" :
+                          displayStatus === 'Triggered' ? "bg-amber-500/10 text-amber-500" :
+                          displayStatus === 'Reported' || displayStatus === 'Settled' ? "bg-emerald-500/10 text-emerald-500" :
+                          "bg-text-tertiary/10 text-text-tertiary"
+                        )}>
                           {displayStatus}
-                        </Badge>
+                        </span>
                       );
                     })()}
                   </div>
-                  {policy.strikeMm && (
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-text-secondary">Strike Threshold</span>
-                      <span className="font-medium">{policy.strikeMm / 10} mm</span>
-                    </div>
-                  )}
                 </div>
-
-                {/* Live Monitor Data (from oracle service) */}
-                {v2Monitor && (
-                  <div className="p-4 rounded-xl bg-background-tertiary/50 border border-border-secondary">
-                    <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-prmx-cyan" />
-                      Live Monitoring
-                    </h4>
-                    
-                    {/* Cumulative Progress */}
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-text-secondary">Cumulative Rainfall</span>
-                        <span className="font-mono font-semibold">
-                          {(v2Monitor.cumulative_mm / 10).toFixed(1)} / {(v2Monitor.strike_mm / 10).toFixed(1)} mm
-                        </span>
-                      </div>
-                      <div className="h-2 bg-background-secondary rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full transition-all ${
-                            v2Monitor.cumulative_mm >= v2Monitor.strike_mm 
-                              ? 'bg-success' 
-                              : v2Monitor.cumulative_mm >= v2Monitor.strike_mm * 0.75 
-                                ? 'bg-warning' 
-                                : 'bg-prmx-cyan'
-                          }`}
-                          style={{ 
-                            width: `${Math.min(100, (v2Monitor.cumulative_mm / v2Monitor.strike_mm) * 100)}%` 
-                          }}
-                        />
-                      </div>
+                
+                <div className="px-5 py-4 space-y-4">
+                  {/* Event Type & Early Trigger */}
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <p className="text-xs text-text-tertiary mb-0.5">Event Type</p>
+                      <p className="text-sm font-medium">
+                        {policy.eventType === 'CumulativeRainfallWindow' 
+                          ? 'Cumulative' 
+                          : '24h Rolling'}
+                      </p>
                     </div>
-
-                    {/* State and Last Fetch */}
-                    <div className="grid grid-cols-2 gap-3 text-xs">
-                      <div>
-                        <span className="text-text-tertiary">State</span>
-                        <p className="font-medium capitalize">{v2Monitor.state}</p>
-                      </div>
-                      <div>
-                        <span className="text-text-tertiary">Last Fetch</span>
-                        <p className="font-medium">
-                          {v2Monitor.last_fetch_at > 0 
-                            ? new Date(v2Monitor.last_fetch_at * 1000).toLocaleTimeString()
-                            : 'Never'}
-                        </p>
-                      </div>
+                    <div className="flex-1">
+                      <p className="text-xs text-text-tertiary mb-0.5">Early Trigger</p>
+                      <p className="text-sm font-medium">
+                        {policy.earlyTrigger ? (
+                          <span className="text-emerald-500 flex items-center gap-1">
+                            <Zap className="w-3 h-3" /> On
+                          </span>
+                        ) : 'Off'}
+                      </p>
                     </div>
-
-                    {/* Report TX Hash if available */}
-                    {v2Monitor.report_tx_hash && (
-                      <div className="mt-3 pt-3 border-t border-border-secondary">
-                        <span className="text-xs text-text-tertiary">Report TX</span>
-                        <p className="font-mono text-xs truncate text-prmx-cyan">
-                          {v2Monitor.report_tx_hash}
-                        </p>
+                    {policy.strikeMm && (
+                      <div className="flex-1">
+                        <p className="text-xs text-text-tertiary mb-0.5">Strike</p>
+                        <p className="text-sm font-semibold text-prmx-cyan">{policy.strikeMm / 10} mm</p>
                       </div>
                     )}
                   </div>
-                )}
 
-                {/* Link to Oracle Service page */}
-                <Link href="/oracle-service">
-                  <Button 
-                    variant="secondary" 
-                    className="w-full" 
-                    icon={<Activity className="w-4 h-4" />}
-                  >
-                    View All V2 Monitors
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Settlement Actions (DAO only) */}
-          {canSettle && (
-            <Card>
-              <CardHeader>
-                <h2 className="text-xl font-semibold">Settlement</h2>
-                <p className="text-sm text-text-secondary">Settle this expired policy</p>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button
-                  onClick={() => handleSettle(true)}
-                  loading={settling}
-                  className="w-full bg-success hover:bg-success/90"
-                  icon={<CheckCircle2 className="w-4 h-4" />}
-                >
-                  Event Occurred (Pay Out)
-                </Button>
-                <Button
-                  onClick={() => handleSettle(false)}
-                  loading={settling}
-                  variant="secondary"
-                  className="w-full"
-                  icon={<XCircle className="w-4 h-4" />}
-                >
-                  No Event (Return Capital)
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Settlement Result Card */}
-          {policy.status === 'Settled' && (
-            <Card className={settlementResult?.eventOccurred ? 'border-success/30' : 'border-prmx-cyan/30'}>
-              <CardHeader className="pb-2">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-success" />
-                  Settlement Result
-                </h2>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {settlementResult ? (
-                  <>
-                    {/* Event Status */}
-                    <div className={`p-4 rounded-xl ${settlementResult.eventOccurred ? 'bg-success/10 border border-success/30' : 'bg-prmx-cyan/10 border border-prmx-cyan/30'}`}>
-                      <div className="flex items-center gap-3 mb-2">
-                        {settlementResult.eventOccurred ? (
-                          <CloudRain className="w-6 h-6 text-success" />
-                        ) : (
-                          <CheckCircle2 className="w-6 h-6 text-prmx-cyan" />
-                        )}
-                        <div>
-                          <p className="font-semibold">
-                            {settlementResult.eventOccurred ? 'Event Occurred' : 'No Event'}
-                          </p>
-                          <p className="text-xs text-text-secondary">
-                            {settlementResult.eventOccurred 
-                              ? 'Rainfall exceeded strike threshold' 
-                              : 'Rainfall stayed below strike threshold'}
-                          </p>
+                  {/* Live Monitor Data */}
+                  {v2Monitor && (
+                    <div className="pt-3 border-t border-border-primary/30 space-y-3">
+                      {/* Progress bar */}
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-text-tertiary">Progress</span>
+                          <span className="text-xs font-medium">
+                            {(v2Monitor.cumulative_mm / 10).toFixed(1)} / {(v2Monitor.strike_mm / 10).toFixed(1)} mm
+                          </span>
+                        </div>
+                        <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden">
+                          <div 
+                            className={cn(
+                              "h-full rounded-full transition-all",
+                              v2Monitor.cumulative_mm >= v2Monitor.strike_mm 
+                                ? 'bg-emerald-500' 
+                                : 'bg-prmx-cyan'
+                            )}
+                            style={{ 
+                              width: `${Math.min(100, (v2Monitor.cumulative_mm / v2Monitor.strike_mm) * 100)}%` 
+                            }}
+                          />
                         </div>
                       </div>
+
+                      {/* State and Last Fetch */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className={cn(
+                            "w-2 h-2 rounded-full",
+                            v2Monitor.state === 'monitoring' ? "bg-prmx-cyan animate-pulse" :
+                            v2Monitor.state === 'triggered' ? "bg-amber-500" :
+                            "bg-text-tertiary"
+                          )} />
+                          <span className="text-xs text-text-secondary capitalize">{v2Monitor.state}</span>
+                        </div>
+                        <span className="text-xs text-text-tertiary">
+                          {v2Monitor.last_fetch_at > 0 
+                            ? `Updated ${new Date(v2Monitor.last_fetch_at * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                            : 'No data yet'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Link to Oracle Service */}
+                  <Link href="/oracle-service">
+                    <Button variant="secondary" size="sm" className="w-full" icon={<Activity className="w-4 h-4" />}>
+                      View All Monitors
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Settlement Actions - Sleek design */}
+          {canSettle && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                      <Shield className="w-4 h-4 text-amber-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-base font-semibold">Settlement</h2>
+                      <p className="text-xs text-text-tertiary">Settle this expired policy</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="p-5 space-y-3">
+                  <Button
+                    onClick={() => handleSettle(true)}
+                    loading={settling}
+                    className="w-full bg-emerald-500 hover:bg-emerald-600"
+                    icon={<CheckCircle2 className="w-4 h-4" />}
+                  >
+                    Event Occurred
+                  </Button>
+                  <Button
+                    onClick={() => handleSettle(false)}
+                    loading={settling}
+                    variant="secondary"
+                    className="w-full"
+                    icon={<XCircle className="w-4 h-4" />}
+                  >
+                    No Event
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Settlement Result Card - Sleek design */}
+          {policy.status === 'Settled' && (
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className={cn(
+                        "w-8 h-8 rounded-lg flex items-center justify-center",
+                        settlementResult?.eventOccurred ? "bg-emerald-500/10" : "bg-prmx-cyan/10"
+                      )}>
+                        <CheckCircle2 className={cn(
+                          "w-4 h-4",
+                          settlementResult?.eventOccurred ? "text-emerald-500" : "text-prmx-cyan"
+                        )} />
+                      </div>
+                      <h2 className="text-base font-semibold">Settlement Result</h2>
+                    </div>
+                    <span className={cn(
+                      "text-xs font-medium px-2 py-1 rounded-full",
+                      settlementResult?.eventOccurred ? "bg-emerald-500/10 text-emerald-500" : "bg-prmx-cyan/10 text-prmx-cyan"
+                    )}>
+                      {settlementResult?.eventOccurred ? 'Event Triggered' : 'No Event'}
+                    </span>
+                  </div>
+                </div>
+                
+                {settlementResult ? (
+                  <div className="p-5 space-y-4">
+                    {/* Event Status */}
+                    <div className="flex items-center gap-3">
+                      {settlementResult.eventOccurred ? (
+                        <CloudRain className="w-5 h-5 text-emerald-500" />
+                      ) : (
+                        <CheckCircle2 className="w-5 h-5 text-prmx-cyan" />
+                      )}
+                      <p className="text-sm text-text-secondary">
+                        {settlementResult.eventOccurred 
+                          ? 'Rainfall exceeded strike threshold' 
+                          : 'Rainfall stayed below threshold'}
+                      </p>
                     </div>
 
-                    {/* DeFi Position Unwound Indicator */}
+                    {/* DeFi Position Unwound */}
                     {defiInfo && defiInfo.investmentStatus === 'Settled' && defiInfo.position && (
-                      <div className="p-3 rounded-lg bg-prmx-purple/5 border border-prmx-purple/20">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center justify-between text-sm pt-3 border-t border-border-primary/30">
+                        <div className="flex items-center gap-2">
                           <TrendingUp className="w-4 h-4 text-prmx-purple" />
-                          <span className="text-sm font-medium">DeFi Position Unwound</span>
+                          <span className="text-text-tertiary">DeFi Position</span>
                         </div>
-                        <div className="space-y-1 text-sm">
-                          <div className="flex justify-between">
-                            <span className="text-text-secondary">Principal Invested</span>
-                            <span className="font-medium">{formatUSDT(defiInfo.position.principalUsdt)}</span>
-                          </div>
-                          <p className="text-xs text-text-tertiary mt-2">
-                            Position was unwound from DeFi strategy at settlement
-                          </p>
-                        </div>
+                        <span className="font-medium">{formatUSDT(defiInfo.position.principalUsdt)} unwound</span>
                       </div>
                     )}
 
                     {/* Financial Outcome */}
-                    <div className="space-y-3">
-                      {settlementResult.eventOccurred ? (
-                        <>
-                        <div className="p-3 rounded-lg bg-success/5 border border-success/20">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Wallet className="w-4 h-4 text-success" />
-                            <span className="text-sm text-text-secondary">Payout to Policyholder</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-xl font-bold text-success">
+                    {settlementResult.eventOccurred ? (
+                      <div className="pt-3 border-t border-border-primary/30">
+                        <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-emerald-500/5 to-transparent">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-text-tertiary">Holder Payout</span>
+                            <span className="text-xl font-bold text-emerald-500">
                               {formatUSDT(settlementResult.payoutToHolder)}
-                            </p>
-                            <ArrowRight className="w-4 h-4 text-text-tertiary" />
-                            <span className="text-sm text-text-secondary truncate">
-                              {formatAddress(policy.holder)}
                             </span>
                           </div>
                         </div>
-                          
-                          {/* Partial Payout Warning (when payout < maxPayout) */}
-                          {settlementResult.payoutToHolder < policy.maxPayout && (
-                            <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
-                              <div className="flex items-start gap-2">
-                                <XCircle className="w-4 h-4 text-warning mt-0.5" />
-                                <div>
-                                  <p className="text-sm font-medium text-warning">Partial Payout</p>
-                                  <p className="text-xs text-text-secondary mt-1">
-                                    Payout was {formatUSDT(settlementResult.payoutToHolder)} instead of the full {formatUSDT(policy.maxPayout)} due to DeFi losses that exceeded DAO coverage capacity.
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                        <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
-                          <div className="flex items-center gap-2 mb-1">
-                            <TrendingUp className="w-4 h-4 text-prmx-cyan" />
-                            <span className="text-sm text-text-secondary">Returned to LPs</span>
+                        
+                        {settlementResult.payoutToHolder < policy.maxPayout && (
+                          <div className="flex items-center gap-2 mt-2 text-xs text-amber-500">
+                            <XCircle className="w-3 h-3" />
+                            <span>Partial payout due to DeFi losses</span>
                           </div>
-                          <p className="text-xl font-bold text-prmx-cyan">
-                            {formatUSDT(settlementResult.returnedToLps)}
-                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="pt-3 border-t border-border-primary/30">
+                        <div className="px-4 py-3 rounded-lg bg-gradient-to-r from-prmx-cyan/5 to-transparent">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-text-tertiary">Returned to LPs</span>
+                            <span className="text-xl font-bold text-prmx-cyan">
+                              {formatUSDT(settlementResult.returnedToLps)}
+                            </span>
+                          </div>
                         </div>
-
-                          {/* LP Loss Warning (when returned < expected pool balance) */}
-                          {defiInfo?.position && settlementResult.returnedToLps < defiInfo.position.principalUsdt && (
-                            <div className="p-3 rounded-lg bg-warning/10 border border-warning/30">
-                              <div className="flex items-start gap-2">
-                                <XCircle className="w-4 h-4 text-warning mt-0.5" />
-                                <div>
-                                  <p className="text-sm font-medium text-warning">LP Loss Absorbed</p>
-                                  <p className="text-xs text-text-secondary mt-1">
-                                    LPs received {formatUSDT(settlementResult.returnedToLps)} instead of full principal due to DeFi losses. 
-                                    The DAO covered what it could.
-                                  </p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-
-                    {/* DAO Contribution Note (show when DeFi was involved) */}
-                    {defiInfo?.position && (
-                      <div className="p-2 rounded-lg bg-prmx-cyan/5">
-                        <p className="text-xs text-text-secondary text-center">
-                          🛡️ DAO provided loss coverage for DeFi-allocated funds
-                        </p>
+                        
+                        {defiInfo?.position && settlementResult.returnedToLps < defiInfo.position.principalUsdt && (
+                          <div className="flex items-center gap-2 mt-2 text-xs text-amber-500">
+                            <XCircle className="w-3 h-3" />
+                            <span>LP loss absorbed by DAO</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {/* Settlement Time */}
-                    <div className="pt-2 border-t border-border-secondary">
-                      <div className="flex items-center gap-2 text-xs text-text-tertiary">
+                    <div className="flex items-center justify-between text-xs text-text-tertiary pt-3 border-t border-border-primary/30">
+                      <div className="flex items-center gap-1.5">
                         <Clock className="w-3 h-3" />
-                        Settled on {formatDateTimeUTC(settlementResult.settledAt)}
+                        <span>Settled</span>
                       </div>
+                      <span>{formatDateTimeUTC(settlementResult.settledAt)}</span>
                     </div>
-                  </>
+                  </div>
                 ) : (
-                  <div className="text-center py-4">
-                    <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-success" />
-                    <p className="text-sm text-text-secondary">
-                      Policy has been settled
-                    </p>
+                  <div className="text-center py-8">
+                    <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-500" />
+                    <p className="text-sm text-text-secondary">Settled</p>
                   </div>
                 )}
               </CardContent>
@@ -1179,25 +1076,40 @@ export default function PolicyDetailPage() {
         </div>
       </div>
 
-      {/* Capital Pool Details */}
+      {/* Capital Pool Details - Sleek design */}
       {policy.capitalPool.lpHolders && policy.capitalPool.lpHolders.length > 0 && (
-        <Card>
-          <CardHeader>
-            <h2 className="text-xl font-semibold flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-prmx-purple" />
-              LP Capital Pool
-            </h2>
-            <p className="text-sm text-text-secondary">
-              Liquidity providers backing this policy
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {policy.capitalPool.lpHolders.map((holder: string, index: number) => (
-                <div key={index} className="p-3 rounded-lg bg-background-tertiary/50">
-                  <p className="font-mono text-xs truncate">{formatAddress(holder)}</p>
+        <Card className="overflow-hidden">
+          <CardContent className="p-0">
+            {/* Header */}
+            <div className="px-5 py-4 border-b border-border-primary/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                    <Users className="w-4 h-4 text-prmx-purple" />
+                  </div>
+                  <h2 className="text-base font-semibold">LP Capital Pool</h2>
                 </div>
-              ))}
+                <span className="text-xs text-text-tertiary">
+                  {policy.capitalPool.lpHolders.length} provider{policy.capitalPool.lpHolders.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+            
+            <div className="p-5">
+              <div className="space-y-2">
+                {policy.capitalPool.lpHolders.map((holder: string, index: number) => (
+                  <div 
+                    key={index} 
+                    className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-background-tertiary/30 transition-colors group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-tertiary w-4">{index + 1}</span>
+                      <code className="font-mono text-xs text-text-secondary">{formatAddress(holder)}</code>
+                    </div>
+                    <Copy className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" />
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>

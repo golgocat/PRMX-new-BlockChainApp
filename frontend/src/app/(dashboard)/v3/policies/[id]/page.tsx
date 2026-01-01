@@ -28,7 +28,6 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Table, TableHead, TableBody, TableRow, TableHeaderCell, TableCell, TableEmpty } from '@/components/ui/Table';
 import { useWalletStore } from '@/stores/walletStore';
 import { useV3Policy, useV3OracleState, useV3PolicyLpHolders, useV3Observations } from '@/hooks/useV3ChainData';
 import { WeatherHistoryChart } from '@/components/features/WeatherHistoryChart';
@@ -536,14 +535,9 @@ export default function V3PolicyDetailPage() {
                 </Button>
               </Link>
               
-              {/* Dynamic gradient avatar */}
+              {/* Subtle gradient avatar - matching V1/V2 style */}
               <div 
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-lg flex-shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 160}, 70%, 45%) 0%, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 200}, 80%, 35%) 100%)`
-                }}
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-sm flex-shrink-0 bg-gradient-to-br from-gray-600 to-gray-700 dark:from-slate-600 dark:to-slate-700 border border-gray-500/30"
               >
                 {shortId.slice(0, 4).toUpperCase()}
               </div>
@@ -594,58 +588,70 @@ export default function V3PolicyDetailPage() {
       <div className="grid md:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
-          {/* Coverage Details */}
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold">Coverage Details</h3>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-text-secondary mb-1">Event Type</p>
-                    <p className="font-medium text-lg">{eventInfo?.label}</p>
-                    <p className="text-sm text-text-tertiary">{eventInfo?.description}</p>
+          {/* Coverage Details - Sleek design */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                    <Shield className="w-4 h-4 text-prmx-purple" />
                   </div>
-                  <div>
-                    <p className="text-sm text-text-secondary mb-1">Trigger Threshold</p>
-                    <p className="font-medium text-lg">
-                      {formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)}
-                    </p>
-                  </div>
+                  <h3 className="text-base font-semibold">Coverage Details</h3>
                 </div>
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-text-secondary mb-1">
-                      <MapPin className="w-4 h-4 inline mr-1" />
-                      Location
-                    </p>
-                    <p className="font-medium text-lg">{policy.location?.name || `Location #${policy.locationId}`}</p>
+              </div>
+              
+              <div className="p-5">
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Left column - Event info */}
+                  <div className="space-y-5">
+                    <div>
+                      <p className="text-xs text-text-tertiary mb-1">Event Type</p>
+                      <p className="text-base font-semibold">{eventInfo?.label}</p>
+                      <p className="text-xs text-text-tertiary mt-1">{eventInfo?.description}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-text-tertiary mb-1">Trigger Threshold</p>
+                      <p className="text-xl font-bold text-prmx-cyan">
+                        {formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-text-secondary mb-2">
-                      <Calendar className="w-4 h-4 inline mr-1" />
-                      Coverage Period
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
-                        <p className="text-xs text-text-tertiary">Start</p>
-                        <p className="font-medium text-sm">
-                          {new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
-                        </p>
-                        <p className="text-xs text-text-tertiary">
-                          {new Date(policy.coverageStart * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
-                        </p>
+                  
+                  {/* Right column - Location & Period */}
+                  <div className="space-y-5">
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <MapPin className="w-3.5 h-3.5 text-text-tertiary" />
+                        <p className="text-xs text-text-tertiary">Location</p>
                       </div>
-                      <span className="text-text-tertiary">→</span>
-                      <div className="text-center px-3 py-1.5 rounded-lg bg-background-tertiary">
-                        <p className="text-xs text-text-tertiary">End</p>
-                        <p className="font-medium text-sm">
-                          {new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
-                        </p>
-                        <p className="text-xs text-text-tertiary">
-                          {new Date(policy.coverageEnd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
-                        </p>
+                      <p className="text-base font-semibold">{policy.location?.name || `Location #${policy.locationId}`}</p>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Calendar className="w-3.5 h-3.5 text-text-tertiary" />
+                        <p className="text-xs text-text-tertiary">Coverage Period</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="text-center px-3 py-2 rounded-lg bg-background-tertiary/50 flex-1">
+                          <p className="text-[10px] text-text-tertiary uppercase tracking-wide">Start</p>
+                          <p className="font-semibold text-sm mt-0.5">
+                            {new Date(policy.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                          </p>
+                          <p className="text-[10px] text-text-tertiary">
+                            {new Date(policy.coverageStart * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                          </p>
+                        </div>
+                        <span className="text-text-tertiary text-sm">→</span>
+                        <div className="text-center px-3 py-2 rounded-lg bg-background-tertiary/50 flex-1">
+                          <p className="text-[10px] text-text-tertiary uppercase tracking-wide">End</p>
+                          <p className="font-semibold text-sm mt-0.5">
+                            {new Date(policy.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                          </p>
+                          <p className="text-[10px] text-text-tertiary">
+                            {new Date(policy.coverageEnd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })} UTC
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -692,44 +698,54 @@ export default function V3PolicyDetailPage() {
             </CardContent>
           </Card>
           
-          {/* Oracle State / Weather Monitoring */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Activity className="w-5 h-5 text-prmx-cyan" />
-                  Weather Monitoring
-                </h3>
-                <span className="text-xs text-text-tertiary">
-                  {oracleState?.observedUntil && oracleState.observedUntil > 0 
-                    ? `Last updated: ${new Date(oracleState.observedUntil * 1000).toLocaleString()}`
-                    : now < policy.coverageStart
-                      ? `Starts in ${formatTimeRemaining(policy.coverageStart)}`
-                      : 'Awaiting first observation'
-                  }
-                </span>
+          {/* Oracle State / Weather Monitoring - Sleek design */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                      <Activity className="w-4 h-4 text-prmx-cyan" />
+                    </div>
+                    <h3 className="text-base font-semibold">Weather Monitoring</h3>
+                  </div>
+                  <span className="text-[11px] text-text-tertiary">
+                    {oracleState?.observedUntil && oracleState.observedUntil > 0 
+                      ? `Updated ${new Date(oracleState.observedUntil * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                      : now < policy.coverageStart
+                        ? `Starts in ${formatTimeRemaining(policy.coverageStart)}`
+                        : 'Awaiting data'
+                    }
+                  </span>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-6">
+              
               {oracleLoading ? (
-                <div className="animate-pulse space-y-4">
-                  <div className="h-20 bg-background-tertiary/50 rounded" />
+                <div className="px-5 py-6">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-12 bg-background-tertiary/50 rounded-lg" />
+                    <div className="h-4 bg-background-tertiary/50 rounded w-2/3" />
+                  </div>
                 </div>
               ) : oracleState ? (
-                <div className="space-y-4">
-                  {/* Current Value vs Threshold */}
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-lg bg-background-tertiary/50">
-                      <p className="text-sm text-text-secondary mb-1">
+                <div className="px-5 py-4 space-y-4">
+                  {/* Current Value vs Threshold - Side by side */}
+                  <div className="flex items-stretch gap-3">
+                    <div className="flex-1 p-3 rounded-lg bg-background-tertiary/30">
+                      <p className="text-xs text-text-tertiary mb-1">
                         {getAggStateLabel(oracleState.aggState)}
                       </p>
-                      <p className="text-2xl font-bold">
+                      <p className="text-xl font-bold text-prmx-cyan">
                         {formatAggStateValue(oracleState.aggState)}
                       </p>
                     </div>
-                    <div className="p-4 rounded-lg bg-background-tertiary/50">
-                      <p className="text-sm text-text-secondary mb-1">Trigger Threshold</p>
-                      <p className="text-2xl font-bold">
+                    <div className="flex items-center text-text-tertiary">
+                      <span className="text-xs">/</span>
+                    </div>
+                    <div className="flex-1 p-3 rounded-lg bg-background-tertiary/30">
+                      <p className="text-xs text-text-tertiary mb-1">Threshold</p>
+                      <p className="text-xl font-bold">
                         {formatThresholdValue(
                           policy.eventSpec.threshold.value,
                           policy.eventSpec.threshold.unit
@@ -738,32 +754,28 @@ export default function V3PolicyDetailPage() {
                     </div>
                   </div>
                   
-                  {/* Threshold proximity (visual) */}
+                  {/* Threshold proximity bar */}
                   <div>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-text-secondary">Threshold Proximity</span>
+                    <div className="flex justify-between items-center mb-1.5">
+                      <span className="text-xs text-text-tertiary">Progress</span>
+                      <span className="text-xs font-medium">
+                        {Math.min(100, getThresholdProximity(oracleState.aggState, policy.eventSpec.threshold.value)).toFixed(0)}%
+                      </span>
                     </div>
-                    <div className="h-4 bg-background-tertiary rounded-full overflow-hidden relative">
-                      {/* Calculate progress based on agg state vs threshold */}
+                    <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden">
                       <div 
                         className={cn(
-                          "h-full transition-all",
-                          policy.status === 'Triggered' 
-                            ? 'bg-error' 
-                            : 'bg-gradient-to-r from-success via-warning to-error'
+                          "h-full transition-all rounded-full",
+                          policy.status === 'Triggered' ? 'bg-error' : 'bg-prmx-cyan'
                         )}
                         style={{ 
                           width: `${Math.min(100, getThresholdProximity(oracleState.aggState, policy.eventSpec.threshold.value))}%` 
                         }}
                       />
-                      <div 
-                        className="absolute top-0 h-full w-0.5 bg-white"
-                        style={{ left: '100%', transform: 'translateX(-2px)' }}
-                      />
                     </div>
                   </div>
                   
-                  {/* Next Snapshot & Commitment */}
+                  {/* Next Snapshot & Commitment - Compact */}
                   {(() => {
                     const snapshotInfo = getNextSnapshotInfo(
                       oracleState.observedUntil,
@@ -775,52 +787,45 @@ export default function V3PolicyDetailPage() {
                     const isInFinal24h = policy.coverageEnd - now <= 24 * 3600;
                     
                     return (
-                      <div className="grid md:grid-cols-2 gap-4">
+                      <div className="pt-3 border-t border-border-primary/30 space-y-3">
                         {/* Next Snapshot */}
                         {policy.status === 'Active' && (
-                          <div className={cn(
-                            "p-3 rounded-lg border",
-                            snapshotInfo.isUrgent 
-                              ? "bg-warning/10 border-warning/30"
-                              : "bg-background-tertiary/50 border-transparent"
-                          )}>
-                            <p className="text-xs text-text-secondary mb-1 flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              Next Snapshot
-                            </p>
-                            <p className={cn(
-                              "font-medium",
-                              snapshotInfo.isUrgent && "text-warning"
-                            )}>
-                              {snapshotInfo.label}
-                            </p>
-                            <p className="text-xs text-text-tertiary mt-1">
-                              {isInFinal24h
-                                ? 'Hourly updates (final 24h)'
-                                : 'Updates every 6 hours'
-                              }
-                            </p>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Clock className="w-3.5 h-3.5 text-text-tertiary" />
+                              <span className="text-xs text-text-tertiary">Next update</span>
+                            </div>
+                            <div className="text-right">
+                              <span className={cn(
+                                "text-sm font-medium",
+                                snapshotInfo.isUrgent ? "text-amber-500" : "text-text-primary"
+                              )}>
+                                {snapshotInfo.label}
+                              </span>
+                              <p className="text-[10px] text-text-tertiary">
+                                {isInFinal24h ? 'Hourly' : 'Every 6h'}
+                              </p>
+                            </div>
                           </div>
                         )}
                         
-                        {/* Commitment hash */}
-                        <div className={cn(
-                          "p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30",
-                          policy.status !== 'Active' && "md:col-span-2"
-                        )}>
-                          <p className="text-xs text-text-secondary mb-1">Commitment Hash</p>
-                          <code className="text-xs break-all">{oracleState.commitment}</code>
+                        {/* Commitment hash - Collapsible style */}
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-xs text-text-tertiary flex-shrink-0">Commitment</span>
+                          <code className="text-[10px] text-text-secondary font-mono break-all text-right leading-relaxed">
+                            {oracleState.commitment.slice(0, 24)}...
+                          </code>
                         </div>
                       </div>
                     );
                   })()}
                 </div>
               ) : (
-                <div className="text-center py-8 text-text-secondary">
-                  <CloudRain className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No oracle data available yet</p>
-                  <p className="text-sm text-text-tertiary">
-                    Weather monitoring will begin when coverage starts
+                <div className="px-5 py-8 text-center">
+                  <CloudRain className="w-10 h-10 mx-auto mb-3 text-text-tertiary/50" />
+                  <p className="text-sm text-text-secondary">No data yet</p>
+                  <p className="text-xs text-text-tertiary mt-1">
+                    Monitoring starts with coverage
                   </p>
                 </div>
               )}
@@ -927,247 +932,271 @@ export default function V3PolicyDetailPage() {
             </Card>
           )}
           
-          {/* LP Holders */}
+          {/* LP Holders - Refined design */}
           <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                LP Token Holders
-              </h3>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <Users className="w-5 h-5 text-text-secondary" />
+                  LP Token Holders
+                </h2>
+                {!holdersLoading && lpHolders.length > 0 && (
+                  <span className="text-sm text-text-tertiary">
+                    {lpHolders.reduce((sum, h) => sum + h.lpShares, 0).toLocaleString()} total shares
+                  </span>
+                )}
+              </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableHeaderCell>Holder</TableHeaderCell>
-                    <TableHeaderCell>LP Shares</TableHeaderCell>
-                    <TableHeaderCell>Ownership</TableHeaderCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {holdersLoading ? (
-                    <TableRow className="animate-pulse">
-                      <TableCell><div className="h-4 w-32 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
-                      <TableCell><div className="h-4 w-16 bg-background-tertiary/50 rounded" /></TableCell>
-                    </TableRow>
-                  ) : lpHolders.length === 0 ? (
-                    <TableEmpty
-                      icon={<Users className="w-8 h-8" />}
-                      title="No LP holders"
-                      description="No underwriters have accepted this policy yet"
-                    />
-                  ) : (
-                    lpHolders.map((holder) => {
-                      const isMe = holder.holder === selectedAccount?.address;
-                      return (
-                        <TableRow key={holder.holder}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleCopyAddress(holder.holder)}
-                                className="flex items-center gap-1.5 group cursor-pointer hover:text-prmx-cyan transition-colors"
-                                title="Click to copy address"
-                              >
-                                <code className="text-sm group-hover:text-prmx-cyan transition-colors">{formatAddress(holder.holder)}</code>
-                                {copiedAddress === holder.holder ? (
-                                  <Check className="w-3.5 h-3.5 text-success" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5 text-text-tertiary group-hover:text-prmx-cyan transition-colors" />
-                                )}
-                              </button>
-                              {isMe && <Badge variant="cyan">You</Badge>}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium">{holder.lpShares}</span>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <div className="w-16 h-2 bg-background-tertiary rounded-full overflow-hidden">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-prmx-cyan to-teal-500"
-                                  style={{ width: `${holder.percentageOwned}%` }}
-                                />
-                              </div>
-                              <span className="text-sm">{holder.percentageOwned.toFixed(1)}%</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
+            <CardContent className="space-y-3">
+              {holdersLoading ? (
+                <div className="animate-pulse space-y-2">
+                  <div className="h-12 bg-background-tertiary/50 rounded-lg" />
+                  <div className="h-12 bg-background-tertiary/50 rounded-lg" />
+                </div>
+              ) : lpHolders.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="w-10 h-10 mx-auto mb-3 text-text-tertiary/50" />
+                  <p className="text-text-secondary text-sm">No LP holders yet</p>
+                  <p className="text-text-tertiary text-xs mt-1">
+                    No underwriters have accepted this policy yet
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {lpHolders.map((holder, idx) => {
+                    const isMe = holder.holder === selectedAccount?.address;
+                    
+                    return (
+                      <div 
+                        key={holder.holder}
+                        className="group flex items-center gap-3 p-3 rounded-lg hover:bg-background-tertiary/50 transition-colors"
+                      >
+                        {/* Rank indicator */}
+                        <div className={cn(
+                          "w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0",
+                          idx === 0 
+                            ? "bg-prmx-cyan/20 text-prmx-cyan" 
+                            : "bg-background-tertiary text-text-tertiary"
+                        )}>
+                          {idx + 1}
+                        </div>
+                        
+                        {/* Address & shares */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleCopyAddress(holder.holder)}
+                              className="flex items-center gap-1.5 group/copy cursor-pointer"
+                              title="Click to copy address"
+                            >
+                              <code className="text-sm font-medium text-text-primary group-hover/copy:text-prmx-cyan transition-colors">
+                                {formatAddress(holder.holder)}
+                              </code>
+                              {copiedAddress === holder.holder ? (
+                                <Check className="w-3.5 h-3.5 text-success" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 group-hover/copy:text-prmx-cyan transition-all" />
+                              )}
+                            </button>
+                            {isMe && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-prmx-cyan/20 text-prmx-cyan">
+                                You
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-text-tertiary mt-0.5">
+                            {holder.lpShares.toLocaleString()} shares
+                          </p>
+                        </div>
+                        
+                        {/* Ownership percentage with mini bar */}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <div className="w-12 h-1.5 rounded-full bg-background-tertiary overflow-hidden">
+                            <div 
+                              className="h-full bg-prmx-cyan rounded-full"
+                              style={{ width: `${holder.percentageOwned}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-text-primary w-12 text-right">
+                            {holder.percentageOwned.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
         
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Financial Summary */}
-          <Card>
-            <CardHeader>
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Financial Summary
-              </h3>
-            </CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Premium per Share</span>
-                <span className="font-medium">{formatUSDT(policy.premiumPerShare, false)}</span>
+          {/* Financial Summary - Sleek design */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header with gradient accent */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <DollarSign className="w-4 h-4 text-emerald-500" />
+                  </div>
+                  <h2 className="text-base font-semibold">Financial Summary</h2>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Total Shares</span>
-                <span className="font-medium">{policy.totalShares}</span>
+              
+              {/* Max Payout highlight */}
+              <div className="px-5 py-4 bg-gradient-to-r from-emerald-500/5 to-transparent">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-text-tertiary">Max Payout</span>
+                  <span className="text-2xl font-bold text-emerald-500">{formatUSDT(policy.maxPayout, false)}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Premium Paid</span>
-                <span className="font-medium text-success">{formatUSDT(policy.premiumPaid, false)}</span>
-              </div>
-              <hr className="border-border-primary" />
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Payout per Share</span>
-                <span className="font-medium">$100</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-text-secondary">Max Payout</span>
-                <span className="font-medium text-prmx-cyan">{formatUSDT(policy.maxPayout, false)}</span>
+              
+              {/* Details */}
+              <div className="px-5 py-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-text-tertiary">Shares</span>
+                  <span className="text-sm font-medium">{policy.totalShares}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-text-tertiary">Premium / Share</span>
+                  <span className="text-sm font-medium">{formatUSDT(policy.premiumPerShare, false)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-text-tertiary">Premium Paid</span>
+                  <span className="text-sm font-medium text-prmx-cyan">{formatUSDT(policy.premiumPaid, false)}</span>
+                </div>
+                <div className="h-px bg-border-primary/50 my-1" />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-text-tertiary">Payout / Share</span>
+                  <span className="text-sm font-medium">$100</span>
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          {/* DeFi Allocation Card */}
-          <Card className={defiInfo?.isAllocatedToDefi ? 'border-success/30' : 'border-border-secondary'}>
-            <CardHeader className="pb-2">
-              <h2 className="text-lg font-semibold flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-success" />
-                DeFi Yield Strategy
-              </h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          {/* DeFi Allocation Card - Sleek design */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-violet-500/10 flex items-center justify-center">
+                      <TrendingUp className="w-4 h-4 text-violet-500" />
+                    </div>
+                    <h2 className="text-base font-semibold">DeFi Strategy</h2>
+                  </div>
+                  {!defiLoading && defiInfo && (
+                    <span className={cn(
+                      "text-xs font-medium px-2 py-1 rounded-full",
+                      defiInfo.isAllocatedToDefi 
+                        ? "bg-emerald-500/10 text-emerald-500" 
+                        : "bg-text-tertiary/10 text-text-tertiary"
+                    )}>
+                      {defiInfo.isAllocatedToDefi ? 'Active' : 'Inactive'}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
               {defiLoading ? (
-                // Loading state
-                <div className="animate-pulse space-y-4">
-                  <div className="h-16 bg-background-tertiary/50 rounded-xl" />
-                  <div className="h-8 bg-background-tertiary/50 rounded-lg" />
+                <div className="px-5 py-6">
+                  <div className="animate-pulse space-y-3">
+                    <div className="h-4 bg-background-tertiary/50 rounded w-2/3" />
+                    <div className="h-4 bg-background-tertiary/50 rounded w-1/2" />
+                  </div>
                 </div>
               ) : defiInfo ? (
-                <>
-                  {/* Investment Status */}
-                  <div className={`p-4 rounded-xl ${
-                    defiInfo.isAllocatedToDefi 
-                      ? 'bg-success/10 border border-success/30' 
-                      : 'bg-background-tertiary/50 border border-border-secondary'
-                  }`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-text-secondary">Status</span>
-                      <Badge 
-                        variant={defiInfo.isAllocatedToDefi ? 'success' : 'default'}
-                        className="text-xs"
-                      >
-                        {defiInfo.investmentStatus === 'Invested' && '🟢 Allocated to DeFi'}
-                        {defiInfo.investmentStatus === 'NotInvested' && '⚪ Not Allocated'}
-                        {defiInfo.investmentStatus === 'Unwinding' && '🔄 Unwinding'}
-                        {defiInfo.investmentStatus === 'Settled' && '✓ Settled'}
-                        {defiInfo.investmentStatus === 'Failed' && '❌ Failed'}
-                      </Badge>
+                <div className="px-5 py-4">
+                  {/* Status indicator */}
+                  {defiInfo.isAllocatedToDefi ? (
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-xs text-text-secondary">
+                        Earning yield via Hydration Stableswap
+                      </span>
                     </div>
-                    {defiInfo.isAllocatedToDefi && (
-                      <p className="text-xs text-text-secondary">
-                        Locked funds are generating yield via Hydration Stableswap (Mock Strategy)
-                      </p>
-                    )}
-                  </div>
+                  ) : (
+                    <p className="text-xs text-text-tertiary mb-4">
+                      Funds available for DeFi allocation
+                    </p>
+                  )}
 
-                  {/* Position Details (if allocated) */}
-                  {defiInfo.position && (
+                  {/* Position Details */}
+                  {defiInfo.position ? (
                     <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <span className="text-text-secondary text-sm">Principal Allocated</span>
-                        <span className="font-medium text-success">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-text-tertiary">Principal</span>
+                        <span className="text-sm font-semibold text-emerald-500">
                           {formatUSDT(defiInfo.position.principalUsdt, false)}
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-text-secondary text-sm">LP Tokens</span>
-                        <span className="font-medium">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-text-tertiary">LP Tokens</span>
+                        <span className="text-sm font-medium">
                           {(Number(defiInfo.position.lpShares) / 1_000_000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
                     </div>
+                  ) : poolBalance !== null && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-text-tertiary">Pool Balance</span>
+                      <span className="text-sm font-medium">{formatUSDT(poolBalance, false)}</span>
+                    </div>
                   )}
                   
-                  {/* Pool Account Address */}
+                  {/* Pool Account */}
                   {defiInfo.poolAccount && (
-                    <div className="pt-3 border-t border-border-secondary">
+                    <div className="mt-4 pt-3 border-t border-border-primary/30">
                       <div className="flex items-center justify-between">
-                        <span className="text-text-secondary text-sm">Pool Account</span>
-                        <div className="flex items-center gap-2">
-                          <code className="text-xs font-mono bg-background-tertiary px-2 py-1 rounded">
+                        <span className="text-xs text-text-tertiary">Pool</span>
+                        <button
+                          onClick={() => handleCopyAddress(defiInfo.poolAccount!)}
+                          className="flex items-center gap-1.5 group"
+                          title="Copy address"
+                        >
+                          <code className="text-xs font-mono text-text-secondary group-hover:text-prmx-cyan transition-colors">
                             {formatAddress(defiInfo.poolAccount)}
                           </code>
-                          <button
-                            onClick={() => handleCopyAddress(defiInfo.poolAccount!)}
-                            className="p-1 hover:bg-background-tertiary rounded transition-colors"
-                            title="Copy full address"
-                          >
-                            {copiedAddress === defiInfo.poolAccount ? (
-                              <Check className="w-3 h-3 text-success" />
-                            ) : (
-                              <Copy className="w-3 h-3 text-text-tertiary" />
-                            )}
-                          </button>
-                        </div>
+                          {copiedAddress === defiInfo.poolAccount ? (
+                            <Check className="w-3 h-3 text-success" />
+                          ) : (
+                            <Copy className="w-3 h-3 text-text-tertiary opacity-0 group-hover:opacity-100 transition-opacity" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Pool Balance Info (if not allocated) */}
-                  {!defiInfo.isAllocatedToDefi && poolBalance !== null && (
-                    <div className="flex justify-between p-3 rounded-lg bg-background-tertiary/50">
-                      <span className="text-text-secondary text-sm">Pool Balance</span>
-                      <span className="font-medium">
-                        {formatUSDT(poolBalance, false)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Manual Allocation Button (if not allocated and user can allocate) */}
+                  {/* Allocate Button */}
                   {!defiInfo.isAllocatedToDefi && canAllocate && poolBalance !== null && poolBalance > 0n && (
-                    <div className="pt-2 border-t border-border-secondary">
+                    <div className="mt-4">
                       <Button
-                        variant="primary"
+                        variant="secondary"
                         size="sm"
                         className="w-full"
                         onClick={() => setShowAllocationModal(true)}
                         icon={<TrendingUp className="w-4 h-4" />}
                       >
-                        Allocate to DeFi Strategy
+                        Allocate to DeFi
                       </Button>
-                      {!isDao && myLpHolding && (
-                        <p className="text-xs text-text-tertiary mt-2 text-center">
-                          You hold {myLpHolding.percentageOwned.toFixed(1)}% of LP tokens (&ge;51% required)
-                        </p>
-                      )}
                     </div>
                   )}
-
-                  {/* Info tooltip */}
-                  <div className="p-3 rounded-lg bg-prmx-cyan/5 border border-prmx-cyan/20">
-                    <p className="text-xs text-text-secondary">
-                      💡 Policy funds may be allocated to DeFi strategies to generate yield. 
-                      The DAO guarantees coverage of potential losses.
-                    </p>
-                  </div>
-                </>
+                </div>
               ) : (
-                // Error/fallback state
-                <div className="text-center py-4 text-text-secondary">
-                  <p className="text-sm">Unable to load DeFi status</p>
+                <div className="px-5 py-6 text-center">
+                  <p className="text-sm text-text-tertiary">Unable to load status</p>
                 </div>
               )}
+              
+              {/* Footer note */}
+              <div className="px-5 py-3 bg-background-tertiary/30 border-t border-border-primary/30">
+                <p className="text-[11px] text-text-tertiary">
+                  DAO guarantees coverage of DeFi losses
+                </p>
+              </div>
             </CardContent>
           </Card>
           
@@ -1235,49 +1264,60 @@ export default function V3PolicyDetailPage() {
             </div>
           </Modal>
           
-          {/* My Position */}
+          {/* My Position - Sleek design */}
           {(isHolder || myLpHolding) && (
-            <Card>
-              <CardHeader>
-                <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Percent className="w-5 h-5" />
-                  My Position
-                </h3>
-              </CardHeader>
-              <CardContent className="p-6 space-y-4">
-                {isHolder && (
-                  <div className="p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30">
-                    <p className="text-sm font-medium text-prmx-cyan">Policy Holder</p>
-                    <p className="text-xs text-text-secondary mt-1">
-                      You will receive the payout if the weather event occurs
-                    </p>
+            <Card className="overflow-hidden">
+              <CardContent className="p-0">
+                {/* Header */}
+                <div className="px-5 py-4 border-b border-border-primary/50">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                      <Percent className="w-4 h-4 text-prmx-cyan" />
+                    </div>
+                    <h3 className="text-base font-semibold">My Position</h3>
                   </div>
-                )}
-                {myLpHolding && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">My LP Shares</span>
-                      <span className="font-medium">{myLpHolding.lpShares}</span>
+                </div>
+                
+                <div className="px-5 py-4">
+                  {isHolder && (
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-2 h-2 rounded-full bg-prmx-cyan" />
+                      <div>
+                        <p className="text-sm font-medium text-prmx-cyan">Policy Holder</p>
+                        <p className="text-xs text-text-tertiary">
+                          Receive payout if event occurs
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">Ownership</span>
-                      <span className="font-medium">{myLpHolding.percentageOwned.toFixed(1)}%</span>
+                  )}
+                  {myLpHolding && (
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-text-tertiary">LP Shares</span>
+                        <span className="text-sm font-medium">{myLpHolding.lpShares}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-text-tertiary">Ownership</span>
+                        <span className="text-sm font-semibold text-prmx-cyan">{myLpHolding.percentageOwned.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-text-tertiary">Collateral</span>
+                        <span className="text-sm font-medium">
+                          {formatUSDT(BigInt(myLpHolding.lpShares) * BigInt(100_000_000))}
+                        </span>
+                      </div>
+                      {policy.status === 'Active' && !isExpired && (
+                        <div className="pt-3 mt-1">
+                          <Link href="/lp">
+                            <Button variant="secondary" size="sm" className="w-full">
+                              Trade LP Tokens
+                            </Button>
+                          </Link>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-secondary">My Collateral</span>
-                      <span className="font-medium">
-                        {formatUSDT(BigInt(myLpHolding.lpShares) * BigInt(100_000_000))}
-                      </span>
-                    </div>
-                    {policy.status === 'Active' && !isExpired && (
-                      <Link href="/lp" className="block mt-6 pt-4 border-t border-border-secondary">
-                        <Button variant="secondary" size="sm" className="w-full">
-                          Trade LP Tokens
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
               </CardContent>
             </Card>
           )}

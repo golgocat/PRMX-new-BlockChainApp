@@ -358,18 +358,18 @@ html.light .prmx-rdp .rdp-day_outside .rdp-button {
 
   :root .btn-primary,
   html.dark .btn-primary {
-    @apply bg-gradient-to-r from-prmx-cyan via-prmx-blue to-prmx-purple;
-    @apply hover:shadow-prmx-glow-sm;
+    @apply bg-prmx-cyan hover:bg-prmx-cyan/90;
+    @apply shadow-sm hover:shadow-md hover:shadow-prmx-cyan/20;
   }
 
   html.light .btn-primary {
-    @apply bg-gradient-to-r from-sky-500 to-blue-500;
-    @apply hover:shadow-lg hover:shadow-sky-200;
+    @apply bg-sky-600 hover:bg-sky-700;
+    @apply shadow-sm hover:shadow-md hover:shadow-sky-300/50;
   }
 
   .btn-primary::before {
     content: '';
-    @apply absolute inset-0 bg-white/20 opacity-0 hover:opacity-100 transition-opacity duration-300;
+    @apply absolute inset-0 bg-white/10 opacity-0 hover:opacity-100 transition-opacity duration-300;
   }
 
   .btn-secondary {

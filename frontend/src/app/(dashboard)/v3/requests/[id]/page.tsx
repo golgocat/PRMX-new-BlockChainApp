@@ -274,8 +274,8 @@ export default function V3RequestDetailPage() {
         
         <Card>
           <CardContent className="py-16 text-center">
-            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-              <Wallet className="w-10 h-10 text-prmx-cyan" />
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary flex items-center justify-center">
+              <Wallet className="w-10 h-10 text-gray-400 dark:text-text-tertiary" />
             </div>
             <h3 className="text-xl font-semibold mb-2">Connect Your Wallet</h3>
             <p className="text-text-secondary mb-8 max-w-md mx-auto">
@@ -384,14 +384,9 @@ export default function V3RequestDetailPage() {
                 </Button>
               </Link>
               
-              {/* Dynamic gradient avatar */}
+              {/* Subtle gradient avatar */}
               <div 
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-lg flex-shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 30}, 70%, 50%) 0%, 
-                    hsl(${(parseInt(shortId, 16) % 60) + 60}, 80%, 40%) 100%)`
-                }}
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-mono text-lg font-bold shadow-sm flex-shrink-0 bg-gradient-to-br from-gray-600 to-gray-700 dark:from-slate-600 dark:to-slate-700 border border-gray-500/30"
               >
                 {shortId.slice(0, 4).toUpperCase()}
               </div>
@@ -456,7 +451,7 @@ export default function V3RequestDetailPage() {
           <div className="flex flex-col md:flex-row gap-6">
             {/* Event Icon & Type */}
             <div className="flex-shrink-0">
-              <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center text-5xl shadow-lg">
+              <div className="w-24 h-24 rounded-2xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary flex items-center justify-center text-5xl">
                 {eventInfo?.icon || '📋'}
               </div>
             </div>
@@ -473,12 +468,12 @@ export default function V3RequestDetailPage() {
               </div>
               
               <div className="flex flex-wrap gap-4">
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background-tertiary">
-                  <MapPin className="w-4 h-4 text-prmx-cyan" />
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-transparent">
+                  <MapPin className="w-4 h-4 text-gray-500 dark:text-text-secondary" />
                   <span className="font-medium">{request.location?.name || `Location #${request.locationId}`}</span>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-background-tertiary">
-                  <Target className="w-4 h-4 text-prmx-purple" />
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-transparent">
+                  <Target className="w-4 h-4 text-gray-500 dark:text-text-secondary" />
                   <span className="font-medium">
                     Trigger: {formatThresholdValue(request.eventSpec.threshold.value, request.eventSpec.threshold.unit)}
                   </span>
@@ -510,17 +505,11 @@ export default function V3RequestDetailPage() {
                 <span className="text-lg font-medium text-text-secondary">{request.totalShares} shares</span>
               </div>
             </div>
-            <div className="relative h-4 bg-background-tertiary rounded-full overflow-hidden">
+            <div className="relative h-3 bg-gray-200 dark:bg-background-tertiary rounded-full overflow-hidden">
               <div 
-                className="absolute inset-y-0 left-0 bg-gradient-to-r from-prmx-cyan to-teal-500 transition-all duration-500 ease-out"
+                className="absolute inset-y-0 left-0 bg-prmx-cyan transition-all duration-500 ease-out"
                 style={{ width: `${fillPercentage}%` }}
               />
-              {fillPercentage > 0 && fillPercentage < 100 && (
-                <div 
-                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-lg border-2 border-prmx-cyan"
-                  style={{ left: `calc(${fillPercentage}% - 6px)` }}
-                />
-              )}
             </div>
             {remainingShares > 0 && !isExpired && (
               <p className="text-sm text-text-secondary mt-2">
@@ -535,116 +524,155 @@ export default function V3RequestDetailPage() {
       <div className="grid md:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="md:col-span-2 space-y-6">
-          {/* Coverage Timeline */}
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-prmx-cyan" />
-                <h3 className="text-lg font-semibold">Coverage Timeline</h3>
+          {/* Coverage Timeline - Sleek horizontal design */}
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-border-primary/50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-prmx-cyan/10 flex items-center justify-center">
+                    <Calendar className="w-4 h-4 text-prmx-cyan" />
+                  </div>
+                  <h3 className="text-base font-semibold">Timeline</h3>
+                </div>
               </div>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="relative">
-                {/* Timeline line */}
-                <div className="absolute left-4 top-8 bottom-8 w-0.5 bg-border-secondary" />
+              
+              {/* Timeline - Horizontal on desktop, vertical on mobile */}
+              <div className="p-5">
+                {/* Desktop horizontal timeline */}
+                <div className="hidden md:block">
+                  <div className="relative">
+                    {/* Progress bar background */}
+                    <div className="absolute top-4 left-0 right-0 h-0.5 bg-border-secondary" />
+                    
+                    {/* Progress bar fill - based on current time */}
+                    {(() => {
+                      const totalDuration = request.coverageEnd - request.createdAt;
+                      const elapsed = Math.max(0, Math.min(now - request.createdAt, totalDuration));
+                      const progress = totalDuration > 0 ? (elapsed / totalDuration) * 100 : 0;
+                      return (
+                        <div 
+                          className="absolute top-4 left-0 h-0.5 bg-gradient-to-r from-emerald-500 via-prmx-cyan to-prmx-purple transition-all duration-500"
+                          style={{ width: `${Math.min(progress, 100)}%` }}
+                        />
+                      );
+                    })()}
+                    
+                    {/* Timeline points */}
+                    <div className="relative flex justify-between">
+                      {/* Created */}
+                      <div className="flex flex-col items-center">
+                        <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shadow-sm">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="mt-3 text-center">
+                          <p className="text-xs font-medium text-emerald-500">Created</p>
+                          <p className="text-[11px] text-text-tertiary mt-0.5">
+                            {new Date(request.createdAt * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                          </p>
+                          <p className="text-[10px] text-text-tertiary">
+                            {new Date(request.createdAt * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Expires */}
+                      <div className="flex flex-col items-center">
+                        <div className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center shadow-sm',
+                          isExpired ? 'bg-rose-500' : now < request.expiresAt ? 'bg-amber-500' : 'bg-rose-500'
+                        )}>
+                          <Clock className="w-4 h-4 text-white" />
+                        </div>
+                        <div className="mt-3 text-center">
+                          <p className={cn('text-xs font-medium', isExpired ? 'text-rose-500' : 'text-amber-500')}>
+                            {isExpired ? 'Expired' : 'Expires'}
+                          </p>
+                          <p className="text-[11px] text-text-tertiary mt-0.5">
+                            {new Date(request.expiresAt * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                          </p>
+                          <p className="text-[10px] text-text-tertiary">
+                            {new Date(request.expiresAt * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Coverage Start */}
+                      <div className="flex flex-col items-center">
+                        <div className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all',
+                          now >= request.coverageStart 
+                            ? 'bg-prmx-cyan' 
+                            : 'bg-background-secondary border-2 border-border-secondary'
+                        )}>
+                          <Shield className={cn('w-4 h-4', now >= request.coverageStart ? 'text-white' : 'text-text-tertiary')} />
+                        </div>
+                        <div className="mt-3 text-center">
+                          <p className={cn('text-xs font-medium', now >= request.coverageStart ? 'text-prmx-cyan' : 'text-text-tertiary')}>
+                            Start
+                          </p>
+                          <p className="text-[11px] text-text-tertiary mt-0.5">
+                            {new Date(request.coverageStart * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                          </p>
+                          <p className="text-[10px] text-text-tertiary">
+                            {new Date(request.coverageStart * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Coverage End */}
+                      <div className="flex flex-col items-center">
+                        <div className={cn(
+                          'w-8 h-8 rounded-full flex items-center justify-center shadow-sm transition-all',
+                          now >= request.coverageEnd 
+                            ? 'bg-prmx-purple' 
+                            : 'bg-background-secondary border-2 border-border-secondary'
+                        )}>
+                          <Calendar className={cn('w-4 h-4', now >= request.coverageEnd ? 'text-white' : 'text-text-tertiary')} />
+                        </div>
+                        <div className="mt-3 text-center">
+                          <p className={cn('text-xs font-medium', now >= request.coverageEnd ? 'text-prmx-purple' : 'text-text-tertiary')}>
+                            End
+                          </p>
+                          <p className="text-[11px] text-text-tertiary mt-0.5">
+                            {new Date(request.coverageEnd * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}
+                          </p>
+                          <p className="text-[10px] text-text-tertiary">
+                            {new Date(request.coverageEnd * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
                 
-                {/* Timeline events */}
-                <div className="space-y-6">
-                  {/* Request Created */}
-                  <div className="flex items-start gap-4">
-                    <div className="relative z-10 w-8 h-8 rounded-full bg-success flex items-center justify-center flex-shrink-0">
-                      <CheckCircle2 className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="pt-1">
-                      <p className="font-medium">Request Created</p>
-                      <p className="text-sm text-text-secondary">
-                        {new Date(request.createdAt * 1000).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'UTC'
-                        })} UTC
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Request Expires */}
-                  <div className="flex items-start gap-4">
-                    <div className={cn(
-                      'relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                      isExpired ? 'bg-error' : 'bg-warning'
-                    )}>
-                      <Clock className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="pt-1">
-                      <p className="font-medium">
-                        {isExpired ? 'Request Expired' : 'Request Expires'}
-                      </p>
-                      <p className="text-sm text-text-secondary">
-                        {new Date(request.expiresAt * 1000).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'UTC'
-                        })} UTC
-                      </p>
-                      {!isExpired && (
-                        <Badge variant="warning" className="mt-1 text-xs">
-                          {formatTimeRemaining(request.expiresAt)} remaining
-                        </Badge>
+                {/* Mobile vertical timeline */}
+                <div className="md:hidden space-y-4">
+                  {[
+                    { label: 'Created', time: request.createdAt, icon: CheckCircle2, color: 'emerald', done: true },
+                    { label: isExpired ? 'Expired' : 'Expires', time: request.expiresAt, icon: Clock, color: isExpired ? 'rose' : 'amber', done: isExpired },
+                    { label: 'Coverage Start', time: request.coverageStart, icon: Shield, color: 'cyan', done: now >= request.coverageStart },
+                    { label: 'Coverage End', time: request.coverageEnd, icon: Calendar, color: 'purple', done: now >= request.coverageEnd },
+                  ].map((item, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      <div className={cn(
+                        'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0',
+                        item.done 
+                          ? `bg-${item.color}-500` 
+                          : 'bg-background-secondary border-2 border-border-secondary'
                       )}
+                      style={item.done ? { backgroundColor: item.color === 'emerald' ? '#10b981' : item.color === 'rose' ? '#f43f5e' : item.color === 'amber' ? '#f59e0b' : item.color === 'cyan' ? '#22d3ee' : '#a855f7' } : {}}
+                      >
+                        <item.icon className={cn('w-3.5 h-3.5', item.done ? 'text-white' : 'text-text-tertiary')} />
+                      </div>
+                      <div className="flex-1 flex items-center justify-between">
+                        <span className="text-sm font-medium">{item.label}</span>
+                        <span className="text-xs text-text-tertiary">
+                          {new Date(item.time * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })} {new Date(item.time * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC', hour12: false })}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                  
-                  {/* Coverage Start */}
-                  <div className="flex items-start gap-4">
-                    <div className={cn(
-                      'relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                      now >= request.coverageStart ? 'bg-prmx-cyan' : 'bg-background-tertiary border-2 border-border-secondary'
-                    )}>
-                      <Shield className={cn('w-4 h-4', now >= request.coverageStart ? 'text-white' : 'text-text-tertiary')} />
-                    </div>
-                    <div className="pt-1">
-                      <p className="font-medium">Coverage Starts</p>
-                      <p className="text-sm text-text-secondary">
-                        {new Date(request.coverageStart * 1000).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'UTC'
-                        })} UTC
-                      </p>
-                    </div>
-                  </div>
-                  
-                  {/* Coverage End */}
-                  <div className="flex items-start gap-4">
-                    <div className={cn(
-                      'relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-                      now >= request.coverageEnd ? 'bg-prmx-purple' : 'bg-background-tertiary border-2 border-border-secondary'
-                    )}>
-                      <Calendar className={cn('w-4 h-4', now >= request.coverageEnd ? 'text-white' : 'text-text-tertiary')} />
-                    </div>
-                    <div className="pt-1">
-                      <p className="font-medium">Coverage Ends</p>
-                      <p className="text-sm text-text-secondary">
-                        {new Date(request.coverageEnd * 1000).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          timeZone: 'UTC'
-                        })} UTC
-                      </p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
@@ -663,7 +691,7 @@ export default function V3RequestDetailPage() {
                 {/* Per Share Terms */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-prmx-cyan" />
+                    <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
                     Per Share
                   </h4>
                   <div className="space-y-3">
@@ -685,7 +713,7 @@ export default function V3RequestDetailPage() {
                 {/* Total Values */}
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-text-tertiary uppercase tracking-wider flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-prmx-purple" />
+                    <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-500" />
                     Totals
                   </h4>
                   <div className="space-y-3">
@@ -699,9 +727,9 @@ export default function V3RequestDetailPage() {
                         {formatUSDT(BigInt(request.totalShares) * request.premiumPerShare, false)}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between p-3 rounded-lg bg-prmx-cyan/10 border border-prmx-cyan/30">
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary">
                       <span className="text-text-secondary">Max Payout</span>
-                      <span className="font-bold text-prmx-cyan text-xl">
+                      <span className="font-bold text-text-primary text-xl">
                         {formatUSDT(BigInt(request.totalShares) * request.payoutPerShare, false)}
                       </span>
                     </div>
@@ -710,17 +738,17 @@ export default function V3RequestDetailPage() {
               </div>
               
               {/* ROI Indicator */}
-              <div className="mt-6 p-4 rounded-xl bg-success/10 border border-success/30">
+              <div className="mt-6 p-4 rounded-xl bg-gray-50 dark:bg-background-tertiary/50 border border-gray-200 dark:border-border-secondary">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <TrendingUp className="w-5 h-5 text-success" />
+                    <TrendingUp className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
                     <div>
                       <p className="font-medium">Underwriter Return on Collateral</p>
                       <p className="text-sm text-text-secondary">If no event occurs during coverage period</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-2xl font-bold text-success">+{roiPercentage.toFixed(1)}%</p>
+                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">+{roiPercentage.toFixed(1)}%</p>
                   </div>
                 </div>
               </div>
@@ -738,8 +766,8 @@ export default function V3RequestDetailPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 border border-prmx-cyan/30 flex items-center justify-center">
-                    <Users className="w-6 h-6 text-prmx-cyan" />
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-border-secondary flex items-center justify-center">
+                    <Users className="w-6 h-6 text-gray-500 dark:text-text-secondary" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
@@ -820,9 +848,9 @@ export default function V3RequestDetailPage() {
                     </div>
                     
                     {/* What You Get */}
-                    <div className="p-4 rounded-xl bg-prmx-cyan/10 border border-prmx-cyan/30 space-y-2">
+                    <div className="p-4 rounded-xl bg-gray-50 dark:bg-background-tertiary/50 border border-gray-200 dark:border-border-secondary space-y-2">
                       <p className="font-medium text-sm flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-prmx-cyan" />
+                        <Zap className="w-4 h-4 text-text-secondary" />
                         What you get:
                       </p>
                       <ul className="text-xs text-text-secondary space-y-1 ml-6">

@@ -45,7 +45,7 @@ function getStatusBadge(status: V3RequestStatus, expiresAt: number, filledShares
   if (status === 'PartiallyFilled' && isExpired) {
     return (
       <div className="flex flex-col gap-0.5">
-        <Badge variant="success">Policy Created</Badge>
+        <Badge variant="success">Partial</Badge>
         <span className="text-[10px] text-text-tertiary">{filledShares} shares</span>
       </div>
     );
@@ -69,7 +69,7 @@ function getStatusBadge(status: V3RequestStatus, expiresAt: number, filledShares
       if (filledShares > 0) {
         return (
           <div className="flex flex-col gap-0.5">
-            <Badge variant="success">Policy Created</Badge>
+            <Badge variant="success">Partial</Badge>
             <span className="text-[10px] text-text-tertiary">{filledShares} shares</span>
           </div>
         );

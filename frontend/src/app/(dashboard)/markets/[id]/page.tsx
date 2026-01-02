@@ -445,7 +445,7 @@ export default function MarketDetailPage() {
                 </Button>
               </Link>
               {isConnected && market.status === 'Open' && (
-                <Link href="/policies/new" className="block">
+                <Link href={`/policies/new?marketId=${market.id}`} className="block">
                   <Button className="w-full" icon={<Shield className="w-4 h-4" />}>
                     Get Coverage
                   </Button>

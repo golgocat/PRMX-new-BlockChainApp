@@ -45,7 +45,7 @@ export function useV3Locations() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch locations');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected]);
 
@@ -53,7 +53,7 @@ export function useV3Locations() {
     refresh();
   }, [refresh]);
 
-  return { locations, loading, error, refresh: () => refresh(false) };
+  return { locations, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -65,10 +65,10 @@ export function useV3Location(locationId: number | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || locationId === null) return;
     
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     
     try {
@@ -77,7 +77,7 @@ export function useV3Location(locationId: number | null) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch location');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, locationId]);
 
@@ -85,7 +85,7 @@ export function useV3Location(locationId: number | null) {
     refresh();
   }, [refresh]);
 
-  return { location, loading, error, refresh };
+  return { location, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 // =============================================================================
@@ -123,7 +123,7 @@ export function useV3Requests(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch requests');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setIsRefreshing(false);
     }
   }, [isChainConnected]);
@@ -145,7 +145,7 @@ export function useV3Requests(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     loading, 
     isRefreshing: isRefreshing || isPending, 
     error, 
-    refresh: () => refresh(false) 
+    refresh: (silent = false) => refresh(silent) 
   };
 }
 
@@ -180,7 +180,7 @@ export function useV3OpenRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch open requests');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setIsRefreshing(false);
     }
   }, [isChainConnected]);
@@ -202,7 +202,7 @@ export function useV3OpenRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) 
     loading, 
     isRefreshing: isRefreshing || isPending, 
     error, 
-    refresh: () => refresh(false) 
+    refresh: (silent = false) => refresh(silent) 
   };
 }
 
@@ -227,7 +227,7 @@ export function useV3Request(requestId: string | null, pollInterval: number = FA
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch request');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, requestId]);
 
@@ -243,7 +243,7 @@ export function useV3Request(requestId: string | null, pollInterval: number = FA
     return () => clearInterval(interval);
   }, [isChainConnected, requestId, pollInterval, refresh]);
 
-  return { request, loading, error, refresh: () => refresh(false) };
+  return { request, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -261,7 +261,7 @@ export function useV3MyRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     if (!isChainConnected || !selectedAccount) return;
     
     if (!silent) setLoading(true);
-    setIsRefreshing(true);
+    if (silent) setIsRefreshing(true);
     setError(null);
     
     try {
@@ -272,7 +272,7 @@ export function useV3MyRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch my requests');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setIsRefreshing(false);
     }
   }, [isChainConnected, selectedAccount]);
@@ -294,7 +294,7 @@ export function useV3MyRequests(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     loading, 
     isRefreshing: isRefreshing || isPending, 
     error, 
-    refresh: () => refresh(false) 
+    refresh: (silent = false) => refresh(silent) 
   };
 }
 
@@ -333,7 +333,7 @@ export function useV3Policies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch policies');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setIsRefreshing(false);
     }
   }, [isChainConnected]);
@@ -355,7 +355,7 @@ export function useV3Policies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     loading, 
     isRefreshing: isRefreshing || isPending, 
     error, 
-    refresh: () => refresh(false) 
+    refresh: (silent = false) => refresh(silent) 
   };
 }
 
@@ -368,10 +368,10 @@ export function useV3Policy(policyId: string | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || !policyId) return;
     
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     
     try {
@@ -380,7 +380,7 @@ export function useV3Policy(policyId: string | null) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch policy');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, policyId]);
 
@@ -388,7 +388,7 @@ export function useV3Policy(policyId: string | null) {
     refresh();
   }, [refresh]);
 
-  return { policy, loading, error, refresh };
+  return { policy, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -412,7 +412,7 @@ export function useV3MyPolicies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch my policies');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, selectedAccount]);
 
@@ -428,7 +428,7 @@ export function useV3MyPolicies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     return () => clearInterval(interval);
   }, [isChainConnected, selectedAccount, pollInterval, refresh]);
 
-  return { policies, loading, error, refresh: () => refresh(false) };
+  return { policies, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 // =============================================================================
@@ -456,7 +456,7 @@ export function useV3OracleState(policyId: string | null, pollInterval: number =
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch oracle state');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, policyId]);
 
@@ -472,7 +472,7 @@ export function useV3OracleState(policyId: string | null, pollInterval: number =
     return () => clearInterval(interval);
   }, [isChainConnected, policyId, pollInterval, refresh]);
 
-  return { oracleState, loading, error, refresh: () => refresh(false) };
+  return { oracleState, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 // =============================================================================
@@ -488,14 +488,14 @@ export function useV3Observations(policyId: string | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || !policyId) {
       setObservations([]);
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
     
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     
     try {
@@ -512,7 +512,7 @@ export function useV3Observations(policyId: string | null) {
       setError(errorMessage);
       console.error(`[V3 Observations] Error fetching observations for policy ${policyId}:`, err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, policyId]);
 
@@ -520,7 +520,7 @@ export function useV3Observations(policyId: string | null) {
     refresh();
   }, [refresh]);
 
-  return { observations, loading, error, refresh };
+  return { observations, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 // =============================================================================
@@ -548,7 +548,7 @@ export function useV3MyLpHoldings(pollInterval: number = DEFAULT_POLL_INTERVAL) 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch LP holdings');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, selectedAccount]);
 
@@ -564,7 +564,7 @@ export function useV3MyLpHoldings(pollInterval: number = DEFAULT_POLL_INTERVAL) 
     return () => clearInterval(interval);
   }, [isChainConnected, selectedAccount, pollInterval, refresh]);
 
-  return { holdings, loading, error, refresh: () => refresh(false) };
+  return { holdings, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 
 /**
@@ -576,10 +576,10 @@ export function useV3PolicyLpHolders(policyId: string | null) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || !policyId) return;
     
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     
     try {
@@ -588,7 +588,7 @@ export function useV3PolicyLpHolders(policyId: string | null) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch LP holders');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, policyId]);
 
@@ -596,6 +596,6 @@ export function useV3PolicyLpHolders(policyId: string | null) {
     refresh();
   }, [refresh]);
 
-  return { holders, loading, error, refresh };
+  return { holders, loading, error, refresh: (silent = false) => refresh(silent) };
 }
 

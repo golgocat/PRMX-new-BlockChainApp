@@ -45,7 +45,7 @@ export function useMarkets(pollInterval: number = 0) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch markets');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setIsRefreshing(false);
     }
   }, [isChainConnected]);
@@ -141,7 +141,7 @@ export function usePolicies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch policies');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setIsRefreshing(false);
       isFirstLoad.current = false;
     }
@@ -191,7 +191,7 @@ export function useMyPolicies(pollInterval: number = DEFAULT_POLL_INTERVAL) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch policies');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       isFirstLoad.current = false;
     }
   }, [isChainConnected, selectedAccount]);
@@ -521,7 +521,7 @@ export function useDashboardStats(pollInterval: number = DEFAULT_POLL_INTERVAL) 
     } catch (err) {
       console.error('Failed to fetch dashboard stats:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
       setIsRefreshing(false);
       isFirstLoad.current = false;
     }
@@ -764,14 +764,14 @@ export function useLpPositionOutcomes() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!isChainConnected || !selectedAccount) {
       setOutcomes([]);
-      setLoading(false);
+      if (!silent) setLoading(false);
       return;
     }
     
-    setLoading(true);
+    if (!silent) setLoading(true);
     setError(null);
     
     try {
@@ -898,7 +898,7 @@ export function useLpPositionOutcomes() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch position outcomes');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isChainConnected, selectedAccount]);
 
@@ -906,5 +906,5 @@ export function useLpPositionOutcomes() {
     refresh();
   }, [refresh]);
 
-  return { outcomes, loading, error, refresh };
+  return { outcomes, loading, error, refresh: (silent = false) => refresh(silent) };
 }

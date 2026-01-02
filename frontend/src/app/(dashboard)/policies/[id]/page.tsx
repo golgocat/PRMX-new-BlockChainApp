@@ -625,6 +625,15 @@ export default function PolicyDetailPage() {
                         const holderTotal = Number(holding.shares) + Number(holding.lockedShares);
                         const ownership = totalShares > 0 ? (holderTotal / totalShares) * 100 : 0;
                         const accountInfo = api.getAccountByAddress(holding.holder);
+                        // Consistent color for each holder - used in both individual bar and combined bar
+                        const holderColors = [
+                          { bg: 'bg-prmx-cyan', text: 'text-prmx-cyan', bgLight: 'bg-prmx-cyan/20' },
+                          { bg: 'bg-emerald-500', text: 'text-emerald-500', bgLight: 'bg-emerald-500/20' },
+                          { bg: 'bg-prmx-purple', text: 'text-prmx-purple', bgLight: 'bg-prmx-purple/20' },
+                          { bg: 'bg-amber-500', text: 'text-amber-500', bgLight: 'bg-amber-500/20' },
+                          { bg: 'bg-rose-500', text: 'text-rose-500', bgLight: 'bg-rose-500/20' },
+                        ];
+                        const color = holderColors[idx % holderColors.length];
                         
                         return (
                           <div 
@@ -634,7 +643,7 @@ export default function PolicyDetailPage() {
                             <div className="flex items-center gap-2.5">
                               <span className={cn(
                                 "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold",
-                                idx === 0 ? "bg-prmx-cyan/20 text-prmx-cyan" : "bg-background-tertiary text-text-tertiary"
+                                color.bgLight, color.text
                               )}>
                                 {idx + 1}
                               </span>
@@ -657,7 +666,7 @@ export default function PolicyDetailPage() {
                             <div className="flex items-center gap-2">
                               <div className="w-16 h-1 bg-background-tertiary rounded-full overflow-hidden">
                                 <div 
-                                  className="h-full bg-prmx-cyan rounded-full"
+                                  className={cn("h-full rounded-full", color.bg)}
                                   style={{ width: `${ownership}%` }}
                                 />
                               </div>
@@ -668,14 +677,14 @@ export default function PolicyDetailPage() {
                       })}
                     </div>
 
-                    {/* Ownership Distribution Bar */}
+                    {/* Ownership Distribution Bar - colors match individual holders */}
                     <div className="pt-3 border-t border-border-primary/30">
                       <div className="h-1.5 rounded-full bg-background-tertiary overflow-hidden flex">
                         {lpHoldings.map((holding, idx) => {
                           const totalShares = lpHoldings.reduce((sum, h) => sum + Number(h.shares) + Number(h.lockedShares), 0);
                           const holderTotal = Number(holding.shares) + Number(holding.lockedShares);
                           const width = totalShares > 0 ? (holderTotal / totalShares) * 100 : 0;
-                          const colors = ['bg-prmx-cyan', 'bg-prmx-purple', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500'];
+                          const colors = ['bg-prmx-cyan', 'bg-emerald-500', 'bg-prmx-purple', 'bg-amber-500', 'bg-rose-500'];
                           return (
                             <div 
                               key={holding.holder}

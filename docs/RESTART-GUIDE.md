@@ -11,11 +11,12 @@ This guide explains the restart process for the PRMX development environment, in
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Restart Modes](#restart-modes)
-3. [What Happens When You Restart](#what-happens-when-you-restart)
-4. [API Key Security](#api-key-security)
-5. [Services Overview](#services-overview)
-6. [Troubleshooting](#troubleshooting)
+2. [Post-Restart Steps](#post-restart-steps)
+3. [Restart Modes](#restart-modes)
+4. [What Happens When You Restart](#what-happens-when-you-restart)
+5. [API Key Security](#api-key-security)
+6. [Services Overview](#services-overview)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -47,6 +48,110 @@ V3_INGEST_HMAC_SECRET="your_secret" \
 R_PRICING_API_KEY="your_key" \
 ./scripts/restart-dev-environment.sh
 ```
+
+---
+
+## Post-Restart Steps
+
+After a `--tmp` restart, additional steps are required to ensure all oracles are working correctly.
+
+### Step 1: Verify V3 Secrets Injection
+
+The restart script automatically injects V3 secrets if environment variables are set. Verify:
+
+```bash
+# Check header status indicator in frontend (both dots should be green)
+# Or check via script:
+node scripts/set-v3-oracle-secrets.mjs --dry-run
+```
+
+### Step 2: Inject V1 AccuWeather API Key (CRITICAL)
+
+> **⚠️ IMPORTANT**: The V1 oracle uses a DIFFERENT offchain storage key than V3.
+> The restart script only injects via genesis, but the OCW may not pick it up immediately.
+> Manual injection ensures the key is available in offchain storage.
+
+**Storage Key (MUST use hyphens, NOT underscores):**
+```
+✅ Correct: prmx-oracle::accuweather-api-key
+❌ Wrong:   prmx-oracle::accuweather_api_key
+```
+
+**Injection Command:**
+```bash
+cd frontend && source ../.env && node -e "
+const { ApiPromise, WsProvider } = require('@polkadot/api');
+
+async function injectV1Key() {
+  const api = await ApiPromise.create({ provider: new WsProvider('ws://127.0.0.1:9944') });
+  
+  const apiKey = process.env.ACCUWEATHER_API_KEY;
+  if (!apiKey) { console.error('ACCUWEATHER_API_KEY not set'); process.exit(1); }
+  
+  // CORRECT storage key with HYPHENS
+  const storageKey = '0x' + Buffer.from('prmx-oracle::accuweather-api-key').toString('hex');
+  const apiKeyHex = '0x' + Buffer.from(apiKey).toString('hex');
+  
+  await api.rpc.offchain.localStorageSet('PERSISTENT', storageKey, apiKeyHex);
+  console.log('✅ V1 AccuWeather API key injected');
+  
+  await api.disconnect();
+}
+injectV1Key();
+"
+```
+
+### Step 3: Trigger Manual Rainfall Fetch
+
+The V1 OCW only fetches rainfall every 600 blocks (~1 hour). Trigger an immediate fetch:
+
+```bash
+cd frontend && source ../.env && node -e "
+const { ApiPromise, WsProvider, Keyring } = require('@polkadot/api');
+
+async function triggerFetch() {
+  const api = await ApiPromise.create({ provider: new WsProvider('ws://127.0.0.1:9944') });
+  const alice = new Keyring({ type: 'sr25519' }).addFromUri('//Alice');
+  
+  // Request fetch for all markets via sudo
+  await api.tx.sudo.sudo(api.tx.prmxOracle.requestRainfallFetchAll())
+    .signAndSend(alice, ({ status }) => {
+      if (status.isInBlock) {
+        console.log('✅ Rainfall fetch triggered for all markets');
+        api.disconnect();
+      }
+    });
+}
+triggerFetch();
+"
+```
+
+### Step 4: Populate V3 Location Registry
+
+```bash
+node scripts/populate-location-registry.mjs --sudo
+```
+
+### Step 5: Verify System Health
+
+**Check Node Logs for Success:**
+```bash
+# Should see successful AccuWeather fetches (NOT 401 errors)
+grep -i "accuweather" /tmp/prmx-node.log | tail -20
+
+# Look for these success messages:
+# ✅ Resolved AccuWeather location key for market X
+# ✅ Fetched 24 rainfall records for market X
+# 🌧️ AccuWeather 24h rainfall for market X: Y.Y mm
+
+# If you see this, the key is WRONG:
+# ❌ AccuWeather API returned status 401
+```
+
+**Check Frontend:**
+- Header status indicator: Both dots should be green
+- Oracle V1 page: Should show real rainfall data (not "No Data")
+- Oracle V2 service: Should be running and healthy
 
 ---
 
@@ -457,6 +562,52 @@ grep "api_key_pending" /tmp/prmx-node.log
 grep "Fetched.*hourly rainfall records" /tmp/prmx-node.log
 ```
 
+#### AccuWeather API returning 401 Unauthorized
+
+**Symptom:** Node logs show `AccuWeather API returned status 401` and `Failed to resolve location key`
+
+**Cause:** V1 AccuWeather API key was injected with the **wrong storage key** (underscore vs hyphen)
+
+**Wrong vs Correct Key:**
+```
+❌ Wrong:   prmx-oracle::accuweather_api_key  (underscores)
+✅ Correct: prmx-oracle::accuweather-api-key  (hyphens)
+```
+
+**Solution:**
+```bash
+# 1. Re-inject with CORRECT storage key
+cd frontend && source ../.env && node -e "
+const { ApiPromise, WsProvider } = require('@polkadot/api');
+(async () => {
+  const api = await ApiPromise.create({ provider: new WsProvider('ws://127.0.0.1:9944') });
+  const storageKey = '0x' + Buffer.from('prmx-oracle::accuweather-api-key').toString('hex');
+  const apiKeyHex = '0x' + Buffer.from(process.env.ACCUWEATHER_API_KEY).toString('hex');
+  await api.rpc.offchain.localStorageSet('PERSISTENT', storageKey, apiKeyHex);
+  console.log('✅ Key re-injected with correct storage key');
+  await api.disconnect();
+})();
+"
+
+# 2. Trigger manual fetch via sudo
+cd frontend && source ../.env && node -e "
+const { ApiPromise, WsProvider, Keyring } = require('@polkadot/api');
+(async () => {
+  const api = await ApiPromise.create({ provider: new WsProvider('ws://127.0.0.1:9944') });
+  const alice = new Keyring({ type: 'sr25519' }).addFromUri('//Alice');
+  await api.tx.sudo.sudo(api.tx.prmxOracle.requestRainfallFetchAll())
+    .signAndSend(alice, ({ status }) => {
+      if (status.isInBlock) { console.log('✅ Fetch triggered'); api.disconnect(); }
+    });
+})();
+"
+
+# 3. Verify success in logs (wait ~15 seconds)
+sleep 15 && grep -i "accuweather" /tmp/prmx-node.log | tail -10
+# Should see: ✅ Resolved AccuWeather location key for market X
+# Should NOT see: AccuWeather API returned status 401
+```
+
 #### V3 policies not being monitored
 
 **Symptom:** V3 policies show "N/A" for Observed time, no snapshots being submitted
@@ -580,5 +731,5 @@ export R_PRICING_API_KEY="your_key"
 
 ---
 
-*Last updated: December 2025*
+*Last updated: January 2026*
 

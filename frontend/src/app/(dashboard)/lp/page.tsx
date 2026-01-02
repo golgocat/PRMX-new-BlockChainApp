@@ -44,6 +44,7 @@ import { useLpOrders, useMyLpHoldings, usePolicies, useMarkets, useTradeHistory,
 import { useV3Policies } from '@/hooks/useV3ChainData';
 import * as api from '@/lib/api';
 import { formatId } from '@/lib/api-v3';
+import { formatThresholdValue } from '@/types/v3';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import type { LpAskOrder, Policy, DaoSolvencyInfo, PolicyDefiInfo, LpTradeRecord, LpPositionOutcome } from '@/types';
@@ -113,6 +114,8 @@ export default function LpTradingPage() {
     },
     // V3-specific: store location name for display
     locationName: v3Policy.location?.name,
+    // V3-specific: event spec for threshold display
+    eventSpec: v3Policy.eventSpec,
   });
 
   // Helper to get policy by ID (hash-based IDs are unique, no collision possible)
@@ -397,7 +400,7 @@ export default function LpTradingPage() {
     }
   };
 
-  const handleCancelOrder = async (orderId: number) => {
+  const handleCancelOrder = async (orderId: number, sellerAddress?: string) => {
     const keypair = useWalletStore.getState().getKeypair();
     if (!keypair) {
       toast.error('Please connect your wallet');
@@ -406,8 +409,19 @@ export default function LpTradingPage() {
 
     setCancellingOrderId(orderId);
     try {
-      await api.cancelLpAsk(keypair, orderId);
-      toast.success('Order cancelled successfully');
+      // Check if this is a DAO Capital order and the current user is DAO Admin
+      const isDaoOrder = sellerAddress && api.isDaoCapitalAccount(sellerAddress);
+      const isDaoAdmin = selectedAccount?.role === 'DAO Admin';
+      
+      if (isDaoOrder && isDaoAdmin) {
+        // Use sudo to cancel DAO Capital orders
+        await api.cancelLpAskAsDao(keypair, orderId);
+        toast.success('DAO order cancelled successfully');
+      } else {
+        // Regular cancel for own orders
+        await api.cancelLpAsk(keypair, orderId);
+        toast.success('Order cancelled successfully');
+      }
       handleRefresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to cancel order');
@@ -563,12 +577,9 @@ export default function LpTradingPage() {
                     <Wallet className="w-6 h-6 text-text-tertiary" />
                   </div>
                   <h3 className="text-base font-semibold text-text-primary mb-1">No LP Holdings</h3>
-                  <p className="text-sm text-text-tertiary mb-4 max-w-sm mx-auto">
+                  <p className="text-sm text-text-tertiary max-w-sm mx-auto">
                     Start earning from premiums via the orderbook
                   </p>
-                  <Button onClick={() => setActiveTab('orderbook')} size="sm">
-                    Browse Orderbook
-                  </Button>
                 </CardContent>
               </Card>
             ) : (
@@ -581,13 +592,15 @@ export default function LpTradingPage() {
                   <div className="w-[100px] text-center flex-shrink-0">Start</div>
                   <div className="w-[100px] text-center flex-shrink-0">End</div>
                   <div className="w-[100px] text-center flex-shrink-0">DeFi</div>
-                  <div className="flex-1 text-center">Status</div>
+                  <div className="w-[100px] text-center flex-shrink-0">Status</div>
+                  <div className="w-[80px] flex-shrink-0"></div>
                 </div>
                 
                 {/* List Items */}
                 <div className="divide-y divide-border-secondary">
                   {holdings.filter(h => h.shares > 0).map((holding, index) => {
                     const policyVersionHint = (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined;
+                    const isDaoHolding = (holding as any)._isDaoHolding === true;
                     const policy = getPolicyForHolding(holding.policyId, holding.shares, selectedAccount?.address, policyVersionHint);
                     const market = policy ? getMarketById(policy.marketId) : null;
                     const daysRemaining = policy ? getDaysRemaining(policy.coverageEnd) : 0;
@@ -643,6 +656,11 @@ export default function LpTradingPage() {
                                 )}>
                                   {policy?.policyVersion || 'V1'}
                                 </span>
+                                {isDaoHolding && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-prmx-purple/20 text-prmx-purple-light">
+                                    DAO
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-1 mt-0.5">
                                 <MapPin className="w-3 h-3 text-text-tertiary flex-shrink-0" />
@@ -695,7 +713,7 @@ export default function LpTradingPage() {
                           </div>
                           
                           {/* Status */}
-                          <div className="flex-1 flex items-center justify-center gap-2">
+                          <div className="w-[100px] flex-shrink-0 text-center">
                             <span className={cn(
                               "px-2.5 py-1 rounded-full text-xs font-medium",
                               isEnded 
@@ -706,7 +724,12 @@ export default function LpTradingPage() {
                             )}>
                               {isEnded ? 'Ended' : `${daysRemaining}d left`}
                             </span>
-                            <ChevronRight className="w-4 h-4 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-0.5 transition-all" />
+                          </div>
+                          
+                          {/* Action */}
+                          <div className="w-[80px] flex-shrink-0 flex items-center justify-end gap-1 text-text-tertiary group-hover:text-prmx-cyan transition-colors">
+                            <span className="text-xs font-medium">Details</span>
+                            <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-all" />
                           </div>
                         </div>
                         
@@ -928,6 +951,9 @@ export default function LpTradingPage() {
                 <div className="divide-y divide-border-secondary">
                   {filteredOrders.map((order) => {
                     const isOwner = isSameAddress(order.seller, selectedAccount?.address);
+                    const isDaoOrder = api.isDaoCapitalAccount(order.seller);
+                    const isDaoAdmin = selectedAccount?.role === 'DAO Admin';
+                    const canCancel = isOwner || (isDaoOrder && isDaoAdmin);
                     const total = order.remaining * order.priceUsdt;
                     const policy = getPolicyById(order.policyId);
                     const market = policy ? getMarketById(policy.marketId) : null;
@@ -949,7 +975,8 @@ export default function LpTradingPage() {
                         }}
                         className={cn(
                           "group py-3 px-4 hover:bg-background-tertiary/30 transition-colors cursor-pointer",
-                          isOwner && "bg-prmx-cyan/5"
+                          isOwner && "bg-prmx-cyan/5",
+                          isDaoOrder && isDaoAdmin && !isOwner && "bg-prmx-purple/5"
                         )}>
                         {/* Main Row - Compact layout */}
                         <div className="flex items-center gap-3">
@@ -977,6 +1004,11 @@ export default function LpTradingPage() {
                                   Yours
                                 </span>
                               )}
+                              {isDaoOrder && !isOwner && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-prmx-purple/10 text-prmx-purple uppercase">
+                                  DAO
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 mt-0.5 text-xs text-text-tertiary">
                               <span className="flex items-center gap-1">
@@ -998,7 +1030,7 @@ export default function LpTradingPage() {
                             <p className="text-xs text-text-tertiary">
                               {market && potentialReturn > 0 ? (
                                 <span className={cn("font-medium", potentialReturn >= 50 ? "text-emerald-500" : "text-prmx-cyan")}>
-                                  +{potentialReturn.toFixed(0)}% return
+                                  +{potentialReturn.toFixed(1)}% return
                                 </span>
                               ) : (
                                 <span>per share</span>
@@ -1008,11 +1040,11 @@ export default function LpTradingPage() {
                           
                           {/* Action */}
                           <div className="flex-shrink-0 ml-2">
-                            {isOwner ? (
+                            {canCancel ? (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleCancelOrder(order.orderId);
+                                  handleCancelOrder(order.orderId, order.seller);
                                 }}
                                 disabled={cancellingOrderId !== null}
                                 className="text-xs font-medium text-rose-500 hover:text-rose-600 disabled:opacity-50"
@@ -1495,7 +1527,7 @@ export default function LpTradingPage() {
                   <TrendingUp className="w-4 h-4 text-emerald-500" />
                   <span className="text-sm text-text-secondary">If no event</span>
                 </div>
-                <span className="text-sm font-bold text-emerald-500">+{potentialReturn.toFixed(0)}% return</span>
+                <span className="text-sm font-bold text-emerald-500">+{potentialReturn.toFixed(1)}% return</span>
               </div>
             )}
 
@@ -1558,6 +1590,7 @@ export default function LpTradingPage() {
         {selectedHoldingPolicyId !== null && (() => {
           const holding = holdings.find(h => h.policyId === selectedHoldingPolicyId);
           const policyVersionHint = holding ? (holding as any)._policyVersion as 'V1V2' | 'V3' | undefined : undefined;
+          const isDaoHolding = holding ? (holding as any)._isDaoHolding === true : false;
           const policy = holding 
             ? getPolicyForHolding(selectedHoldingPolicyId, holding.shares, selectedAccount?.address, policyVersionHint)
             : getPolicyById(selectedHoldingPolicyId);
@@ -1603,6 +1636,11 @@ export default function LpTradingPage() {
                   )}>
                     {policy?.policyVersion || 'V1'}
                   </span>
+                  {isDaoHolding && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded uppercase bg-prmx-purple/20 text-prmx-purple-light">
+                      DAO
+                    </span>
+                  )}
                   <span className={cn(
                     "text-[10px] font-bold px-1.5 py-0.5 rounded uppercase",
                     isEnded ? "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300"
@@ -1620,7 +1658,7 @@ export default function LpTradingPage() {
             {/* Key Stats - Side by side */}
             <div className="flex gap-3">
               <div className="flex-1 p-3 rounded-lg bg-background-tertiary/30">
-                <p className="text-xs text-text-tertiary mb-1">Your Shares</p>
+                <p className="text-xs text-text-tertiary mb-1">{isDaoHolding ? 'DAO Shares' : 'Your Shares'}</p>
                 <p className="text-2xl font-bold text-text-primary">{holding.shares.toString()}</p>
                 <p className="text-[10px] text-text-tertiary">{ownershipPercent.toFixed(1)}% of pool</p>
               </div>
@@ -1639,7 +1677,12 @@ export default function LpTradingPage() {
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
                 <span className="text-sm text-text-secondary">Strike</span>
-                <span className="text-sm font-medium">{market?.strikeValue || 50} mm</span>
+                <span className="text-sm font-medium">
+                  {(policy as any)?.eventSpec 
+                    ? formatThresholdValue((policy as any).eventSpec.threshold.value, (policy as any).eventSpec.threshold.unit)
+                    : `${market?.strikeValue || 50} mm`
+                  }
+                </span>
               </div>
               <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/20">
                 <span className="text-sm text-text-secondary">Total Pool</span>
@@ -1689,7 +1732,7 @@ export default function LpTradingPage() {
                       <button
                         onClick={() => {
                           setShowHoldingModal(false);
-                          handleCancelOrder(order.orderId);
+                          handleCancelOrder(order.orderId, order.seller);
                         }}
                         className="text-xs text-rose-500 hover:text-rose-600 font-medium"
                       >
@@ -1724,9 +1767,11 @@ export default function LpTradingPage() {
               <AlertTriangle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0 mt-0.5" />
               <p className="text-[11px] text-text-tertiary">
                 <span className="text-rose-500 font-medium">Risk:</span>{' '}
-                {policy?.policyVersion === 'V2' 
-                  ? `Cumulative rainfall > ${market?.strikeValue || 50}mm triggers payout.`
-                  : `24h rainfall > ${market?.strikeValue || 50}mm triggers payout.`
+                {policy?.policyVersion === 'V3' && (policy as any)?.eventSpec
+                  ? `${(policy as any).eventSpec.eventType.replace(/([A-Z])/g, ' $1').trim()} > ${formatThresholdValue((policy as any).eventSpec.threshold.value, (policy as any).eventSpec.threshold.unit)} triggers payout.`
+                  : policy?.policyVersion === 'V2' 
+                    ? `Cumulative rainfall > ${market?.strikeValue || 50}mm triggers payout.`
+                    : `24h rainfall > ${market?.strikeValue || 50}mm triggers payout.`
                 }
               </p>
             </div>
@@ -2154,6 +2199,9 @@ export default function LpTradingPage() {
           const payoutPerShare = isV3 ? BigInt(100_000_000) : (market?.payoutPerShare || BigInt(100_000_000));
           const potentialReturn = calculatePotentialReturn(order.priceUsdt, payoutPerShare);
           const isOwner = isSameAddress(order.seller, selectedAccount?.address);
+          const isDaoOrder = api.isDaoCapitalAccount(order.seller);
+          const isDaoAdmin = selectedAccount?.role === 'DAO Admin';
+          const canCancel = isOwner || (isDaoOrder && isDaoAdmin);
           const totalValue = order.remaining * order.priceUsdt;
           const sellerInfo = api.getAccountByAddress(order.seller);
           
@@ -2190,6 +2238,11 @@ export default function LpTradingPage() {
                     {isOwner && (
                       <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 uppercase">
                         Your Order
+                      </span>
+                    )}
+                    {isDaoOrder && !isOwner && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-prmx-purple/10 text-prmx-purple uppercase">
+                        DAO Order
                       </span>
                     )}
                   </div>
@@ -2279,17 +2332,17 @@ export default function LpTradingPage() {
 
               {/* Actions */}
               <div className="flex gap-3">
-                {isOwner ? (
+                {canCancel ? (
                   <Button
                     variant="danger"
                     onClick={() => {
                       setShowOrderDetailModal(false);
-                      handleCancelOrder(order.orderId);
+                      handleCancelOrder(order.orderId, order.seller);
                     }}
                     loading={cancellingOrderId === order.orderId}
                     className="flex-1"
                   >
-                    Cancel Order
+                    {isDaoOrder && !isOwner ? 'Cancel DAO Order' : 'Cancel Order'}
                   </Button>
                 ) : (
                   <Button

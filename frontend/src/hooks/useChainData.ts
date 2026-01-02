@@ -295,6 +295,7 @@ export function useLpOrders() {
 
 /**
  * Hook to fetch LP holdings for current user
+ * If user is DAO Admin, also includes DAO Treasury holdings
  */
 export function useMyLpHoldings() {
   const { isChainConnected, selectedAccount } = useWalletStore();
@@ -311,8 +312,34 @@ export function useMyLpHoldings() {
     setError(null);
     
     try {
-      const data = await api.getLpHoldings(selectedAccount.address);
-      setHoldings(data);
+      // Fetch user's own holdings
+      const userHoldings = await api.getLpHoldings(selectedAccount.address);
+      
+      // If user is DAO Admin, also fetch DAO Treasury holdings
+      const isDaoAdmin = selectedAccount.role === 'DAO Admin';
+      if (isDaoAdmin) {
+        const daoAddress = api.TEST_ACCOUNTS.daoCapital.address;
+        const daoHoldings = await api.getLpHoldings(daoAddress);
+        
+        // Mark DAO holdings with a flag and merge
+        const markedDaoHoldings = daoHoldings.map(h => ({
+          ...h,
+          _isDaoHolding: true,
+        }));
+        
+        // Merge holdings, avoiding duplicates (same policyId)
+        const allHoldings = [...userHoldings];
+        for (const daoHolding of markedDaoHoldings) {
+          const existing = allHoldings.find(h => h.policyId === daoHolding.policyId);
+          if (!existing) {
+            allHoldings.push(daoHolding);
+          }
+        }
+        
+        setHoldings(allHoldings);
+      } else {
+        setHoldings(userHoldings);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch LP holdings');
     } finally {

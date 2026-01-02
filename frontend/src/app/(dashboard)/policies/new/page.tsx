@@ -60,9 +60,9 @@ export default function NewPolicyPage() {
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [quoteRequestId, setQuoteRequestId] = useState<number | null>(null);
+  const [quoteRequestId, setQuoteRequestId] = useState<string | null>(null);
   const [currentQuote, setCurrentQuote] = useState<QuoteRequest | null>(null);
-  const [policyId, setPolicyId] = useState<number | null>(null);
+  const [policyId, setPolicyId] = useState<string | null>(null);
   const [showWalletModal, setShowWalletModal] = useState(false);
   
   // Form state
@@ -177,7 +177,7 @@ export default function NewPolicyPage() {
 
     setIsSubmitting(true);
     try {
-      let requestId: number;
+      let requestId: string;
       
       if (policyVersion === 'V2' && isV2Available) {
         // V2 quote request for Manila with cumulative rainfall
@@ -203,7 +203,7 @@ export default function NewPolicyPage() {
         });
       }
       
-      if (requestId < 0) {
+      if (!requestId) {
         throw new Error('Failed to get quote ID from chain event');
       }
       
@@ -840,7 +840,7 @@ export default function NewPolicyPage() {
             <h2 className="text-2xl font-bold mb-2">Coverage Applied!</h2>
             <p className="text-text-secondary mb-6 max-w-md mx-auto">
               Your insurance policy has been created successfully. 
-              Policy ID: <span className="text-prmx-cyan">#{policyId}</span>
+              Policy ID: <span className="text-prmx-cyan font-mono">{policyId ? `${policyId.slice(0, 10)}...${policyId.slice(-6)}` : ''}</span>
             </p>
             <div className="flex gap-3 justify-center">
               <Link href="/policies">

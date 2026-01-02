@@ -22,10 +22,13 @@ const roleIcons: Record<string, typeof User> = {
 
 const roleColors: Record<string, string> = {
   'DAO Admin': 'bg-prmx-purple/20 text-prmx-purple-light border-prmx-purple/30',
+  'DAO Treasury': 'bg-prmx-purple/20 text-prmx-purple-light border-prmx-purple/30',
   'Customer': 'bg-prmx-cyan/20 text-prmx-cyan border-prmx-cyan/30',
   'LP 1': 'bg-success/20 text-success border-success/30',
   'LP 2': 'bg-warning/20 text-warning border-warning/30',
 };
+
+const defaultRoleColor = 'bg-gray-500/20 text-gray-400 border-gray-500/30';
 
 export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModalProps) {
   const { connectDevMode, connectPolkadotJs, isConnecting } = useWalletStore();
@@ -179,7 +182,9 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
                   </button>
                   
                   <div className="space-y-2 mt-2">
-                    {(Object.keys(TEST_ACCOUNTS) as AccountKey[]).map((key) => {
+                    {(Object.keys(TEST_ACCOUNTS) as AccountKey[])
+                      .filter((key) => TEST_ACCOUNTS[key].seed) // Only show accounts with seeds (can sign transactions)
+                      .map((key) => {
                       const account = TEST_ACCOUNTS[key];
                       const Icon = roleIcons[account.role];
                       
@@ -192,7 +197,7 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
                         >
                           <div className={cn(
                             'w-10 h-10 rounded-lg flex items-center justify-center',
-                            roleColors[account.role].split(' ')[0]
+                            (roleColors[account.role] || defaultRoleColor).split(' ')[0]
                           )}>
                             <Icon className="w-5 h-5" />
                           </div>
@@ -201,7 +206,7 @@ export function WalletConnectionModal({ isOpen, onClose }: WalletConnectionModal
                               <span className="font-medium">{account.name}</span>
                               <span className={cn(
                                 'text-xs px-1.5 py-0.5 rounded border',
-                                roleColors[account.role]
+                                roleColors[account.role] || defaultRoleColor
                               )}>
                                 {account.role}
                               </span>

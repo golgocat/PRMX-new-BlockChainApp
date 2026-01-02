@@ -69,7 +69,17 @@ export async function checkV1OracleKey(): Promise<{
   try {
     const api = await getApi();
     
-    // Check AccuWeather API key evidence
+    // First, try to check offchain storage directly for the API key
+    let offchainKeyExists = false;
+    try {
+      const storageKey = '0x' + Buffer.from('prmx-oracle::accuweather_api_key').toString('hex');
+      const offchainValue = await (api.rpc as any).offchain.localStorageGet('PERSISTENT', storageKey);
+      offchainKeyExists = offchainValue && offchainValue.isSome;
+    } catch {
+      // Offchain RPC might not be available in all environments
+    }
+    
+    // Also check AccuWeather API key evidence from on-chain data
     const markets = await api.query.prmxMarkets.markets.entries();
     let hasLocationConfig = false;
     let hasRollingState = false;
@@ -96,7 +106,8 @@ export async function checkV1OracleKey(): Promise<{
       }
     }
     
-    const accuweatherConfigured = hasLocationConfig || hasRollingState;
+    // AccuWeather is configured if key exists in offchain storage OR there's on-chain evidence
+    const accuweatherConfigured = offchainKeyExists || hasLocationConfig || hasRollingState;
     
     // Check R Pricing API key evidence and detect fallback usage
     let rPricingConfigured = false;

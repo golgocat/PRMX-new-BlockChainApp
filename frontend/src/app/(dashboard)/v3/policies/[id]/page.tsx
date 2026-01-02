@@ -965,6 +965,8 @@ export default function V3PolicyDetailPage() {
                 <div className="space-y-2">
                   {lpHolders.map((holder, idx) => {
                     const isMe = holder.holder === selectedAccount?.address;
+                    const accountInfo = api.getAccountByAddress(holder.holder);
+                    const isDao = accountInfo?.role?.includes('DAO');
                     
                     return (
                       <div 
@@ -990,7 +992,7 @@ export default function V3PolicyDetailPage() {
                               title="Click to copy address"
                             >
                               <code className="text-sm font-medium text-text-primary group-hover/copy:text-prmx-cyan transition-colors">
-                                {formatAddress(holder.holder)}
+                                {accountInfo?.name || formatAddress(holder.holder)}
                               </code>
                               {copiedAddress === holder.holder ? (
                                 <Check className="w-3.5 h-3.5 text-success" />
@@ -998,6 +1000,11 @@ export default function V3PolicyDetailPage() {
                                 <Copy className="w-3.5 h-3.5 text-text-tertiary opacity-0 group-hover:opacity-100 group-hover/copy:text-prmx-cyan transition-all" />
                               )}
                             </button>
+                            {isDao && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-prmx-purple/20 text-prmx-purple">
+                                DAO
+                              </span>
+                            )}
                             {isMe && (
                               <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-prmx-cyan/20 text-prmx-cyan">
                                 You

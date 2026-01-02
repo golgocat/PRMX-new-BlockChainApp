@@ -210,6 +210,8 @@ pub mod pallet {
         OrderNotFound,
         /// Not the order owner.
         NotOrderOwner,
+        /// Not a DAO order (order does not belong to DAO Capital account).
+        NotDaoOrder,
         /// Insufficient LP balance.
         InsufficientLpBalance,
         /// Insufficient USDT balance.
@@ -281,6 +283,53 @@ pub mod pallet {
 
             // Remove from user orders
             UserOrders::<T>::mutate(&who, order.policy_id, |orders| {
+                orders.retain(|&id| id != order_id);
+            });
+
+            // Remove order
+            Orders::<T>::remove(order_id);
+
+            Self::deposit_event(Event::AskCancelled {
+                order_id,
+                remaining: order.remaining,
+            });
+
+            Ok(())
+        }
+
+        /// Cancel an ask order as DAO admin.
+        /// 
+        /// This allows the DAO admin (with Root/Sudo privileges) to cancel orders
+        /// that belong to the DAO Capital account. This is necessary because the
+        /// DAO Capital account is a treasury account without a regular keypair.
+        /// 
+        /// - `order_id`: The order to cancel.
+        #[pallet::call_index(3)]
+        #[pallet::weight(30_000)]
+        pub fn cancel_lp_ask_as_dao(
+            origin: OriginFor<T>,
+            order_id: OrderId,
+        ) -> DispatchResult {
+            // Require root (sudo) origin for DAO operations
+            ensure_root(origin)?;
+
+            // Load order
+            let order = Orders::<T>::get(order_id)
+                .ok_or(Error::<T>::OrderNotFound)?;
+
+            // Verify this is a DAO Capital account order
+            let dao_account = T::DaoAccountId::get();
+            ensure!(order.seller == dao_account, Error::<T>::NotDaoOrder);
+
+            // Unlock LP tokens (policy-specific) for the DAO account
+            T::HoldingsApi::unlock_lp_tokens(order.policy_id, &dao_account, order.remaining)
+                .map_err(|_| Error::<T>::TransferFailed)?;
+
+            // Remove from ask book
+            Self::remove_from_ask_book(order.policy_id, order.price, order_id)?;
+
+            // Remove from user orders
+            UserOrders::<T>::mutate(&dao_account, order.policy_id, |orders| {
                 orders.retain(|&id| id != order_id);
             });
 

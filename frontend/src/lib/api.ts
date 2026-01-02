@@ -50,6 +50,14 @@ export const TEST_ACCOUNTS = {
     usdtBalance: BigInt('1000000000000'), // 1M USDT
     description: 'Liquidity provider 2',
   },
+  daoCapital: {
+    name: 'DAO Capital',
+    role: 'DAO Treasury',
+    address: '5EyKeA48QNY6LbD2QeN2JUuArTiyBTDN2BBYoLLCwz9rXdZS',
+    seed: '', // DAO Capital account - no seed available
+    usdtBalance: BigInt('100000000000000'), // 100M USDT (DAO reserves)
+    description: 'DAO capital pool that automatically underwrites policies',
+  },
 } as const;
 
 export type AccountKey = keyof typeof TEST_ACCOUNTS;
@@ -72,11 +80,29 @@ let keyring: Keyring | null = null;
 let connectionPromise: Promise<ApiPromise> | null = null;
 
 /**
+ * Disconnect and clear the API connection (useful when chain restarts)
+ */
+export async function disconnectApi(): Promise<void> {
+  if (apiInstance) {
+    await apiInstance.disconnect();
+    apiInstance = null;
+    connectionPromise = null;
+    console.log('Disconnected from PRMX chain');
+  }
+}
+
+/**
  * Initialize and return the API connection
  */
 export async function getApi(): Promise<ApiPromise> {
   if (apiInstance?.isConnected) {
     return apiInstance;
+  }
+  
+  // Clear stale connection if it exists but is disconnected
+  if (apiInstance && !apiInstance.isConnected) {
+    apiInstance = null;
+    connectionPromise = null;
   }
 
   if (connectionPromise) {
@@ -445,7 +471,16 @@ export async function requestQuote(
 ): Promise<string> {
   const api = await getApi();
   
+  // Get the requester address for fallback lookup
+  const requesterAddress = signer.address;
+  
+  // Get existing quote IDs before submitting (for fallback detection)
+  const existingQuotes = await api.query.prmxQuote.quoteRequests.entries();
+  const existingQuoteIds = new Set(existingQuotes.map(([key]) => (key.args[0] as any).toHex()));
+  console.log('V1 Quote: existing quote count:', existingQuoteIds.size);
+  
   return new Promise((resolve, reject) => {
+    console.log('V1 Quote request: submitting transaction...');
     api.tx.prmxQuote.requestPolicyQuote(
       params.marketId,
       params.coverageStart,
@@ -453,8 +488,11 @@ export async function requestQuote(
       params.latitude,
       params.longitude,
       params.shares
-    ).signAndSend(signer, ({ status, events, dispatchError }) => {
+    ).signAndSend(signer, async ({ status, events, dispatchError }) => {
+      console.log('V1 Quote status update:', status.type);
+      
       if (dispatchError) {
+        console.error('V1 Quote dispatch error:', dispatchError.toString());
         if (dispatchError.isModule) {
           const decoded = api.registry.findMetaError(dispatchError.asModule);
           reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
@@ -463,18 +501,46 @@ export async function requestQuote(
         }
         return;
       }
-      if (status.isFinalized) {
+      
+      // Check for InBlock status (faster than Finalized)
+      if (status.isInBlock) {
+        console.log('V1 Quote request in block:', status.asInBlock.toHex());
+        console.log('V1 Events:', events.map(({ event }) => `${event.section}.${event.method}`));
+        
         const quoteEvent = events.find(({ event }) => 
-          event.method === 'QuoteRequested'
+          event.section === 'prmxQuote' && event.method === 'QuoteRequested'
         );
         if (quoteEvent) {
           // H128 quote IDs are hex strings
           const data = quoteEvent.event.data;
+          console.log('V1 QuoteRequested event data:', data.toJSON());
           const quoteId = (data[0] as any).toHex ? (data[0] as any).toHex() : data[0].toString();
+          console.log('V1 Quote ID extracted:', quoteId);
           resolve(quoteId);
         } else {
-          console.warn('QuoteRequested event not found');
-          resolve('');
+          // Fallback: Events array is empty (metadata mismatch issue)
+          // Query the chain to find the new quote
+          console.warn('V1 Events empty - using fallback quote detection...');
+          try {
+            const newQuotes = await api.query.prmxQuote.quoteRequests.entries();
+            for (const [key, value] of newQuotes) {
+              const quoteId = (key.args[0] as any).toHex();
+              if (!existingQuoteIds.has(quoteId)) {
+                const data = (value as any).toJSON();
+                // Verify it's our quote by checking requester
+                if (data.requester === requesterAddress) {
+                  console.log('V1 Quote ID found via fallback:', quoteId);
+                  resolve(quoteId);
+                  return;
+                }
+              }
+            }
+            console.warn('No new quote found for requester');
+            resolve('');
+          } catch (fallbackError) {
+            console.error('Fallback quote detection failed:', fallbackError);
+            resolve('');
+          }
         }
       }
     });
@@ -514,7 +580,16 @@ export async function requestQuoteV2(
   // Scale strike to match on-chain storage (mm * 10)
   const scaledStrike = params.strikeMm * 10;
   
+  // Get the requester address for fallback lookup
+  const requesterAddress = signer.address;
+  
+  // Get existing quote IDs before submitting (for fallback detection)
+  const existingQuotes = await api.query.prmxQuote.quoteRequests.entries();
+  const existingQuoteIds = new Set(existingQuotes.map(([key]) => (key.args[0] as any).toHex()));
+  console.log('V2 Quote: existing quote count:', existingQuoteIds.size);
+  
   return new Promise((resolve, reject) => {
+    console.log('V2 Quote request: submitting transaction...');
     api.tx.prmxQuote.requestPolicyQuoteV2(
       params.marketId,
       params.coverageStart,
@@ -524,8 +599,11 @@ export async function requestQuoteV2(
       params.shares,
       params.durationDays,
       scaledStrike
-    ).signAndSend(signer, ({ status, events, dispatchError }) => {
+    ).signAndSend(signer, async ({ status, events, dispatchError }) => {
+      console.log('V2 Quote status update:', status.type);
+      
       if (dispatchError) {
+        console.error('V2 Quote dispatch error:', dispatchError.toString());
         if (dispatchError.isModule) {
           const decoded = api.registry.findMetaError(dispatchError.asModule);
           reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
@@ -534,18 +612,46 @@ export async function requestQuoteV2(
         }
         return;
       }
-      if (status.isFinalized) {
+      
+      // Check for InBlock status (faster than Finalized)
+      if (status.isInBlock) {
+        console.log('V2 Quote request in block:', status.asInBlock.toHex());
+        console.log('V2 Events:', events.map(({ event }) => `${event.section}.${event.method}`));
+        
         const quoteEvent = events.find(({ event }) => 
-          event.method === 'QuoteRequested'
+          event.section === 'prmxQuote' && event.method === 'QuoteRequested'
         );
         if (quoteEvent) {
           // H128 quote IDs are hex strings
           const data = quoteEvent.event.data;
+          console.log('V2 QuoteRequested event data:', data.toJSON());
           const quoteId = (data[0] as any).toHex ? (data[0] as any).toHex() : data[0].toString();
+          console.log('V2 Quote ID extracted:', quoteId);
           resolve(quoteId);
         } else {
-          console.warn('QuoteRequested event not found');
-          resolve('');
+          // Fallback: Events array is empty (metadata mismatch issue)
+          // Query the chain to find the new quote
+          console.warn('V2 Events empty - using fallback quote detection...');
+          try {
+            const newQuotes = await api.query.prmxQuote.quoteRequests.entries();
+            for (const [key, value] of newQuotes) {
+              const quoteId = (key.args[0] as any).toHex();
+              if (!existingQuoteIds.has(quoteId)) {
+                const data = (value as any).toJSON();
+                // Verify it's our quote by checking requester
+                if (data.requester === requesterAddress) {
+                  console.log('V2 Quote ID found via fallback:', quoteId);
+                  resolve(quoteId);
+                  return;
+                }
+              }
+            }
+            console.warn('No new quote found for requester');
+            resolve('');
+          } catch (fallbackError) {
+            console.error('Fallback quote detection failed:', fallbackError);
+            resolve('');
+          }
         }
       }
     });
@@ -559,7 +665,7 @@ export async function requestQuoteV2(
  */
 export async function submitQuote(
   signer: KeyringPair,
-  quoteId: number,
+  quoteId: string,  // H128 hex string
   probabilityPpm: number = 100000 // Default 10% probability
 ): Promise<string> {
   const api = await getApi();
@@ -1028,6 +1134,87 @@ export async function cancelLpAsk(
         reject(err);
       });
   });
+}
+
+/**
+ * Cancel an LP ask order as DAO admin (for orders created by DAO Capital account)
+ * Requires the signer to be a sudo/root account (Alice in dev mode)
+ */
+export async function cancelLpAskAsDao(
+  signer: KeyringPair,
+  orderId: string
+): Promise<string> {
+  const api = await getApi();
+  
+  return new Promise((resolve, reject) => {
+    let unsub: () => void;
+    
+    // Wrap the cancel call in sudo
+    const cancelCall = api.tx.prmxOrderbookLp.cancelLpAskAsDao(orderId);
+    
+    api.tx.sudo.sudo(cancelCall)
+      .signAndSend(signer, ({ status, dispatchError, events }) => {
+        if (dispatchError) {
+          if (dispatchError.isModule) {
+            const decoded = api.registry.findMetaError(dispatchError.asModule);
+            reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+          } else {
+            reject(new Error(dispatchError.toString()));
+          }
+          unsub?.();
+          return;
+        }
+        
+        // Check for Sudid event to see if the inner call succeeded
+        if (events) {
+          const sudidEvent = events.find(({ event }) => 
+            event.section === 'sudo' && event.method === 'Sudid'
+          );
+          if (sudidEvent) {
+            const result = sudidEvent.event.data[0];
+            if (result && (result as any).isErr) {
+              const error = (result as any).asErr;
+              if (error.isModule) {
+                const decoded = api.registry.findMetaError(error.asModule);
+                reject(new Error(`${decoded.section}.${decoded.name}: ${decoded.docs.join(' ')}`));
+              } else {
+                reject(new Error('DAO cancel failed: ' + error.toString()));
+              }
+              unsub?.();
+              return;
+            }
+          }
+          
+          const failedEvent = events.find(({ event }) => 
+            event.section === 'system' && event.method === 'ExtrinsicFailed'
+          );
+          if (failedEvent) {
+            reject(new Error('Transaction failed on-chain'));
+            unsub?.();
+            return;
+          }
+        }
+        
+        // Resolve on InBlock for faster response
+        if (status.isInBlock) {
+          resolve(status.asInBlock.toHex());
+          unsub?.();
+        }
+      })
+      .then(unsubFn => {
+        unsub = unsubFn;
+      })
+      .catch(err => {
+        reject(err);
+      });
+  });
+}
+
+/**
+ * Check if an address is the DAO Capital account
+ */
+export function isDaoCapitalAccount(address: string): boolean {
+  return address === TEST_ACCOUNTS.daoCapital.address;
 }
 
 // ============================================================================

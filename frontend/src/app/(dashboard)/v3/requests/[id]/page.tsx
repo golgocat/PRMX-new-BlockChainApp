@@ -879,11 +879,11 @@ export default function V3RequestDetailPage() {
                           </li>
                           <li className="flex items-center gap-1.5">
                             <div className="w-1 h-1 rounded-full bg-emerald-500" />
-                            Premium: {formatUSDT(premiumToEarn, false)} upfront
+                            Premium: {formatUSDT(premiumToEarn, false)} (locked until settlement)
                           </li>
                           <li className="flex items-center gap-1.5">
                             <div className="w-1 h-1 rounded-full bg-text-tertiary" />
-                            No event: keep collateral + premium
+                            No event: receive collateral + premium
                           </li>
                         </ul>
                       </div>

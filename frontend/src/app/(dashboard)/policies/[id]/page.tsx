@@ -638,13 +638,18 @@ export default function PolicyDetailPage() {
                               )}>
                                 {idx + 1}
                               </span>
-                              <div>
+                              <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium">
                                   {accountInfo?.name || formatAddress(holding.holder)}
                                 </span>
+                                {accountInfo?.role?.includes('DAO') && (
+                                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-prmx-purple/20 text-prmx-purple">
+                                    DAO
+                                  </span>
+                                )}
                                 {Number(holding.lockedShares) > 0 && (
-                                  <span className="ml-2 text-[10px] text-amber-500">
-                                    <Lock className="w-2.5 h-2.5 inline" /> {Number(holding.lockedShares)}
+                                  <span className="text-[10px] text-amber-500 flex items-center gap-0.5">
+                                    <Lock className="w-2.5 h-2.5" /> {Number(holding.lockedShares)}
                                   </span>
                                 )}
                               </div>
@@ -805,9 +810,9 @@ export default function PolicyDetailPage() {
                 {/* Header */}
                 <div className="px-5 py-4 border-b border-border-primary/50">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
-                        <Activity className="w-4 h-4 text-prmx-purple" />
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg bg-prmx-purple/10 flex items-center justify-center">
+                        <Activity className="w-4.5 h-4.5 text-prmx-purple" />
                       </div>
                       <h2 className="text-base font-semibold">V2 Oracle</h2>
                     </div>
@@ -822,7 +827,7 @@ export default function PolicyDetailPage() {
                       
                       return (
                         <span className={cn(
-                          "text-xs font-medium px-2 py-1 rounded-full",
+                          "text-xs font-medium px-2.5 py-1 rounded-full",
                           displayStatus === 'Monitoring' ? "bg-prmx-cyan/10 text-prmx-cyan" :
                           displayStatus === 'Triggered' ? "bg-amber-500/10 text-amber-500" :
                           displayStatus === 'Reported' || displayStatus === 'Settled' ? "bg-emerald-500/10 text-emerald-500" :
@@ -835,82 +840,84 @@ export default function PolicyDetailPage() {
                   </div>
                 </div>
                 
-                <div className="px-5 py-4 space-y-4">
-                  {/* Event Type & Early Trigger */}
-                  <div className="flex gap-4">
-                    <div className="flex-1">
-                      <p className="text-xs text-text-tertiary mb-0.5">Event Type</p>
-                      <p className="text-sm font-medium">
-                        {policy.eventType === 'CumulativeRainfallWindow' 
-                          ? 'Cumulative' 
-                          : '24h Rolling'}
-                      </p>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs text-text-tertiary mb-0.5">Early Trigger</p>
-                      <p className="text-sm font-medium">
-                        {policy.earlyTrigger ? (
-                          <span className="text-emerald-500 flex items-center gap-1">
-                            <Zap className="w-3 h-3" /> On
-                          </span>
-                        ) : 'Off'}
-                      </p>
-                    </div>
-                    {policy.strikeMm && (
-                      <div className="flex-1">
-                        <p className="text-xs text-text-tertiary mb-0.5">Strike</p>
-                        <p className="text-sm font-semibold text-prmx-cyan">{policy.strikeMm / 10} mm</p>
-                      </div>
-                    )}
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 divide-x divide-border-primary/30">
+                  <div className="px-5 py-4 text-center">
+                    <p className="text-[11px] uppercase tracking-wide text-text-tertiary mb-1">Event Type</p>
+                    <p className="text-sm font-semibold">
+                      {policy.eventType === 'CumulativeRainfallWindow' 
+                        ? 'Cumulative' 
+                        : '24h Rolling'}
+                    </p>
                   </div>
+                  <div className="px-5 py-4 text-center">
+                    <p className="text-[11px] uppercase tracking-wide text-text-tertiary mb-1">Early Trigger</p>
+                    <p className="text-sm font-semibold">
+                      {policy.earlyTrigger ? (
+                        <span className="text-emerald-500 inline-flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5" /> On
+                        </span>
+                      ) : (
+                        <span className="text-text-secondary">Off</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="px-5 py-4 text-center">
+                    <p className="text-[11px] uppercase tracking-wide text-text-tertiary mb-1">Strike</p>
+                    <p className="text-sm font-bold text-prmx-cyan">
+                      {policy.strikeMm ? `${policy.strikeMm / 10} mm` : `${policy.strikeValue} mm`}
+                    </p>
+                  </div>
+                </div>
 
-                  {/* Live Monitor Data */}
-                  {v2Monitor && (
-                    <div className="pt-3 border-t border-border-primary/30 space-y-3">
-                      {/* Progress bar */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-xs text-text-tertiary">Progress</span>
-                          <span className="text-xs font-medium">
-                            {(v2Monitor.cumulative_mm / 10).toFixed(1)} / {(v2Monitor.strike_mm / 10).toFixed(1)} mm
-                          </span>
-                        </div>
-                        <div className="h-1.5 bg-background-tertiary rounded-full overflow-hidden">
-                          <div 
-                            className={cn(
-                              "h-full rounded-full transition-all",
-                              v2Monitor.cumulative_mm >= v2Monitor.strike_mm 
-                                ? 'bg-emerald-500' 
-                                : 'bg-prmx-cyan'
-                            )}
-                            style={{ 
-                              width: `${Math.min(100, (v2Monitor.cumulative_mm / v2Monitor.strike_mm) * 100)}%` 
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* State and Last Fetch */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            v2Monitor.state === 'monitoring' ? "bg-prmx-cyan animate-pulse" :
-                            v2Monitor.state === 'triggered' ? "bg-amber-500" :
-                            "bg-text-tertiary"
-                          )} />
-                          <span className="text-xs text-text-secondary capitalize">{v2Monitor.state}</span>
-                        </div>
-                        <span className="text-xs text-text-tertiary">
-                          {v2Monitor.last_fetch_at > 0 
-                            ? `Updated ${new Date(v2Monitor.last_fetch_at * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
-                            : 'No data yet'}
+                {/* Live Monitor Data */}
+                {v2Monitor && (
+                  <div className="px-5 py-4 border-t border-border-primary/30 space-y-4">
+                    {/* Progress bar */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-text-tertiary">Progress</span>
+                        <span className="text-sm font-medium">
+                          {(v2Monitor.cumulative_mm / 10).toFixed(1)} / {(v2Monitor.strike_mm / 10).toFixed(1)} mm
                         </span>
                       </div>
+                      <div className="h-2 bg-background-tertiary rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            v2Monitor.cumulative_mm >= v2Monitor.strike_mm 
+                              ? 'bg-emerald-500' 
+                              : 'bg-prmx-cyan'
+                          )}
+                          style={{ 
+                            width: `${Math.min(100, (v2Monitor.cumulative_mm / v2Monitor.strike_mm) * 100)}%` 
+                          }}
+                        />
+                      </div>
                     </div>
-                  )}
 
-                  {/* Link to Oracle Service */}
+                    {/* State and Last Fetch */}
+                    <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-background-tertiary/30">
+                      <div className="flex items-center gap-2">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          v2Monitor.state === 'monitoring' ? "bg-prmx-cyan animate-pulse" :
+                          v2Monitor.state === 'triggered' ? "bg-amber-500" :
+                          "bg-text-tertiary"
+                        )} />
+                        <span className="text-sm text-text-secondary capitalize">{v2Monitor.state}</span>
+                      </div>
+                      <span className="text-xs text-text-tertiary">
+                        {v2Monitor.last_fetch_at > 0 
+                          ? `Updated ${new Date(v2Monitor.last_fetch_at * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+                          : 'No data yet'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Link to Oracle Service */}
+                <div className="px-5 py-4 border-t border-border-primary/30">
                   <Link href="/oracle-service">
                     <Button variant="secondary" size="sm" className="w-full" icon={<Activity className="w-4 h-4" />}>
                       View All Monitors

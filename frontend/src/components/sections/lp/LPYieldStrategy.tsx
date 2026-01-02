@@ -184,13 +184,6 @@ export function LPYieldStrategy() {
                   </div>
                 </div>
               </div>
-
-              {/* Floating badge */}
-              <div className="absolute -bottom-4 -right-4 px-4 py-2 rounded-full bg-cyan-100 border border-cyan-200 shadow-sm">
-                <span className="text-sm font-medium text-cyan-700 font-ui">
-                  Smart Contract Managed
-                </span>
-              </div>
             </div>
           </FadeIn>
         </div>

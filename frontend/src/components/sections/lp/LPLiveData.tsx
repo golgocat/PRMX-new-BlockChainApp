@@ -1,18 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Activity, TrendingUp, Droplets, MapPin, Clock, RefreshCw, ArrowUpRight, Timer } from 'lucide-react'
 import { FadeIn } from '@/components/ui/FadeIn'
 import * as api from '@/lib/api'
+import * as apiV3 from '@/lib/api-v3'
 import { formatUSDT } from '@/lib/utils'
-import type { Market, LpAskOrder, ThresholdTriggerLog, Policy } from '@/types'
+import type { Market, LpAskOrder, Policy } from '@/types'
+import type { V3Policy } from '@/types/v3'
+import type { ThresholdTriggerLog } from '@/lib/api'
 
 interface BestOpportunity {
   order: LpAskOrder
   market: Market | undefined
-  policy: Policy | undefined
+  policy: Policy | V3Policy | undefined
   potentialReturn: number
   timeToMaturity: string
+  policyLabel: string
+  isV3: boolean
 }
 
 function formatTimeRemaining(endTimestamp: number): string {
@@ -36,9 +42,19 @@ function formatTimeRemaining(endTimestamp: number): string {
   }
 }
 
+function formatPolicyId(policyId: string | number): string {
+  if (typeof policyId === 'string' && policyId.startsWith('0x')) {
+    // V3 hex ID - show first 8 chars
+    return policyId.slice(2, 10) + '...'
+  }
+  return String(policyId)
+}
+
 export function LPLiveData() {
+  const router = useRouter()
   const [markets, setMarkets] = useState<Market[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
+  const [v3Policies, setV3Policies] = useState<V3Policy[]>([])
   const [orders, setOrders] = useState<LpAskOrder[]>([])
   const [triggerLogs, setTriggerLogs] = useState<ThresholdTriggerLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -47,14 +63,16 @@ export function LPLiveData() {
 
   const fetchData = async () => {
     try {
-      const [marketsData, policiesData, ordersData, logsData] = await Promise.all([
+      const [marketsData, policiesData, v3PoliciesData, ordersData, logsData] = await Promise.all([
         api.getMarkets(),
         api.getPolicies(),
+        apiV3.getV3Policies(),
         api.getLpOrders(),
         api.getThresholdTriggerLogs(),
       ])
       setMarkets(marketsData)
       setPolicies(policiesData)
+      setV3Policies(v3PoliciesData)
       setOrders(ordersData)
       setTriggerLogs(logsData)
       setLastUpdate(new Date())
@@ -81,20 +99,40 @@ export function LPLiveData() {
   // Calculate best opportunities (highest potential return)
   const opportunities: BestOpportunity[] = orders
     .map(order => {
-      const policy = policies.find(p => p.id === order.policyId)
-      const market = policy ? markets.find(m => m.id === policy.marketId) : undefined
-      const payoutPerShare = 100_000_000n // $100 in smallest units
-      const potentialReturn = Number(payoutPerShare - order.priceUsdt) / Number(order.priceUsdt) * 100
+      // Check V1/V2 policies first
+      let policy: Policy | V3Policy | undefined = policies.find(p => p.id === order.policyId)
+      let isV3 = false
+      
+      // Check V3 policies if not found in V1/V2
+      if (!policy) {
+        policy = v3Policies.find(p => p.id === order.policyId)
+        isV3 = !!policy
+      }
+      
+      // Get market - V1/V2 policies have marketId, V3 policies have locationId
+      const market = policy && !isV3 ? markets.find(m => m.id === (policy as Policy).marketId) : undefined
+      const payoutPerShare = BigInt(100_000_000) // $100 in smallest units
+      const potentialReturn = Number(order.priceUsdt) > 0 
+        ? Number(payoutPerShare - order.priceUsdt) / Number(order.priceUsdt) * 100
+        : 0
       const timeToMaturity = policy ? formatTimeRemaining(policy.coverageEnd) : 'Unknown'
-      return { order, market, policy, potentialReturn, timeToMaturity }
+      
+      // Create a user-friendly label
+      let policyLabel: string
+      if (isV3 && policy) {
+        const v3Policy = policy as V3Policy
+        policyLabel = v3Policy.location?.name || formatPolicyId(order.policyId)
+      } else if (policy) {
+        policyLabel = `${market?.name || 'Policy'} #${order.policyId}`
+      } else {
+        policyLabel = formatPolicyId(order.policyId)
+      }
+      
+      return { order, market, policy, potentialReturn, timeToMaturity, policyLabel, isV3 }
     })
+    .filter(opp => opp.potentialReturn > 0) // Only show opportunities with positive returns
     .sort((a, b) => b.potentialReturn - a.potentialReturn)
     .slice(0, 4)
-
-  // Calculate trigger rate
-  const triggerRate = triggerLogs.length > 0 
-    ? (triggerLogs.length / Math.max(markets.length, 1) * 100).toFixed(1)
-    : '0'
 
   return (
     <section className="relative bg-slate-100 py-32 md:py-40 px-6 overflow-hidden">
@@ -155,20 +193,20 @@ export function LPLiveData() {
               color: 'sky',
             },
             {
-              label: 'Open Orders',
-              value: loading ? '...' : orders.length.toString(),
+              label: 'Active Policies',
+              value: loading ? '...' : (policies.filter(p => p.status === 'Active').length + v3Policies.filter(p => p.status === 'Active').length).toString(),
               icon: TrendingUp,
               color: 'cyan',
             },
             {
-              label: 'Historical Triggers',
-              value: loading ? '...' : triggerLogs.length.toString(),
+              label: 'Open Orders',
+              value: loading ? '...' : orders.length.toString(),
               icon: Droplets,
               color: 'blue',
             },
             {
-              label: 'Avg Trigger Rate',
-              value: loading ? '...' : `${triggerRate}%`,
+              label: 'Historical Triggers',
+              value: loading ? '...' : triggerLogs.length.toString(),
               icon: Activity,
               color: 'indigo',
             },
@@ -224,21 +262,30 @@ export function LPLiveData() {
             ) : opportunities.length === 0 ? (
               <div className="text-center py-16">
                 <TrendingUp size={32} className="mx-auto mb-4 text-slate-400" />
-                <p className="text-slate-500 font-ui">No orders in orderbook</p>
-                <p className="text-sm text-slate-400 font-ui mt-1">Check back later or place the first order</p>
+                <p className="text-slate-500 font-ui">No opportunities available</p>
+                <p className="text-sm text-slate-400 font-ui mt-1">Check back later for new LP opportunities</p>
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
                 {opportunities.map((opp, i) => (
                   <div key={opp.order.orderId} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-mono text-sm">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/10 to-sky-500/10 border border-cyan-200/50 flex items-center justify-center text-cyan-600 font-mono text-sm font-bold">
                         #{i + 1}
                       </div>
                       <div>
-                        <p className="font-medium text-slate-900 font-display">
-                          Policy #{opp.order.policyId}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-slate-900 font-display">
+                            {opp.policyLabel}
+                          </p>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                            opp.isV3 
+                              ? 'bg-cyan-100 text-cyan-700' 
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {opp.isV3 ? 'V3' : 'V1'}
+                          </span>
+                        </div>
                         <p className="text-sm text-slate-500 font-ui flex items-center gap-2">
                           <Clock size={12} />
                           {opp.order.remaining.toString()} shares available
@@ -247,25 +294,33 @@ export function LPLiveData() {
                     </div>
                     <div className="flex items-center gap-6 md:gap-8">
                       <div className="text-right hidden sm:block">
-                        <p className="text-sm text-slate-500 font-ui">Time Left</p>
-                        <p className="font-semibold text-slate-700 font-display flex items-center justify-end gap-1">
-                          <Timer size={14} className="text-sky-500" />
+                        <p className="text-xs text-slate-400 font-ui uppercase tracking-wide">Time Left</p>
+                        <p className="font-semibold text-slate-700 font-display flex items-center justify-end gap-1.5 mt-0.5">
+                          <Timer size={14} className="text-cyan-500" />
                           {opp.timeToMaturity}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-slate-500 font-ui">Price</p>
-                        <p className="font-semibold text-slate-900 font-display">{formatUSDT(opp.order.priceUsdt)}</p>
+                        <p className="text-xs text-slate-400 font-ui uppercase tracking-wide">Price</p>
+                        <p className="font-semibold text-slate-900 font-display mt-0.5">{formatUSDT(opp.order.priceUsdt)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm text-slate-500 font-ui">Potential Return</p>
-                        <p className="font-semibold text-emerald-600 font-display">
+                        <p className="text-xs text-slate-400 font-ui uppercase tracking-wide">Return</p>
+                        <p className="font-bold text-emerald-600 font-display mt-0.5">
                           +{opp.potentialReturn.toFixed(1)}%
                         </p>
                       </div>
-                      <div className="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 hover:text-sky-600 hover:border-sky-300 transition-all cursor-pointer">
+                      <button
+                        onClick={() => {
+                          const policyUrl = opp.isV3 
+                            ? `/v3/policies/${opp.order.policyId}`
+                            : `/policies/${opp.order.policyId}`
+                          router.push(policyUrl)
+                        }}
+                        className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-50 to-sky-50 border border-cyan-200/50 flex items-center justify-center text-cyan-500 hover:text-cyan-600 hover:border-cyan-300 hover:shadow-md transition-all cursor-pointer"
+                      >
                         <ArrowUpRight size={18} />
-                      </div>
+                      </button>
                     </div>
                   </div>
                 ))}

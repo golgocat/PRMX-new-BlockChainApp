@@ -17,7 +17,10 @@ import {
   DollarSign,
   Zap,
   ChevronRight,
-  MapPin
+  MapPin,
+  Thermometer,
+  Wind,
+  CloudRain
 } from 'lucide-react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -26,9 +29,12 @@ import { Button } from '@/components/ui/Button';
 import { formatUSDT, formatTimeRemaining, formatAddress } from '@/lib/utils';
 import { useWalletStore, useFormattedBalance, useIsDao } from '@/stores/walletStore';
 import { useMarkets, usePolicies, useLpOrders, useDashboardStats } from '@/hooks/useChainData';
+import { useV3Policies, useV3Locations } from '@/hooks/useV3ChainData';
 import { cn } from '@/lib/utils';
 import * as api from '@/lib/api';
 import type { DaoSolvencyInfo } from '@/types';
+import type { V3Policy, V3Location } from '@/types/v3';
+import { formatThresholdValue } from '@/types/v3';
 
 // Stat card component with subtle styling
 function AnimatedStatCard({ 
@@ -121,6 +127,7 @@ function QuickActionCard({
 function PolicyCard({
   policy,
   marketName,
+  strikeValue,
 }: {
   policy: {
     id: string;
@@ -132,6 +139,7 @@ function PolicyCard({
     status: string;
   };
   marketName: string;
+  strikeValue?: number;
 }) {
   const now = Math.floor(Date.now() / 1000);
   const isExpired = policy.coverageEnd < now;
@@ -149,30 +157,111 @@ function PolicyCard({
           : 'bg-background-secondary/30 border-border-secondary hover:border-prmx-cyan/30'
       )}>
         <div className="flex items-center gap-4">
-          {/* Icon */}
+          {/* Icon - Rainfall for V1/V2 */}
           <div className={cn(
             'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
-            isActive ? 'bg-success/10 dark:bg-success/20' : 'bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50'
+            isActive ? 'bg-sky-500/10 dark:bg-sky-500/20' : 'bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50'
           )}>
-            {isActive ? (
-              <Shield className="w-6 h-6 text-success" />
-            ) : (
-              <Globe2 className="w-6 h-6 text-gray-500 dark:text-gray-400" />
-            )}
+            <CloudRain className={cn('w-6 h-6', isActive ? 'text-sky-500' : 'text-gray-500 dark:text-gray-400')} />
           </div>
           
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span className="font-semibold truncate">{marketName}</span>
+              <Badge variant="default" className="text-[10px] px-1.5 py-0.5">V1/V2</Badge>
               <StatusBadge status={status} />
             </div>
             <div className="flex items-center gap-4 text-sm text-text-secondary">
               <span className="flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5" />
-                {displayId}
+                <Droplets className="w-3.5 h-3.5 text-sky-500" />
+                Rainfall ≥ {strikeValue || 50} mm
               </span>
               <span>{policy.shares.toString()} shares</span>
+            </div>
+          </div>
+          
+          {/* Right side */}
+          <div className="text-right flex-shrink-0">
+            <div className="flex items-center gap-1.5 text-text-secondary mb-1">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm">{formatTimeRemaining(policy.coverageEnd)}</span>
+            </div>
+            <ChevronRight className="w-5 h-5 text-text-tertiary group-hover:text-prmx-cyan group-hover:translate-x-1 transition-all ml-auto" />
+          </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+// Helper to get event type info for V3
+function getEventTypeInfo(eventType: string) {
+  const type = eventType?.toLowerCase() || '';
+  if (type.includes('temperature') || type.includes('temp')) {
+    return { icon: Thermometer, label: 'Temperature', color: 'text-orange-500', bgColor: 'bg-orange-500/10 dark:bg-orange-500/20' };
+  }
+  if (type.includes('wind')) {
+    return { icon: Wind, label: 'Wind', color: 'text-teal-500', bgColor: 'bg-teal-500/10 dark:bg-teal-500/20' };
+  }
+  if (type.includes('precip') || type.includes('rain')) {
+    return { icon: CloudRain, label: 'Precipitation', color: 'text-sky-500', bgColor: 'bg-sky-500/10 dark:bg-sky-500/20' };
+  }
+  return { icon: Droplets, label: 'Weather', color: 'text-prmx-cyan', bgColor: 'bg-prmx-cyan/10 dark:bg-prmx-cyan/20' };
+}
+
+// V3 Policy card component
+function V3PolicyCard({
+  policy,
+  location,
+}: {
+  policy: V3Policy;
+  location?: V3Location;
+}) {
+  const now = Math.floor(Date.now() / 1000);
+  const isExpired = policy.coverageEnd < now;
+  const status = policy.status === 'Active' && isExpired ? 'Expired' : policy.status;
+  const isActive = status === 'Active';
+  const locationName = location?.name || `Location #${policy.locationId}`;
+  
+  // Get event type info
+  const eventTypeInfo = getEventTypeInfo(policy.eventSpec?.eventType || '');
+  const EventIcon = eventTypeInfo.icon;
+  const thresholdDisplay = policy.eventSpec?.threshold 
+    ? formatThresholdValue(policy.eventSpec.threshold.value, policy.eventSpec.threshold.unit)
+    : 'N/A';
+
+  return (
+    <Link href={`/v3/policies/${policy.id}`}>
+      <div className={cn(
+        'group p-4 rounded-xl border transition-all duration-200 cursor-pointer',
+        'hover:shadow-lg hover:shadow-prmx-cyan/5',
+        isActive 
+          ? 'bg-gradient-to-r from-success/5 to-transparent border-success/20 hover:border-success/40' 
+          : 'bg-background-secondary/30 border-border-secondary hover:border-prmx-cyan/30'
+      )}>
+        <div className="flex items-center gap-4">
+          {/* Icon - Based on event type */}
+          <div className={cn(
+            'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
+            isActive ? eventTypeInfo.bgColor : 'bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50'
+          )}>
+            <EventIcon className={cn('w-6 h-6', isActive ? eventTypeInfo.color : 'text-gray-500 dark:text-gray-400')} />
+          </div>
+          
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="font-semibold truncate">{locationName}</span>
+              <Badge variant="purple" className="text-[10px] px-1.5 py-0.5">V3</Badge>
+              <StatusBadge status={status} />
+            </div>
+            <div className="flex items-center gap-4 text-sm text-text-secondary">
+              <span className="flex items-center gap-1">
+                <EventIcon className={cn('w-3.5 h-3.5', eventTypeInfo.color)} />
+                {eventTypeInfo.label} ≥ {thresholdDisplay}
+              </span>
+              <span>{policy.totalShares} shares</span>
             </div>
           </div>
           
@@ -242,8 +331,13 @@ export default function DashboardPage() {
   
   const { markets, loading: marketsLoading, refresh: refreshMarkets } = useMarkets();
   const { policies, loading: policiesLoading, refresh: refreshPolicies } = usePolicies();
+  const { policies: v3Policies, loading: v3PoliciesLoading, refresh: refreshV3Policies } = useV3Policies();
+  const { locations: v3Locations, loading: v3LocationsLoading } = useV3Locations();
   const { orders, loading: ordersLoading } = useLpOrders();
   const { stats, loading: statsLoading, refresh: refreshStats } = useDashboardStats();
+  
+  // Policy filter state for DAO
+  const [policyFilter, setPolicyFilter] = useState<'all' | 'v1v2' | 'v3'>('all');
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   
@@ -272,7 +366,7 @@ export default function DashboardPage() {
 
   const handleRefreshAll = async () => {
     setIsRefreshing(true);
-    const refreshPromises = [refreshMarkets(), refreshPolicies(), refreshStats()];
+    const refreshPromises = [refreshMarkets(), refreshPolicies(), refreshV3Policies(), refreshStats()];
     if (isDao) {
       refreshPromises.push(loadSolvencyInfo());
     }
@@ -280,18 +374,30 @@ export default function DashboardPage() {
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  // Get recent policies (last 5, sorted by creation time)
-  const recentPolicies = [...policies]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 5);
+  // Get all V1/V2 policies sorted by creation time
+  const sortedV1V2Policies = [...policies].sort((a, b) => b.createdAt - a.createdAt);
+  
+  // Get all V3 policies sorted by creation time
+  const sortedV3Policies = [...v3Policies].sort((a, b) => b.createdAt - a.createdAt);
+  
+  // Get location by ID
+  const getV3Location = (locationId: number): V3Location | undefined => {
+    return v3Locations.find(l => l.id === locationId);
+  };
 
   // Get market name by ID
   const getMarketName = (marketId: number) => {
     const market = markets.find(m => m.id === marketId);
     return market?.name || `Market #${marketId}`;
   };
+  
+  // Total policy counts for DAO
+  const totalAllPolicies = policies.length + v3Policies.length;
+  const activeV1V2Policies = policies.filter(p => p.status === 'Active').length;
+  const activeV3Policies = v3Policies.filter(p => p.status === 'Active').length;
+  const totalActivePolicies = activeV1V2Policies + activeV3Policies;
 
-  const isLoading = marketsLoading || policiesLoading || statsLoading;
+  const isLoading = marketsLoading || policiesLoading || v3PoliciesLoading || statsLoading;
 
   return (
     <div className="space-y-8">
@@ -379,11 +485,11 @@ export default function DashboardPage() {
         />
         <AnimatedStatCard
           title="Total Policies"
-          value={isLoading ? '...' : stats.totalPolicies}
+          value={isLoading ? '...' : (isDao ? totalAllPolicies : stats.totalPolicies)}
           icon={Shield}
           accentColor="cyan"
-          subtitle={`${stats.activePolicies} active`}
-          onClick={() => window.location.href = '/policies'}
+          subtitle={isDao ? `${totalActivePolicies} active` : `${stats.activePolicies} active`}
+          onClick={isDao ? undefined : () => window.location.href = '/policies'}
         />
         <AnimatedStatCard
           title={isDao ? 'Platform LP Orders' : 'My LP Holdings'}
@@ -513,7 +619,7 @@ export default function DashboardPage() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Policies */}
+        {/* All Policies (DAO) or Recent Policies (others) */}
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
@@ -523,21 +629,61 @@ export default function DashboardPage() {
                     <Shield className="w-5 h-5 text-prmx-cyan" />
                   </div>
                   <div>
-                    <h3 className="font-bold">Recent Policies</h3>
-                    <p className="text-sm text-text-tertiary">{stats.activePolicies} active</p>
+                    <h3 className="font-bold">{isDao ? 'All Policies' : 'Recent Policies'}</h3>
+                    <p className="text-sm text-text-tertiary">
+                      {isDao ? `${totalAllPolicies} total, ${totalActivePolicies} active` : `${stats.activePolicies} active`}
+                    </p>
                   </div>
                 </div>
-                <Link href="/policies" className="text-sm text-prmx-cyan hover:text-prmx-cyan-light flex items-center gap-1 group">
-                  View all <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </Link>
+                {isDao ? (
+                  <div className="flex items-center gap-1 p-1 bg-background-tertiary/50 rounded-lg">
+                    <button
+                      onClick={() => setPolicyFilter('all')}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                        policyFilter === 'all' 
+                          ? 'bg-prmx-cyan text-white' 
+                          : 'text-text-secondary hover:text-text-primary'
+                      )}
+                    >
+                      All ({totalAllPolicies})
+                    </button>
+                    <button
+                      onClick={() => setPolicyFilter('v1v2')}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                        policyFilter === 'v1v2' 
+                          ? 'bg-prmx-cyan text-white' 
+                          : 'text-text-secondary hover:text-text-primary'
+                      )}
+                    >
+                      V1/V2 ({policies.length})
+                    </button>
+                    <button
+                      onClick={() => setPolicyFilter('v3')}
+                      className={cn(
+                        'px-3 py-1.5 text-xs font-medium rounded-md transition-all',
+                        policyFilter === 'v3' 
+                          ? 'bg-prmx-cyan text-white' 
+                          : 'text-text-secondary hover:text-text-primary'
+                      )}
+                    >
+                      V3 ({v3Policies.length})
+                    </button>
+                  </div>
+                ) : (
+                  <Link href="/policies" className="text-sm text-prmx-cyan hover:text-prmx-cyan-light flex items-center gap-1 group">
+                    View all <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {policiesLoading ? (
+            <CardContent>
+              {(policiesLoading || v3PoliciesLoading) ? (
                 <div className="flex items-center justify-center py-12">
                   <RefreshCw className="w-8 h-8 animate-spin text-prmx-cyan" />
                 </div>
-              ) : recentPolicies.length === 0 ? (
+              ) : totalAllPolicies === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 px-4">
                   <div className="w-14 h-14 mb-5 rounded-xl bg-gray-100 dark:bg-background-tertiary border border-gray-200 dark:border-slate-600/50 flex items-center justify-center">
                     <Shield className="w-7 h-7 text-gray-400 dark:text-slate-400" />
@@ -553,13 +699,41 @@ export default function DashboardPage() {
                   )}
                 </div>
               ) : (
-                recentPolicies.map((policy) => (
-                  <PolicyCard
-                    key={policy.id}
-                    policy={policy}
-                    marketName={getMarketName(policy.marketId)}
-                  />
-                ))
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                  {/* V1/V2 Policies */}
+                  {(policyFilter === 'all' || policyFilter === 'v1v2') && sortedV1V2Policies.map((policy) => {
+                    const market = markets.find(m => m.id === policy.marketId);
+                    return (
+                      <PolicyCard
+                        key={policy.id}
+                        policy={policy}
+                        marketName={getMarketName(policy.marketId)}
+                        strikeValue={market?.strikeValue}
+                      />
+                    );
+                  })}
+                  
+                  {/* V3 Policies */}
+                  {(policyFilter === 'all' || policyFilter === 'v3') && sortedV3Policies.map((policy) => (
+                    <V3PolicyCard
+                      key={policy.id}
+                      policy={policy}
+                      location={getV3Location(policy.locationId)}
+                    />
+                  ))}
+                  
+                  {/* Empty state for filtered view */}
+                  {policyFilter === 'v1v2' && sortedV1V2Policies.length === 0 && (
+                    <div className="text-center py-8 text-text-tertiary">
+                      <p>No V1/V2 policies</p>
+                    </div>
+                  )}
+                  {policyFilter === 'v3' && sortedV3Policies.length === 0 && (
+                    <div className="text-center py-8 text-text-tertiary">
+                      <p>No V3 policies</p>
+                    </div>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

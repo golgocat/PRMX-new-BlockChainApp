@@ -611,23 +611,38 @@ export default function OraclePage() {
                     </div>
 
                     {/* Expand/Collapse Button for Bucket Details */}
-                    {data && (data.hourlyBuckets.length > 0 || data.buckets.length > 0) && (
-                      <button
-                        onClick={() => toggleMarketExpanded(market.id)}
-                        className="w-full flex items-center justify-center gap-2 py-2 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-secondary"
-                      >
-                        <List className="w-4 h-4" />
-                        {expandedMarkets.has(market.id) ? 'Hide' : 'Show'} Hourly Readings ({data.hourlyBuckets.length || data.buckets.length})
-                        {data.hourlyBuckets.length > 0 && (
-                          <Badge variant="purple" className="text-[10px]">Historical</Badge>
-                        )}
-                        {expandedMarkets.has(market.id) ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </button>
-                    )}
+                    {data && (data.hourlyBuckets.length > 0 || data.buckets.length > 0) && (() => {
+                      // Check for data gaps
+                      const hasGaps = data.hourlyBuckets.length > 0 && data.hourlyBuckets.length < 24 && (() => {
+                        const hours = data.hourlyBuckets.map(b => b.hourIndex);
+                        const minHour = Math.min(...hours);
+                        const maxHour = Math.max(...hours);
+                        return (maxHour - minHour + 1) > hours.length;
+                      })();
+                      
+                      return (
+                        <button
+                          onClick={() => toggleMarketExpanded(market.id)}
+                          className="w-full flex items-center justify-center gap-2 py-2 text-sm text-prmx-cyan hover:text-prmx-cyan/80 transition-colors border-t border-border-secondary"
+                        >
+                          <List className="w-4 h-4" />
+                          {expandedMarkets.has(market.id) ? 'Hide' : 'Show'} Hourly Readings ({data.hourlyBuckets.length || data.buckets.length})
+                          {data.hourlyBuckets.length > 0 && (
+                            <Badge variant="purple" className="text-[10px]">Historical</Badge>
+                          )}
+                          {hasGaps && (
+                            <span title="Some hours are missing from AccuWeather API">
+                              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                            </span>
+                          )}
+                          {expandedMarkets.has(market.id) ? (
+                            <ChevronUp className="w-4 h-4" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4" />
+                          )}
+                        </button>
+                      );
+                    })()}
 
                     {/* Expanded Bucket Details - Prefer hourly buckets (historical/24) over legacy */}
                     {data && expandedMarkets.has(market.id) && (
@@ -752,6 +767,50 @@ export default function OraclePage() {
                             </div>
                           )}
                         </div>
+                        
+                        {/* Data Gap Warning */}
+                        {data.hourlyBuckets.length > 0 && data.hourlyBuckets.length < 24 && (() => {
+                          // Calculate missing hours
+                          const hours = data.hourlyBuckets.map(b => b.hourIndex);
+                          const minHour = Math.min(...hours);
+                          const maxHour = Math.max(...hours);
+                          const expectedCount = maxHour - minHour + 1;
+                          const missingCount = expectedCount - hours.length;
+                          
+                          if (missingCount > 0) {
+                            // Find the actual missing hours
+                            const missingHours: number[] = [];
+                            for (let h = minHour; h <= maxHour; h++) {
+                              if (!hours.includes(h)) missingHours.push(h);
+                            }
+                            
+                            return (
+                              <div className="mt-3 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                                  <div className="text-xs">
+                                    <p className="text-amber-500 font-medium mb-1">
+                                      {missingCount} hour{missingCount > 1 ? 's' : ''} missing from AccuWeather API
+                                    </p>
+                                    <p className="text-text-tertiary">
+                                      AccuWeather&apos;s API sometimes returns incomplete data. Missing hours:{' '}
+                                      {missingHours.slice(0, 4).map(h => {
+                                        const date = new Date(h * 3600 * 1000);
+                                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                                      }).join(', ')}
+                                      {missingHours.length > 4 && ` (+${missingHours.length - 4} more)`}
+                                    </p>
+                                    <p className="text-text-tertiary mt-1">
+                                      Data may be available on next fetch (~1 hour).
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
                         {/* Summary */}
                         <div className="mt-3 pt-3 border-t border-border-secondary flex items-center justify-between text-sm">
                           <span className="text-text-secondary">Total (Sum of readings)</span>

@@ -180,7 +180,16 @@ export default function OracleV2Page() {
 
   const formatDate = (timestamp: number, includeTimezone = true) => {
     if (!timestamp || timestamp === 0) return 'N/A';
-    const dateStr = new Date(timestamp * 1000).toLocaleString();
+    const date = new Date(timestamp * 1000);
+    const dateStr = date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: '2-digit', 
+      year: 'numeric' 
+    }) + ', ' + date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
     return includeTimezone ? `${dateStr} (${getUtcOffsetString()})` : dateStr;
   };
 
@@ -390,10 +399,10 @@ export default function OracleV2Page() {
                     {/* Details */}
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs pt-3 border-t border-border-primary/30">
                       <span className="text-text-tertiary">
-                        Start: <span className="text-text-secondary">{formatDate(monitor.coverage_start, false)}</span>
+                        Start: <span className="text-text-secondary">{formatDate(monitor.coverage_start, true)}</span>
                       </span>
                       <span className="text-text-tertiary">
-                        End: <span className="text-text-secondary">{formatDate(monitor.coverage_end, false)}</span>
+                        End: <span className="text-text-secondary">{formatDate(monitor.coverage_end, true)}</span>
                       </span>
                       <span className="text-text-tertiary">
                         Updated: <span className="text-text-secondary">

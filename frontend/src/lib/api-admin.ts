@@ -72,7 +72,7 @@ export async function checkV1OracleKey(): Promise<{
     // First, try to check offchain storage directly for the API key
     let offchainKeyExists = false;
     try {
-      const storageKey = '0x' + Buffer.from('prmx-oracle::accuweather_api_key').toString('hex');
+      const storageKey = '0x' + Buffer.from('prmx-oracle::accuweather-api-key').toString('hex');
       const offchainValue = await (api.rpc as any).offchain.localStorageGet('PERSISTENT', storageKey);
       offchainKeyExists = offchainValue && offchainValue.isSome;
     } catch {

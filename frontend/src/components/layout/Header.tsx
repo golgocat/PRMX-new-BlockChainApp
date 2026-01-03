@@ -19,8 +19,9 @@ function getPolkadotJsBlockUrl(blockNumber: number): string {
 }
 
 interface KeyStatus {
-  hmacSecret: boolean;
-  accuweatherKey: boolean;
+  v1AccuweatherKey: boolean;  // V1 oracle AccuWeather key
+  v3AccuweatherKey: boolean;  // V3 oracle AccuWeather key (SEPARATE from V1!)
+  v3HmacSecret: boolean;      // V3 HMAC secret for Ingest API
   loading: boolean;
 }
 
@@ -28,7 +29,12 @@ export function Header() {
   const { isChainConnected, currentBlock } = useWalletStore();
   const { theme, toggleTheme } = useThemeStore();
   const [utcTime, setUtcTime] = useState<string>('');
-  const [keyStatus, setKeyStatus] = useState<KeyStatus>({ hmacSecret: false, accuweatherKey: false, loading: true });
+  const [keyStatus, setKeyStatus] = useState<KeyStatus>({ 
+    v1AccuweatherKey: false, 
+    v3AccuweatherKey: false, 
+    v3HmacSecret: false, 
+    loading: true 
+  });
 
   // Update UTC time every second
   useEffect(() => {
@@ -55,6 +61,7 @@ export function Header() {
   }, []);
 
   // Check oracle key status
+  // NOTE: V1 and V3 have SEPARATE AccuWeather keys in different offchain storage locations!
   useEffect(() => {
     const checkKeys = async () => {
       try {
@@ -64,12 +71,13 @@ export function Header() {
         ]);
         
         setKeyStatus({
-          accuweatherKey: v1Status.status === 'fulfilled' ? v1Status.value.accuweatherConfigured : false,
-          hmacSecret: v3Status.status === 'fulfilled' ? v3Status.value.hmacSecret : false,
+          v1AccuweatherKey: v1Status.status === 'fulfilled' ? v1Status.value.accuweatherConfigured : false,
+          v3AccuweatherKey: v3Status.status === 'fulfilled' ? v3Status.value.accuweatherKey : false,
+          v3HmacSecret: v3Status.status === 'fulfilled' ? v3Status.value.hmacSecret : false,
           loading: false,
         });
       } catch {
-        setKeyStatus({ hmacSecret: false, accuweatherKey: false, loading: false });
+        setKeyStatus({ v1AccuweatherKey: false, v3AccuweatherKey: false, v3HmacSecret: false, loading: false });
       }
     };
     
@@ -125,6 +133,7 @@ export function Header() {
           </div>
 
           {/* Oracle Keys Status - Minimal with hover expansion */}
+          {/* Shows 3 dots: V1 AccuWeather, V3 AccuWeather, V3 HMAC */}
           {!keyStatus.loading && (
             <div className="group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-background-secondary/50 border border-border-primary cursor-help">
               <Key className="w-3.5 h-3.5 text-text-tertiary" />
@@ -132,48 +141,76 @@ export function Header() {
                 <span 
                   className={cn(
                     'w-2 h-2 rounded-full',
-                    keyStatus.hmacSecret ? 'bg-emerald-500' : 'bg-red-500'
+                    keyStatus.v1AccuweatherKey ? 'bg-emerald-500' : 'bg-red-500'
                   )}
+                  title="V1 AccuWeather"
                 />
                 <span 
                   className={cn(
                     'w-2 h-2 rounded-full',
-                    keyStatus.accuweatherKey ? 'bg-emerald-500' : 'bg-red-500'
+                    keyStatus.v3AccuweatherKey ? 'bg-emerald-500' : 'bg-red-500'
                   )}
+                  title="V3 AccuWeather"
+                />
+                <span 
+                  className={cn(
+                    'w-2 h-2 rounded-full',
+                    keyStatus.v3HmacSecret ? 'bg-emerald-500' : 'bg-red-500'
+                  )}
+                  title="V3 HMAC"
                 />
               </div>
               {/* Hover tooltip */}
               <div className="absolute top-full right-0 mt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-                <div className="bg-background-primary border border-border-secondary rounded-lg shadow-xl p-3 min-w-[180px]">
+                <div className="bg-background-primary border border-border-secondary rounded-lg shadow-xl p-3 min-w-[220px]">
                   <p className="text-xs font-medium text-text-secondary mb-2">Oracle Keys Status</p>
                   <div className="space-y-1.5">
+                    {/* V1 AccuWeather */}
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         'w-2 h-2 rounded-full flex-shrink-0',
-                        keyStatus.hmacSecret ? 'bg-emerald-500' : 'bg-red-500'
+                        keyStatus.v1AccuweatherKey ? 'bg-emerald-500' : 'bg-red-500'
                       )} />
-                      <span className="text-xs text-text-primary">HMAC Secret</span>
+                      <span className="text-xs text-text-primary">V1 AccuWeather</span>
                       <span className={cn(
                         'text-xs ml-auto',
-                        keyStatus.hmacSecret ? 'text-emerald-500' : 'text-red-500'
+                        keyStatus.v1AccuweatherKey ? 'text-emerald-500' : 'text-red-500'
                       )}>
-                        {keyStatus.hmacSecret ? 'OK' : 'Missing'}
+                        {keyStatus.v1AccuweatherKey ? 'OK' : 'Missing'}
                       </span>
                     </div>
+                    {/* V3 AccuWeather */}
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         'w-2 h-2 rounded-full flex-shrink-0',
-                        keyStatus.accuweatherKey ? 'bg-emerald-500' : 'bg-red-500'
+                        keyStatus.v3AccuweatherKey ? 'bg-emerald-500' : 'bg-red-500'
                       )} />
-                      <span className="text-xs text-text-primary">AccuWeather</span>
+                      <span className="text-xs text-text-primary">V3 AccuWeather</span>
                       <span className={cn(
                         'text-xs ml-auto',
-                        keyStatus.accuweatherKey ? 'text-emerald-500' : 'text-red-500'
+                        keyStatus.v3AccuweatherKey ? 'text-emerald-500' : 'text-red-500'
                       )}>
-                        {keyStatus.accuweatherKey ? 'OK' : 'Missing'}
+                        {keyStatus.v3AccuweatherKey ? 'OK' : 'Missing'}
+                      </span>
+                    </div>
+                    {/* V3 HMAC Secret */}
+                    <div className="flex items-center gap-2">
+                      <span className={cn(
+                        'w-2 h-2 rounded-full flex-shrink-0',
+                        keyStatus.v3HmacSecret ? 'bg-emerald-500' : 'bg-red-500'
+                      )} />
+                      <span className="text-xs text-text-primary">V3 HMAC Secret</span>
+                      <span className={cn(
+                        'text-xs ml-auto',
+                        keyStatus.v3HmacSecret ? 'text-emerald-500' : 'text-red-500'
+                      )}>
+                        {keyStatus.v3HmacSecret ? 'OK' : 'Missing'}
                       </span>
                     </div>
                   </div>
+                  <p className="text-[10px] text-text-tertiary mt-2 pt-2 border-t border-border-secondary">
+                    V1 and V3 use separate AccuWeather keys
+                  </p>
                 </div>
               </div>
             </div>

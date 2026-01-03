@@ -248,8 +248,12 @@ wait_for_node() {
 # =============================================================================
 # V3 Oracle Secrets Injection
 # =============================================================================
+# NOTE: V3 uses SEPARATE AccuWeather key from V1!
+# - V1 key: prmx-oracle::accuweather-api-key (injected via genesis/PendingApiKey)
+# - V3 key: ocw:v3:accuweather_api_key (injected via RPC by this script)
+# =============================================================================
 inject_v3_secrets() {
-    log_step "Injecting V3 oracle secrets..."
+    log_step "Injecting V3 oracle secrets (SEPARATE from V1!)..."
     
     cd "$PROJECT_ROOT/scripts"
     export PATH="$NODE_PATH:$PATH"
@@ -261,24 +265,40 @@ inject_v3_secrets() {
             source "$HOME/.nvm/nvm.sh" 2>/dev/null || true
         fi
         
-        node set-v3-oracle-secrets.mjs \
+        log_info "  V3 AccuWeather key: ${ACCUWEATHER_API_KEY:0:10}..."
+        log_info "  V3 HMAC secret: ***configured***"
+        
+        # Run injection and capture output
+        INJECT_OUTPUT=$(node set-v3-oracle-secrets.mjs \
             --accuweather-key "$ACCUWEATHER_API_KEY" \
             --hmac-secret "$V3_INGEST_HMAC_SECRET" \
-            --ingest-url "$V3_INGEST_API_URL" \
-            2>&1 | grep -E "^\s*(✅|🎉|Storage)" || true
+            --ingest-url "$V3_INGEST_API_URL" 2>&1)
+        INJECT_RESULT=$?
         
-        if [ ${PIPESTATUS[0]} -eq 0 ]; then
+        # Show key output lines
+        echo "$INJECT_OUTPUT" | grep -E "^\s*(✅|🎉|Storage)" || true
+        
+        if [ $INJECT_RESULT -eq 0 ]; then
             log_success "V3 oracle secrets configured"
+            log_info "  Storage keys:"
+            log_info "    - ocw:v3:accuweather_api_key (V3 AccuWeather)"
+            log_info "    - ocw:v3:ingest_hmac_secret (V3 HMAC)"
+            log_info "    - ocw:v3:ingest_api_url (V3 Ingest URL)"
         else
-            log_warning "V3 oracle secrets injection had issues (check set-v3-oracle-secrets.mjs)"
+            log_error "V3 oracle secrets injection FAILED!"
+            log_error "V3 policies will NOT be monitored until secrets are injected."
+            log_warning "Run manually: node scripts/set-v3-oracle-secrets.mjs --accuweather-key \"\$ACCUWEATHER_API_KEY\" --hmac-secret \"\$V3_INGEST_HMAC_SECRET\""
         fi
     else
+        log_warning "⚠️  V3 secrets NOT configured - V3 policies will NOT be monitored!"
         if [ -z "$V3_INGEST_HMAC_SECRET" ]; then
-            log_warning "V3 secrets skipped (V3_INGEST_HMAC_SECRET not set)"
+            log_warning "  Missing: V3_INGEST_HMAC_SECRET"
         fi
         if [ -z "$ACCUWEATHER_API_KEY" ]; then
-            log_warning "V3 secrets skipped (ACCUWEATHER_API_KEY not set)"
+            log_warning "  Missing: ACCUWEATHER_API_KEY"
         fi
+        log_info "  To fix: Set both env vars and run:"
+        log_info "    node scripts/set-v3-oracle-secrets.mjs --accuweather-key \"\$ACCUWEATHER_API_KEY\" --hmac-secret \"\$V3_INGEST_HMAC_SECRET\""
     fi
 }
 
@@ -431,6 +451,23 @@ echo "  Mode:           $MODE"
 echo "  Frontend:       http://localhost:3000"
 echo "  Node:           ws://localhost:9944"
 echo "  Oracle Service: http://localhost:3001"
+echo ""
+echo "  Oracle Keys:"
+if [ -n "$ACCUWEATHER_API_KEY" ]; then
+    echo "    V1 AccuWeather: ✅ Configured (via genesis)"
+else
+    echo "    V1 AccuWeather: ❌ NOT configured (V1 markets won't fetch data)"
+fi
+if [ -n "$ACCUWEATHER_API_KEY" ] && [ -n "$V3_INGEST_HMAC_SECRET" ]; then
+    echo "    V3 AccuWeather: ✅ Configured (via RPC)"
+    echo "    V3 HMAC Secret: ✅ Configured (via RPC)"
+else
+    echo "    V3 AccuWeather: ❌ NOT configured (V3 policies won't be monitored)"
+    echo "    V3 HMAC Secret: ❌ NOT configured (V3 policies won't be monitored)"
+fi
+echo ""
+echo "  ⚠️  NOTE: V1 and V3 use SEPARATE AccuWeather keys!"
+echo "      Check header indicator in frontend (should show 3 green dots)"
 echo ""
 echo "  Logs:"
 echo "    Node:           tail -f /tmp/prmx-node.log"

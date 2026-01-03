@@ -248,8 +248,13 @@ export async function checkV2OracleStatus(): Promise<{
 
 /**
  * Check V3 Oracle secrets status
- * Since V3 secrets are stored in offchain storage (not queryable via RPC),
- * we check if there's evidence of OCW activity (snapshots in the last 24h)
+ * 
+ * V3 uses SEPARATE offchain storage keys from V1:
+ * - V1 AccuWeather: "prmx-oracle::accuweather-api-key"
+ * - V3 AccuWeather: "ocw:v3:accuweather_api_key" (SCALE-encoded)
+ * - V3 HMAC:        "ocw:v3:ingest_hmac_secret" (SCALE-encoded)
+ * 
+ * We directly check offchain storage for these keys.
  */
 export async function checkV3OracleSecrets(): Promise<{
   hmacSecret: boolean;
@@ -257,48 +262,43 @@ export async function checkV3OracleSecrets(): Promise<{
   ingestUrl: boolean;
 }> {
   try {
-    // Check oracle service for recent V3 activity
-    const response = await fetch(`${ORACLE_SERVICE_URL}/ingest/stats`, {
-      signal: AbortSignal.timeout(5000),
-    });
+    const api = await getApi();
     
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.data) {
-        // If there are snapshots or observations, assume OCW is configured
-        const hasActivity = (data.data.snapshots_count || 0) > 0 || (data.data.observations_count || 0) > 0;
-        
-        // Also check for recent activity (last 24h) from health endpoint
-        const healthResponse = await fetch(`${ORACLE_SERVICE_URL}/admin/health`, {
-          signal: AbortSignal.timeout(5000),
-        });
-        
-        if (healthResponse.ok) {
-          const healthData = await healthResponse.json();
-          if (healthData.success && healthData.data?.metrics) {
-            const recentActivity = 
-              (healthData.data.metrics.snapshots_last_24h || 0) > 0 ||
-              (healthData.data.metrics.observations_last_24h || 0) > 0;
-            
-            const configured = hasActivity || recentActivity;
-            return {
-              hmacSecret: configured,
-              accuweatherKey: configured,
-              ingestUrl: configured,
-            };
-          }
-        }
-        
-        // Fallback: if we have any activity history, assume configured
-        return {
-          hmacSecret: hasActivity,
-          accuweatherKey: hasActivity,
-          ingestUrl: hasActivity,
-        };
-      }
-    }
+    // V3 storage keys (must match ocw.rs constants)
+    const v3AccuweatherKey = 'ocw:v3:accuweather_api_key';
+    const v3HmacKey = 'ocw:v3:ingest_hmac_secret';
+    const v3IngestUrlKey = 'ocw:v3:ingest_api_url';
     
-    return { hmacSecret: false, accuweatherKey: false, ingestUrl: false };
+    // Check each key in offchain storage
+    const [accuweatherResult, hmacResult, urlResult] = await Promise.all([
+      (api.rpc as any).offchain.localStorageGet(
+        'PERSISTENT',
+        '0x' + Buffer.from(v3AccuweatherKey).toString('hex')
+      ).catch(() => null),
+      (api.rpc as any).offchain.localStorageGet(
+        'PERSISTENT',
+        '0x' + Buffer.from(v3HmacKey).toString('hex')
+      ).catch(() => null),
+      (api.rpc as any).offchain.localStorageGet(
+        'PERSISTENT',
+        '0x' + Buffer.from(v3IngestUrlKey).toString('hex')
+      ).catch(() => null),
+    ]);
+    
+    // Check if values are present and non-empty
+    // V3 values are SCALE-encoded (have a length prefix), so minimum length > 1
+    const hasAccuweather = accuweatherResult?.isSome && 
+      Buffer.from(accuweatherResult.unwrap().toHex().slice(2), 'hex').length > 1;
+    const hasHmac = hmacResult?.isSome && 
+      Buffer.from(hmacResult.unwrap().toHex().slice(2), 'hex').length > 1;
+    const hasUrl = urlResult?.isSome && 
+      Buffer.from(urlResult.unwrap().toHex().slice(2), 'hex').length > 1;
+    
+    return {
+      accuweatherKey: hasAccuweather,
+      hmacSecret: hasHmac,
+      ingestUrl: hasUrl,
+    };
   } catch (error) {
     console.error('Failed to check V3 oracle secrets:', error);
     return { hmacSecret: false, accuweatherKey: false, ingestUrl: false };

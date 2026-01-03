@@ -11,12 +11,13 @@ This guide explains the restart process for the PRMX development environment, in
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Post-Restart Steps](#post-restart-steps)
-3. [Restart Modes](#restart-modes)
-4. [What Happens When You Restart](#what-happens-when-you-restart)
-5. [API Key Security](#api-key-security)
-6. [Services Overview](#services-overview)
-7. [Troubleshooting](#troubleshooting)
+2. [V1 vs V3 Key Differences](#v1-vs-v3-key-differences) ⚠️ **Important!**
+3. [Post-Restart Steps](#post-restart-steps)
+4. [Restart Modes](#restart-modes)
+5. [What Happens When You Restart](#what-happens-when-you-restart)
+6. [API Key Security](#api-key-security)
+7. [Services Overview](#services-overview)
+8. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -24,8 +25,9 @@ This guide explains the restart process for the PRMX development environment, in
 
 > **⚠️ IMPORTANT: API Keys Required**
 > 
-> - **`ACCUWEATHER_API_KEY`**: Required for V1 Oracle rainfall data (without it, all markets show 0.0mm)
+> - **`ACCUWEATHER_API_KEY`**: Required for BOTH V1 and V3 Oracles (used separately in different storage locations)
 > - **`V3_INGEST_HMAC_SECRET`**: Required for V3 Oracle monitoring (without it, V3 policies won't be monitored)
+> - **CRITICAL**: V1 and V3 use SEPARATE AccuWeather keys! See [V1 vs V3 Key Differences](#v1-vs-v3-key-differences)
 > - See [Environment Variables Reference](#environment-variables-reference) for all options
 
 ```bash
@@ -51,6 +53,50 @@ R_PRICING_API_KEY="your_key" \
 
 ---
 
+## V1 vs V3 Key Differences
+
+> **⚠️ CRITICAL: V1 and V3 use SEPARATE AccuWeather keys in DIFFERENT storage locations!**
+
+This is the most common cause of "V3 policies not monitored" after a restart.
+
+### Storage Locations
+
+| Oracle | Storage Key | Encoding | Injection Method |
+|--------|-------------|----------|------------------|
+| V1 | `prmx-oracle::accuweather-api-key` | Raw bytes | Genesis or manual RPC |
+| V3 | `ocw:v3:accuweather_api_key` | SCALE-encoded | `set-v3-oracle-secrets.mjs` |
+| V3 | `ocw:v3:ingest_hmac_secret` | SCALE-encoded | `set-v3-oracle-secrets.mjs` |
+
+### Header Status Indicator
+
+The header now shows **3 dots** for oracle key status:
+
+| Dot | Key | What it Monitors |
+|-----|-----|-----------------|
+| 1st | V1 AccuWeather | V1 oracle rainfall data for markets |
+| 2nd | V3 AccuWeather | V3 oracle policy observations |
+| 3rd | V3 HMAC Secret | V3 Ingest API authentication |
+
+### Common Mistake
+
+After a `--tmp` restart, you might see:
+- V1 AccuWeather: ✅ Green (injected via genesis)
+- V3 AccuWeather: ❌ Red (needs separate injection!)
+- V3 HMAC: ❌ Red (needs separate injection!)
+
+This happens because V3 secrets are injected via RPC AFTER the node starts, not at genesis.
+
+### Fix: Inject V3 Secrets
+
+```bash
+# Run the V3 secrets injection script
+node scripts/set-v3-oracle-secrets.mjs \
+    --accuweather-key "$ACCUWEATHER_API_KEY" \
+    --hmac-secret "$V3_INGEST_HMAC_SECRET"
+```
+
+---
+
 ## Post-Restart Steps
 
 After a `--tmp` restart, additional steps are required to ensure all oracles are working correctly.
@@ -60,9 +106,16 @@ After a `--tmp` restart, additional steps are required to ensure all oracles are
 The restart script automatically injects V3 secrets if environment variables are set. Verify:
 
 ```bash
-# Check header status indicator in frontend (both dots should be green)
-# Or check via script:
-node scripts/set-v3-oracle-secrets.mjs --dry-run
+# Check header status indicator in frontend (all 3 dots should be green)
+# The indicator now shows:
+#   Dot 1: V1 AccuWeather key
+#   Dot 2: V3 AccuWeather key  
+#   Dot 3: V3 HMAC Secret
+
+# If V3 dots are red, manually inject:
+node scripts/set-v3-oracle-secrets.mjs \
+    --accuweather-key "$ACCUWEATHER_API_KEY" \
+    --hmac-secret "$V3_INGEST_HMAC_SECRET"
 ```
 
 ### Step 2: Inject V1 AccuWeather API Key (CRITICAL)
@@ -149,9 +202,13 @@ grep -i "accuweather" /tmp/prmx-node.log | tail -20
 ```
 
 **Check Frontend:**
-- Header status indicator: Both dots should be green
+- Header status indicator: All **3 dots** should be green
+  - Dot 1: V1 AccuWeather key
+  - Dot 2: V3 AccuWeather key (SEPARATE from V1!)
+  - Dot 3: V3 HMAC Secret
 - Oracle V1 page: Should show real rainfall data (not "No Data")
 - Oracle V2 service: Should be running and healthy
+- V3 policies: Should show "Observed" timestamps (not "N/A")
 
 ---
 
